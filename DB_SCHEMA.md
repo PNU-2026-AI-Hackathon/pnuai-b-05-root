@@ -1,0 +1,52 @@
+# DB_SCHEMA.md
+
+Pig.Fig. 백엔드의 테이블(모델) 설계 문서입니다. 실제 구현 시 세부 필드 타입/제약조건은 각 앱의
+`models.py`를 기준으로 하되, 변경 시 이 문서도 함께 갱신합니다.
+
+## User (`accounts`)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| id | PK | 사용자 ID |
+| email | EmailField (unique) | 이메일 (로그인 ID) |
+| password | CharField | 비밀번호 (해시 저장) |
+| role | CharField (choices) | `adopter`(입양자) / `grower`(재배자) |
+| created_at | DateTimeField | 가입일시 |
+
+## Seedling (`seedlings`)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| id | PK | 묘목 ID |
+| adopter | FK → User | 입양자 |
+| grower | FK → User | 재배자 |
+| status | CharField (choices) | `growing`(재배중) / `completed`(완료) |
+| started_at | DateTimeField | 재배 시작일 |
+| completed_at | DateTimeField (nullable) | 재배 완료일 |
+| pickup_or_donate | CharField (choices) | 수령(`pickup`) / 기부(`donate`) |
+| donate_type | CharField (nullable) | 기부 유형 (기부 선택 시) |
+
+## Diary (`diary`)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| id | PK | 일지 ID |
+| seedling | FK → Seedling | 대상 묘목 |
+| grower | FK → User | 작성한 재배자 |
+| content | TextField | 일지 내용 |
+| photo | ImageField | 생육 사진 (MEDIA_ROOT에 저장) |
+| created_at | DateTimeField | 작성일시 |
+| yolo_status_tag | CharField | YOLOv8 분석 결과 상태 태그 |
+
+## SensorData (`sensor`)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| id | PK | 센서 데이터 ID |
+| seedling | FK → Seedling | 대상 묘목 |
+| temperature | FloatField | 온도 |
+| humidity | FloatField | 습도 |
+| light | FloatField | 조도 |
+| recorded_at | DateTimeField | 측정일시 |
+| is_anomaly | BooleanField | 이상치 여부 |
+| gemini_diagnosis | TextField (nullable) | Gemini API 진단 결과 |
