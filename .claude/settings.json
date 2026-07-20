@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "Bash(venv/Scripts/python.exe -m pip freeze --local)",
+      "Bash(venv/Scripts/python.exe manage.py makemigrations chatbot)",
+      "Bash(venv/Scripts/python.exe manage.py migrate)"
+    ]
+  }
+}
