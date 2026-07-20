@@ -50,3 +50,15 @@ Pig.Fig. 백엔드의 테이블(모델) 설계 문서입니다. 실제 구현 �
 | recorded_at | DateTimeField | 측정일시 |
 | is_anomaly | BooleanField | 이상치 여부 |
 | gemini_diagnosis | TextField (nullable) | Gemini API 진단 결과 |
+
+## VisionAnalysis (`vision`)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| id | PK | 분석 결과 ID |
+| diary | FK → Diary (nullable) | 연결된 일지 (있으면 diary.yolo_status_tag도 함께 갱신) |
+| image | ImageField | 분석 대상 이미지 (MEDIA_ROOT에 저장) |
+| result_tag | CharField | 분석 결과 (정상/수분부족/과습/조명이상) |
+| confidence | FloatField | 신뢰도 (기본값 0.0) |
+| location_info | CharField (nullable) | 묘목 위치 (예: "선반1-3번") |
+| analyzed_at | DateTimeField | 분석일시 |
