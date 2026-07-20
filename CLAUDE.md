@@ -12,7 +12,9 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
 
 ## 기술 스택
 
-- **프론트엔드**: Flutter (`frontend/`에 `flutter create` 기본 스캐폴딩만 존재, 실제 화면 미착수)
+- **프론트엔드**: Flutter — 입양자(adopter) 플로우(회원가입/로그인/홈/케어 4종), 재배자(grower) 플로우
+  (대시보드/일지/환경점검 3탭) 구현됨. 두 플로우 모두 UI만 완성된 상태이며(케어 게이지·일지·센서 값
+  전부 로컬 mock), 재배자용 sensor/diary/vision API 연동과 완성 신고(1u) 화면은 아직 미착수
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
 - **비전 분석**: YOLOv8 — `vision/yolo_inference.py`에 구조는 있으나 현재 mock 추론(랜덤 값 반환)
@@ -47,6 +49,19 @@ python manage.py test sensor.tests.SensorDataCreateViewTests.test_out_of_range_s
 # 센서 파이프라인 로컬 실행 (실제 하드웨어 없이 테스트)
 python sensor/mqtt_client.py            # MQTT 구독 → SensorData 저장 (standalone, Django 앱 레지스트리 직접 초기화)
 python sensor/mock_sensor.py <seedling_id> [--interval 10]   # 가짜 온습도/조도 값 발행
+```
+
+프론트엔드 명령은 `frontend/` 디렉터리에서 실행합니다.
+
+```bash
+flutter pub get              # 의존성 설치
+flutter analyze              # 정적 분석 (PR 올리기 전 필수)
+flutter test                 # 위젯 테스트 전체 실행
+flutter run -d chrome        # 크롬에서 실행 (에뮬레이터 없이 가장 빠르게 확인 가능)
+flutter run -d windows       # 윈도우 데스크톱 앱으로 실행
+
+# 백엔드가 로컬(8000번 포트)이 아닌 곳에서 실행 중이거나 Android 에뮬레이터에서 테스트할 때
+flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ```
 
 ## 백엔드 앱 구성 및 구현 상태
@@ -127,6 +142,36 @@ Gemini(`gemini-1.5-flash`)로 답변을 생성합니다. 벡터스토어는 `cha
 루트 `config/urls.py`가 앱마다 `/api/<앱명>/` prefix로 각 앱의 `urls.py`를 include합니다
 (예: `/api/sensor/` → `sensor/urls.py`). 새 앱도 이 컨벤션을 따릅니다.
 
+### 프론트엔드 구조 (`frontend/lib/`)
+feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 없이 `StatefulWidget` +
+`setState`만 사용합니다.
+- `core/network/api_client.dart` — 백엔드 공통 HTTP 클라이언트. `baseUrl`은 기본값
+  `http://localhost:8000`이며, `--dart-define=API_BASE_URL=...`로 오버라이드합니다(Android 에뮬레이터는
+  `10.0.2.2` 필요). DRF `ValidationError` 응답(필드명→메시지 배열 또는 `non_field_errors`)을 파싱해
+  `ApiException`으로 던지는 로직이 여기 있습니다 — 새 API 연동 시 이 클라이언트를 재사용합니다.
+- `core/storage/token_storage.dart` — `shared_preferences`로 JWT access/refresh 토큰을 저장.
+- `core/theme/` — `AppColors`(색상 토큰)와 `AppTheme`/`AppTextStyles`(Gaegu 폰트=display,
+  Noto Sans KR=본문, `google_fonts` 패키지) 디자인 시스템. 새 화면은 직접 `TextStyle`을 만들지 않고
+  이 토큰을 사용합니다.
+- `features/<feature>/data/` — repository 계층(예: `auth/data/auth_repository.dart`가
+  `/api/accounts/register|login/`을 감쌉니다). `features/<feature>/presentation/` — 화면 위젯.
+- `shared/widgets/` — 여러 화면에서 재사용하는 공용 위젯(게이지 바, 공용 앱바, 버튼 등).
+- 라우팅은 `main.dart`의 `MaterialApp.routes`에 이름 있는 라우트로 전부 등록합니다(중첩 라우터 없음).
+  로그인 성공 시 역할이 `adopter`면 `pushReplacementNamed('/adopter')`, `grower`면 아직 미구현이라
+  스낵바만 띄웁니다(`login_screen.dart`).
+- 케어 화면(`features/adopter/presentation/care/*.dart`) 4종은 각각 다른 제스처로 게이지 값을 올립니다:
+  물주기=`onLongPressStart`/`onLongPressEnd`로 타이머 반복 증가, 영양제=`Draggable`/`DragTarget`,
+  햇빛=`Slider`, 가지치기=`onLongPressStart` 트리거 `AnimationController.forward()`가 완료되면 1회성으로
+  완료 처리. 네 화면 모두 화면을 벗어나면(라우트 pop) 상태가 초기화되는 로컬 mock 상태이며 백엔드에
+  저장되지 않습니다.
+- `features/grower/presentation/grower_shell.dart`는 `adopter_shell.dart`와 달리 진짜로 탭을 전환하는
+  `StatefulWidget`입니다(`_index`로 `GrowerDashboardScreen`/`GrowerDiaryScreen`/`GrowerSensorScreen`을
+  스왑). 각 탭 화면은 `adopter`의 `HomeScreen`처럼 자기 자신도 `Scaffold`+`PigFigAppBar`를 갖고 있어
+  `GrowerShell`의 `Scaffold.body`로 들어가는 중첩 Scaffold 구조입니다 — 새 탭을 추가할 때도 이 패턴을
+  따릅니다. 대시보드/일지/환경점검 모두 mock 데이터이며 sensor/diary API를 호출하지 않습니다.
+  `login_screen.dart`는 로그인 응답의 `role`이 `grower`면 `pushReplacementNamed('/grower')`로 이동합니다
+  (이전엔 "재배자 화면은 준비 중이에요" 스낵바만 띄웠으나 grower 플로우 구현 후 실제 이동으로 변경).
+
 ## 개발 규칙 (AGENTS.md 요약 — 전체 규칙은 [AGENTS.md](AGENTS.md) 참고)
 
 - 코드 주석은 **한국어**로 작성합니다.
@@ -148,5 +193,9 @@ Gemini(`gemini-1.5-flash`)로 답변을 생성합니다. 벡터스토어는 `cha
 - vision의 YOLOv8 추론은 아직 mock, chatbot은 `GEMINI_API_KEY`, notifications는 `FIREBASE_CREDENTIALS_PATH`
   미설정 시 각각 mock 응답/mock 발송으로 대체되어 로컬에서도 키 없이 동작
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
-- 프론트엔드: `frontend/` 디렉터리에 `flutter create` 기본 스캐폴딩(`lib/main.dart`가 카운터 데모)만 존재,
-  실제 화면/API 연동은 아직 미착수
+- 프론트엔드: 입양자 플로우(회원가입/로그인/홈/케어 4종), 재배자 플로우(대시보드/일지/환경점검 3탭)
+  모두 회원가입·로그인은 실제 백엔드(`/api/accounts/*`)와 연동되어 동작. 케어 게이지·재배자 일지·센서
+  값은 전부 로컬 mock 상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음
+  (diary/sensor/vision API 미연동)
+- 재배자 화면 중 "묘목 완성 신고"(claude.ai/design 문서 1u)는 이번 범위에서 제외됨(아직 미착수).
+  성장 타임라인, 수령/기부, 챗봇·비전 연동 등도 아직 미착수
