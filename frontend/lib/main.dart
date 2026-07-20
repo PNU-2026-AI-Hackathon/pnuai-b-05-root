@@ -6,6 +6,8 @@ import 'features/adopter/presentation/care/nutrient_care_screen.dart';
 import 'features/adopter/presentation/care/pruning_care_screen.dart';
 import 'features/adopter/presentation/care/sunlight_care_screen.dart';
 import 'features/adopter/presentation/care/water_care_screen.dart';
+import 'features/adopter/presentation/donation_certificate_screen.dart';
+import 'features/adopter/presentation/pickup_donate_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/register_screen.dart';
 import 'features/grower/presentation/grower_complete_screen.dart';
@@ -35,6 +37,9 @@ class PigFigApp extends StatelessWidget {
         '/adopter/care/nutrient': (context) => const NutrientCareScreen(),
         '/adopter/care/sunlight': (context) => const SunlightCareScreen(),
         '/adopter/care/pruning': (context) => const PruningCareScreen(),
+        '/adopter/pickup-donate': (context) => const PickupDonateScreen(),
+        '/adopter/donation-certificate': (context) =>
+            const DonationCertificateScreen(),
       },
     );
   }

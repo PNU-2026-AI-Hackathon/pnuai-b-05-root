@@ -77,7 +77,16 @@
       "Bash(dart format *)",
       "Bash(timeout 30 bash -c 'until grep -q READY \"C:\\\\Users\\\\ksydr\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-ksydr-pigfig\\\\f51c7b42-51c0-4ce1-bd63-51ff4c27fcdc\\\\tasks\\\\b3monog21.output\" 2>/dev/null; do sleep 1; done')",
       "Bash(node act.js ./c01_login_and_complete.js)",
-      "Bash(node act.js ./c04_submit_complete.js)"
+      "Bash(node act.js ./c04_submit_complete.js)",
+      "Bash(git -C /c/Users/ksydr/pigfig log --oneline -5)",
+      "Bash(git -C /c/Users/ksydr/pigfig branch --show-current)",
+      "Bash(timeout 30 bash -c 'until grep -q READY \"C:\\\\Users\\\\ksydr\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-ksydr-pigfig\\\\f51c7b42-51c0-4ce1-bd63-51ff4c27fcdc\\\\tasks\\\\boy3d57pl.output\" 2>/dev/null; do sleep 1; done')",
+      "Bash(node act.js ./m01_login.js)",
+      "Bash(node act.js ./m01b_wait.js)",
+      "Bash(node act.js ./m02_mypage.js)",
+      "Bash(node act.js ./m03_pickup_donate.js)",
+      "Bash(node act.js ./m04_toggle_pickup.js)",
+      "Bash(node act.js ./m06_certificate.js)"
     ]
   }
 }
