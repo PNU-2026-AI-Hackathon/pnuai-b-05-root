@@ -48,7 +48,9 @@ class MypageScreen extends StatelessWidget {
                     emoji: '📸',
                     iconBg: AppColors.pink100,
                     label: '성장 타임라인',
-                    onTap: () => _showComingSoon(context),
+                    onTap: () => Navigator.of(
+                      context,
+                    ).pushNamed('/adopter/growth-timeline'),
                   ),
                   _MenuRow(
                     emoji: '🎁',
