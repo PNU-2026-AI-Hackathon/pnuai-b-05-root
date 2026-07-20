@@ -62,7 +62,12 @@ class _GrowerShellState extends State<GrowerShell> {
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem({required this.icon, required this.label, required this.active, required this.onTap});
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String label;
@@ -79,14 +84,23 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (active) Container(width: 26, height: 3, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+            if (active)
+              Container(
+                width: 26,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
             const SizedBox(height: 6),
             Icon(icon, size: 22, color: color),
             const SizedBox(height: 3),
             Text(
               label,
-              style: AppTextStyles.body(fontSize: 12, color: color)
-                  .copyWith(fontWeight: active ? FontWeight.w700 : FontWeight.w500),
+              style: AppTextStyles.body(fontSize: 12, color: color).copyWith(
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
           ],
         ),

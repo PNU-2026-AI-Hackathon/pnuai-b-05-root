@@ -21,11 +21,12 @@ class ApiException implements Exception {
 /// 로 오버라이드한다.
 class ApiClient {
   ApiClient({String? baseUrl})
-      : baseUrl = baseUrl ??
-            const String.fromEnvironment(
-              'API_BASE_URL',
-              defaultValue: 'http://localhost:8000',
-            );
+    : baseUrl =
+          baseUrl ??
+          const String.fromEnvironment(
+            'API_BASE_URL',
+            defaultValue: 'http://localhost:8000',
+          );
 
   final String baseUrl;
 
@@ -52,7 +53,44 @@ class ApiClient {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return decoded;
     }
-    throw ApiException(_extractErrorMessage(decoded), statusCode: response.statusCode);
+    throw ApiException(
+      _extractErrorMessage(decoded),
+      statusCode: response.statusCode,
+    );
+  }
+
+  /// JWT access 토큰이 필요한 인증된 PATCH 요청.
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    Map<String, dynamic>? body,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    late final http.Response response;
+    try {
+      response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: body == null ? null : jsonEncode(body),
+      );
+    } on Exception {
+      throw ApiException('서버에 연결할 수 없어요. 네트워크 상태를 확인해주세요.');
+    }
+
+    final decoded = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded;
+    }
+    throw ApiException(
+      _extractErrorMessage(decoded),
+      statusCode: response.statusCode,
+    );
   }
 
   String _extractErrorMessage(Map<String, dynamic> decoded) {

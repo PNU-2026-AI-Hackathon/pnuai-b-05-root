@@ -25,7 +25,9 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
   }
 
   void _showComingSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('준비 중이에요')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('준비 중이에요')));
   }
 
   @override
@@ -37,18 +39,35 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('📋 오늘의 일지', style: AppTextStyles.title(fontSize: 20).copyWith(fontWeight: FontWeight.w900)),
+            Text(
+              '📋 오늘의 일지',
+              style: AppTextStyles.title(
+                fontSize: 20,
+              ).copyWith(fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 4),
-            Text('입양자에게 성장 기록을 전달해요', style: AppTextStyles.guide(fontSize: 14, color: AppColors.badgeGreenText)),
+            Text(
+              '입양자에게 성장 기록을 전달해요',
+              style: AppTextStyles.guide(
+                fontSize: 14,
+                color: AppColors.badgeGreenText,
+              ),
+            ),
             const SizedBox(height: 14),
             GestureDetector(
               onTap: _showComingSoon,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 26,
+                    horizontal: 16,
+                  ),
                   decoration: BoxDecoration(
                     border: Border.all(color: AppColors.dotInactive, width: 2),
                     borderRadius: BorderRadius.circular(14),
@@ -58,16 +77,33 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
                     children: [
                       const Text('📷', style: TextStyle(fontSize: 28)),
                       const SizedBox(height: 6),
-                      Text('사진 추가하기', style: AppTextStyles.body(fontSize: 15, color: AppColors.badgeGreenText).copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        '사진 추가하기',
+                        style: AppTextStyles.body(
+                          fontSize: 15,
+                          color: AppColors.badgeGreenText,
+                        ).copyWith(fontWeight: FontWeight.w700),
+                      ),
                       const SizedBox(height: 2),
-                      Text('묘목 상태를 찍어 업로드해주세요', style: AppTextStyles.body(fontSize: 12, color: const Color(0xFFB7B2A4))),
+                      Text(
+                        '묘목 상태를 찍어 업로드해주세요',
+                        style: AppTextStyles.body(
+                          fontSize: 12,
+                          color: const Color(0xFFB7B2A4),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 14),
-            Text('성장 단계', style: AppTextStyles.title(fontSize: 15).copyWith(fontWeight: FontWeight.w900)),
+            Text(
+              '성장 단계',
+              style: AppTextStyles.title(
+                fontSize: 15,
+              ).copyWith(fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -86,7 +122,10 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 child: TextField(
                   controller: _noteController,
                   maxLines: null,
@@ -97,13 +136,19 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.all(12),
                     hintText: '오늘의 성장 기록을 남겨주세요...',
-                    hintStyle: AppTextStyles.body(fontSize: 14, color: const Color(0xFFB7B2A4)),
+                    hintStyle: AppTextStyles.body(
+                      fontSize: 14,
+                      color: const Color(0xFFB7B2A4),
+                    ),
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            PigFigButton.primary(label: '입양자에게 전달하기', onPressed: _showComingSoon),
+            PigFigButton.primary(
+              label: '입양자에게 전달하기',
+              onPressed: _showComingSoon,
+            ),
             const SizedBox(height: 14),
           ],
         ),
@@ -113,7 +158,11 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
 }
 
 class _StageChip extends StatelessWidget {
-  const _StageChip({required this.label, required this.selected, required this.onTap});
+  const _StageChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
   final bool selected;
@@ -128,12 +177,16 @@ class _StageChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppColors.green500 : Colors.white,
           borderRadius: BorderRadius.circular(21),
-          border: selected ? null : Border.all(color: AppColors.outline, width: 1.5),
+          border: selected
+              ? null
+              : Border.all(color: AppColors.outline, width: 1.5),
         ),
         child: Text(
           label,
-          style: AppTextStyles.body(fontSize: 14, color: selected ? Colors.white : AppColors.textMuted)
-              .copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+          style: AppTextStyles.body(
+            fontSize: 14,
+            color: selected ? Colors.white : AppColors.textMuted,
+          ).copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
         ),
       ),
     );

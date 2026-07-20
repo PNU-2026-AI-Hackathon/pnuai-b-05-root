@@ -13,8 +13,9 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
 ## 기술 스택
 
 - **프론트엔드**: Flutter — 입양자(adopter) 플로우(회원가입/로그인/홈/케어 4종), 재배자(grower) 플로우
-  (대시보드/일지/환경점검 3탭) 구현됨. 두 플로우 모두 UI만 완성된 상태이며(케어 게이지·일지·센서 값
-  전부 로컬 mock), 재배자용 sensor/diary/vision API 연동과 완성 신고(1u) 화면은 아직 미착수
+  (대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인)와 seedlings 완성 신고
+  (`PATCH /api/seedlings/{id}/complete/`)는 실제 백엔드와 연동되며, 케어 게이지·일지·센서 값은 여전히
+  로컬 mock. 재배자용 sensor/diary/vision API 연동은 아직 미착수
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
 - **비전 분석**: YOLOv8 — `vision/yolo_inference.py`에 구조는 있으나 현재 mock 추론(랜덤 값 반환)
@@ -171,6 +172,17 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   따릅니다. 대시보드/일지/환경점검 모두 mock 데이터이며 sensor/diary API를 호출하지 않습니다.
   `login_screen.dart`는 로그인 응답의 `role`이 `grower`면 `pushReplacementNamed('/grower')`로 이동합니다
   (이전엔 "재배자 화면은 준비 중이에요" 스낵바만 띄웠으나 grower 플로우 구현 후 실제 이동으로 변경).
+- `GrowerDashboardScreen`의 담당 묘목 카드를 탭하면 `GrowerCompleteArgs`(seedlingId/seedlingName/
+  adopterName)를 route argument로 담아 `/grower/complete`(`grower_complete_screen.dart`)로 이동합니다
+  (`RegisterScreen`이 role을 `ModalRoute.of(context)!.settings.arguments`로 읽는 것과 동일한 패턴).
+  이 화면의 "완성 신고하기" 버튼은 `features/grower/data/grower_repository.dart`의
+  `completeSeedling()`을 통해 실제 `PATCH /api/seedlings/{id}/complete/`를 호출하는, 프론트엔드에서
+  최초로 인증 토큰이 필요한 API 연동입니다. 이를 위해 `core/network/api_client.dart`에 `patch()`가
+  추가됐고(`post()`와 동일한 에러 파싱 로직 + `Authorization: Bearer <token>` 헤더), 토큰은
+  `TokenStorage.readAccessToken()`으로 읽습니다. 성공 시 스낵바 후 `Navigator.pop()`으로 대시보드에
+  돌아갑니다(패턴은 `RegisterScreen._submit`과 동일). 대시보드의 담당 묘목 목록 자체는 여전히 mock이라
+  탭한 seedlingId가 실제 DB의 `Seedling.pk`와 우연히 일치할 때만 성공하며, 목록을 실제 API로 채우는
+  작업은 아직 남아 있습니다.
 
 ## 개발 규칙 (AGENTS.md 요약 — 전체 규칙은 [AGENTS.md](AGENTS.md) 참고)
 
@@ -193,9 +205,11 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 - vision의 YOLOv8 추론은 아직 mock, chatbot은 `GEMINI_API_KEY`, notifications는 `FIREBASE_CREDENTIALS_PATH`
   미설정 시 각각 mock 응답/mock 발송으로 대체되어 로컬에서도 키 없이 동작
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
-- 프론트엔드: 입양자 플로우(회원가입/로그인/홈/케어 4종), 재배자 플로우(대시보드/일지/환경점검 3탭)
-  모두 회원가입·로그인은 실제 백엔드(`/api/accounts/*`)와 연동되어 동작. 케어 게이지·재배자 일지·센서
-  값은 전부 로컬 mock 상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음
-  (diary/sensor/vision API 미연동)
-- 재배자 화면 중 "묘목 완성 신고"(claude.ai/design 문서 1u)는 이번 범위에서 제외됨(아직 미착수).
-  성장 타임라인, 수령/기부, 챗봇·비전 연동 등도 아직 미착수
+- 프론트엔드: 입양자 플로우(회원가입/로그인/홈/케어 4종), 재배자 플로우(대시보드/일지/환경점검 3탭 +
+  묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인)와 seedlings 완성 신고
+  (`PATCH /api/seedlings/{id}/complete/`, JWT 인증)는 실제 백엔드와 연동되어 동작 확인됨(수동으로
+  `grower` 배정된 `Seedling` row를 만들어 대시보드 mock id와 실제 pk를 맞춘 뒤 end-to-end 테스트).
+  케어 게이지·재배자 일지·센서 값·대시보드 담당 묘목 목록 자체는 여전히 로컬 mock 상태(라우트
+  이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(diary/sensor/vision API, 묘목 목록 조회 API
+  미연동)
+- 성장 타임라인, 수령/기부, 챗봇·비전 연동 등은 아직 미착수

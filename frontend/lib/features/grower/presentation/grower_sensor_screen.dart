@@ -20,7 +20,9 @@ class _GrowerSensorScreenState extends State<GrowerSensorScreen> {
   int _lux = 1400;
 
   void _showSaved() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('준비 중이에요')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('준비 중이에요')));
   }
 
   @override
@@ -32,9 +34,20 @@ class _GrowerSensorScreenState extends State<GrowerSensorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('🌡️ 환경 점검', style: AppTextStyles.title(fontSize: 20).copyWith(fontWeight: FontWeight.w900)),
+            Text(
+              '🌡️ 환경 점검',
+              style: AppTextStyles.title(
+                fontSize: 20,
+              ).copyWith(fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 4),
-            Text('재배지 방문 시 수치를 입력해주세요', style: AppTextStyles.guide(fontSize: 14, color: AppColors.badgeGreenText)),
+            Text(
+              '재배지 방문 시 수치를 입력해주세요',
+              style: AppTextStyles.guide(
+                fontSize: 14,
+                color: AppColors.badgeGreenText,
+              ),
+            ),
             const SizedBox(height: 12),
             _MetricRow(
               icon: '🌡️',
@@ -75,15 +88,27 @@ class _GrowerSensorScreenState extends State<GrowerSensorScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(color: const Color(0xFFFDEFF2), borderRadius: BorderRadius.circular(18)),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFDEFF2),
+                borderRadius: BorderRadius.circular(18),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('⚠️ 이상 감지', style: AppTextStyles.body(fontSize: 14, color: AppColors.warningPink).copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    '⚠️ 이상 감지',
+                    style: AppTextStyles.body(
+                      fontSize: 14,
+                      color: AppColors.warningPink,
+                    ).copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     '습도가 기준 범위(40~70%)를 초과했어요.\n조도가 기준치(2000 lux) 이하예요. LED 보광등을 켜주세요.',
-                    style: AppTextStyles.body(fontSize: 13, color: const Color(0xFF6B675C)).copyWith(height: 1.65),
+                    style: AppTextStyles.body(
+                      fontSize: 13,
+                      color: const Color(0xFF6B675C),
+                    ).copyWith(height: 1.65),
                   ),
                 ],
               ),
@@ -128,7 +153,13 @@ class _MetricRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
         border: normal ? null : Border.all(color: AppColors.pink100, width: 2),
       ),
       child: Row(
@@ -145,14 +176,32 @@ class _MetricRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: AppTextStyles.body(fontSize: 12, color: AppColors.textMuted).copyWith(fontWeight: FontWeight.w500)),
+                Text(
+                  label,
+                  style: AppTextStyles.body(
+                    fontSize: 12,
+                    color: AppColors.textMuted,
+                  ).copyWith(fontWeight: FontWeight.w500),
+                ),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text(value, style: AppTextStyles.title(fontSize: 22, color: valueColor).copyWith(fontWeight: FontWeight.w900)),
+                    Text(
+                      value,
+                      style: AppTextStyles.title(
+                        fontSize: 22,
+                        color: valueColor,
+                      ).copyWith(fontWeight: FontWeight.w900),
+                    ),
                     const SizedBox(width: 4),
-                    Text(unit, style: AppTextStyles.body(fontSize: 13, color: const Color(0xFFB7B2A4)).copyWith(fontWeight: FontWeight.w500)),
+                    Text(
+                      unit,
+                      style: AppTextStyles.body(
+                        fontSize: 13,
+                        color: const Color(0xFFB7B2A4),
+                      ).copyWith(fontWeight: FontWeight.w500),
+                    ),
                   ],
                 ),
               ],
@@ -160,9 +209,19 @@ class _MetricRow extends StatelessWidget {
           ),
           Row(
             children: [
-              _StepperButton(symbol: '−', background: const Color(0xFFF3F1E9), color: AppColors.textMuted, onTap: onDecrement),
+              _StepperButton(
+                symbol: '−',
+                background: const Color(0xFFF3F1E9),
+                color: AppColors.textMuted,
+                onTap: onDecrement,
+              ),
               const SizedBox(width: 6),
-              _StepperButton(symbol: '+', background: AppColors.badgeGreenBg, color: AppColors.badgeGreenText, onTap: onIncrement),
+              _StepperButton(
+                symbol: '+',
+                background: AppColors.badgeGreenBg,
+                color: AppColors.badgeGreenText,
+                onTap: onIncrement,
+              ),
             ],
           ),
           const SizedBox(width: 10),
@@ -179,7 +238,12 @@ class _MetricRow extends StatelessWidget {
 }
 
 class _StepperButton extends StatelessWidget {
-  const _StepperButton({required this.symbol, required this.background, required this.color, required this.onTap});
+  const _StepperButton({
+    required this.symbol,
+    required this.background,
+    required this.color,
+    required this.onTap,
+  });
 
   final String symbol;
   final Color background;
@@ -195,7 +259,13 @@ class _StepperButton extends StatelessWidget {
         height: 34,
         alignment: Alignment.center,
         decoration: BoxDecoration(color: background, shape: BoxShape.circle),
-        child: Text(symbol, style: AppTextStyles.body(fontSize: 16, color: color).copyWith(fontWeight: FontWeight.w700)),
+        child: Text(
+          symbol,
+          style: AppTextStyles.body(
+            fontSize: 16,
+            color: color,
+          ).copyWith(fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }

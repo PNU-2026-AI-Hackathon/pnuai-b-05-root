@@ -73,7 +73,11 @@
       "Bash(node act.js ./g09_sensor_tab.js)",
       "Bash(node act.js ./g10_stepper.js)",
       "Bash(node act.js ./g11_back_home.js)",
-      "Bash(git -C /c/Users/ksydr/pigfig status --short frontend/lib CLAUDE.md)"
+      "Bash(git -C /c/Users/ksydr/pigfig status --short frontend/lib CLAUDE.md)",
+      "Bash(dart format *)",
+      "Bash(timeout 30 bash -c 'until grep -q READY \"C:\\\\Users\\\\ksydr\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-ksydr-pigfig\\\\f51c7b42-51c0-4ce1-bd63-51ff4c27fcdc\\\\tasks\\\\b3monog21.output\" 2>/dev/null; do sleep 1; done')",
+      "Bash(node act.js ./c01_login_and_complete.js)",
+      "Bash(node act.js ./c04_submit_complete.js)"
     ]
   }
 }
