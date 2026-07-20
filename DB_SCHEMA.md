@@ -62,3 +62,12 @@ Pig.Fig. 백엔드의 테이블(모델) 설계 문서입니다. 실제 구현 �
 | confidence | FloatField | 신뢰도 (기본값 0.0) |
 | location_info | CharField (nullable) | 묘목 위치 (예: "선반1-3번") |
 | analyzed_at | DateTimeField | 분석일시 |
+
+## FCMToken (`notifications`)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| id | PK | 토큰 ID |
+| user | FK → User | 토큰을 등록한 사용자 |
+| token | CharField (unique) | FCM 디바이스 토큰 |
+| created_at | DateTimeField | 등록일시 |

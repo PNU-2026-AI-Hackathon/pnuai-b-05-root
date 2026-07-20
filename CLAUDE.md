@@ -51,16 +51,15 @@ python sensor/mock_sensor.py <seedling_id> [--interval 10]   # 가짜 온습도/
 
 ## 백엔드 앱 구성 및 구현 상태
 
-`backend/` 아래 다음 7개 Django 앱으로 구성됩니다. **notifications만 스캐폴딩 상태**이고
-(`models.py`/`views.py`가 비어있음) 나머지는 구현되어 있습니다.
+`backend/` 아래 다음 7개 Django 앱으로 구성되며, **7개 모두 구현되어 있습니다**.
 
 - `accounts` — 사용자(입양자/재배자) 인증 및 계정 관리 (구현됨)
-- `seedlings` — 묘목 입양/재배 상태 관리 (구현됨)
+- `seedlings` — 묘목 입양/재배 상태 관리 + 완성 신고 (구현됨)
 - `diary` — 재배 일지 (사진, 생육 기록) — 구현됨
 - `sensor` — IoT 센서 데이터(온습도, 조도) 수집 + Prophet 이상 감지 (구현됨)
 - `vision` — YOLOv8 기반 이미지 분석 (현재는 mock 추론) (구현됨)
 - `chatbot` — LangChain RAG + Gemini 기반 챗봇 (구현됨)
-- `notifications` — FCM 푸시 알림 — 스캐폴딩만 존재 (`DB_SCHEMA.md`, `DESIGN.md`에 설계만 정의됨)
+- `notifications` — FCM 푸시 알림 (현재 기본 환경은 mock 모드) (구현됨)
 
 ## 아키텍처
 
@@ -115,6 +114,15 @@ Gemini(`gemini-1.5-flash`)로 답변을 생성합니다. 벡터스토어는 `cha
 `RecursiveCharacterTextSplitter`는 `langchain_text_splitters`에 있습니다(`langchain.chains`/
 `langchain.text_splitter` 아님).
 
+### FCM 푸시 알림 (mock 모드 기본)
+`notifications/fcm.py`의 `send_push_notification(token, title, body)`는 `settings.FIREBASE_CREDENTIALS_PATH`가
+비어있으면(로컬 개발 기본값) 실제 전송 없이 print만 하는 mock 모드로 동작합니다. 값이 있으면
+`firebase_admin`을 lazy 초기화해 실제 FCM 메시지를 보냅니다. `send_notification_to_user(user, title, body)`는
+해당 유저의 `FCMToken`을 전부 조회해 순회 발송하며, `seedlings/views.py`의 `SeedlingCompleteView`
+(`PATCH /api/seedlings/{id}/complete/`, 담당 재배자만 가능)가 묘목 완성 처리 후 이 함수를 호출해
+입양자에게 알림을 보냅니다 — 앱 간 참조가 `seedlings` → `notifications.fcm`로 향하는 유일한 지점입니다.
+`FCMToken.token`은 unique 필드이므로 등록 시 `(user, token)`이 아니라 `token` 하나로 중복을 판단합니다.
+
 ### URL 라우팅
 루트 `config/urls.py`가 앱마다 `/api/<앱명>/` prefix로 각 앱의 `urls.py`를 include합니다
 (예: `/api/sensor/` → `sensor/urls.py`). 새 앱도 이 컨벤션을 따릅니다.
@@ -136,7 +144,8 @@ Gemini(`gemini-1.5-flash`)로 답변을 생성합니다. 벡터스토어는 `cha
 
 ## 현재 개발 상태
 
-- 백엔드: accounts/seedlings/diary/sensor/vision/chatbot 구현 완료, notifications만 스캐폴딩 상태
-- vision의 YOLOv8 추론은 아직 mock, chatbot의 Gemini 연동은 `GEMINI_API_KEY` 미설정 시 mock 응답으로 대체
+- 백엔드: 7개 앱(accounts/seedlings/diary/sensor/vision/chatbot/notifications) 모두 구현 완료
+- vision의 YOLOv8 추론은 아직 mock, chatbot은 `GEMINI_API_KEY`, notifications는 `FIREBASE_CREDENTIALS_PATH`
+  미설정 시 각각 mock 응답/mock 발송으로 대체되어 로컬에서도 키 없이 동작
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드(Flutter)는 아직 미착수
