@@ -51,16 +51,16 @@ python sensor/mock_sensor.py <seedling_id> [--interval 10]   # 가짜 온습도/
 
 ## 백엔드 앱 구성 및 구현 상태
 
-`backend/` 아래 다음 7개 Django 앱으로 구성됩니다. **accounts / seedlings / sensor만 구현되어 있고**,
-나머지는 `models.py`/`views.py`가 비어있는 스캐폴딩 상태입니다 (`DB_SCHEMA.md`, `DESIGN.md`에 설계만 정의됨).
+`backend/` 아래 다음 7개 Django 앱으로 구성됩니다. **notifications만 스캐폴딩 상태**이고
+(`models.py`/`views.py`가 비어있음) 나머지는 구현되어 있습니다.
 
 - `accounts` — 사용자(입양자/재배자) 인증 및 계정 관리 (구현됨)
 - `seedlings` — 묘목 입양/재배 상태 관리 (구현됨)
+- `diary` — 재배 일지 (사진, 생육 기록) — 구현됨
 - `sensor` — IoT 센서 데이터(온습도, 조도) 수집 + Prophet 이상 감지 (구현됨)
-- `diary` — 재배 일지 (사진, 생육 기록) — 스캐폴딩만 존재
-- `vision` — YOLOv8 기반 이미지 분석 — 스캐폴딩만 존재
-- `chatbot` — LangChain RAG + Gemini 기반 챗봇 — 스캐폴딩만 존재
-- `notifications` — FCM 푸시 알림 — 스캐폴딩만 존재
+- `vision` — YOLOv8 기반 이미지 분석 (현재는 mock 추론) (구현됨)
+- `chatbot` — LangChain RAG + Gemini 기반 챗봇 (구현됨)
+- `notifications` — FCM 푸시 알림 — 스캐폴딩만 존재 (`DB_SCHEMA.md`, `DESIGN.md`에 설계만 정의됨)
 
 ## 아키텍처
 
@@ -95,6 +95,26 @@ python sensor/mock_sensor.py <seedling_id> [--interval 10]   # 가짜 온습도/
 `sensor/mock_sensor.py`는 Django에 의존하지 않는 순수 MQTT publisher로, 실제 하드웨어 없이
 로컬에서 파이프라인을 테스트할 때 사용합니다.
 
+### 비전 분석 (mock → 실제 YOLOv8로 교체 예정)
+`vision/yolo_inference.py`의 `analyze_image(image_path)`는 아직 무화과 학습 데이터가 없어
+현재는 랜덤 mock 값(result_tag/confidence/location_info)을 반환합니다. `_get_model()`이
+`ultralytics.YOLO`를 lazy하게 로드하도록 구조만 잡아뒀고, 실제 추론 코드는 붙어있지 않습니다
+(테스트에서 가중치 다운로드가 트리거되지 않도록 의도적으로 그렇게 되어 있음). `VisionAnalyzeView`는
+재배자만 호출 가능하며, `diary_id`를 함께 보내면 해당 `Diary.yolo_status_tag`도 갱신합니다
+(diary 소유권 검사 포함).
+
+### RAG 챗봇 파이프라인
+`chatbot/rag_pipeline.py`는 농촌진흥청 매뉴얼 기반 지식 문서 10개를 코드에 직접 하드코딩해두고
+(PDF 등 외부 파일 의존 없음), `initialize_rag()`가 이를 ChromaDB로 임베딩해
+`chatbot/vector_store/`에 저장(이미 저장되어 있으면 재임베딩 없이 로드)합니다. `ask_question()`은
+Gemini(`gemini-1.5-flash`)로 답변을 생성합니다. 벡터스토어는 `chatbot/views.py`의 모듈 전역
+`_vectorstore`에 프로세스당 한 번만 캐싱됩니다. `settings.GEMINI_API_KEY`가 비어있으면
+`ChatbotAskView`는 RAG를 아예 호출하지 않고 고정 mock 응답("챗봇 서비스 준비 중입니다.")을
+반환합니다 — 로컬 개발 시 API 키 없이도 앱이 동작하게 하기 위함입니다.
+`langchain` 1.x부터 API가 크게 바뀌어 `RetrievalQA`는 `langchain_classic.chains`에,
+`RecursiveCharacterTextSplitter`는 `langchain_text_splitters`에 있습니다(`langchain.chains`/
+`langchain.text_splitter` 아님).
+
 ### URL 라우팅
 루트 `config/urls.py`가 앱마다 `/api/<앱명>/` prefix로 각 앱의 `urls.py`를 include합니다
 (예: `/api/sensor/` → `sensor/urls.py`). 새 앱도 이 컨벤션을 따릅니다.
@@ -112,9 +132,11 @@ python sensor/mock_sensor.py <seedling_id> [--interval 10]   # 가짜 온습도/
 - Git 워크플로(브랜치 네이밍, 커밋 메시지, PR 규칙)는 [CONTRIBUTING.md](CONTRIBUTING.md) 참고.
   요약: `main` 직접 push 금지, `feat/`·`fix/`·`refactor/`·`docs/`·`chore/` 브랜치 prefix,
   push 전 `manage.py check`와 `manage.py test` 통과 필수.
+- 작업 완료 후 요약은 **한국어**로 작성합니다.
 
 ## 현재 개발 상태
 
-- 백엔드: accounts/seedlings/sensor 구현 완료, diary/vision/chatbot/notifications는 스캐폴딩만 존재
-- DB(MySQL)는 아직 미연결 — `.env`에 실제 접속 정보 입력 및 `migrate` 필요
+- 백엔드: accounts/seedlings/diary/sensor/vision/chatbot 구현 완료, notifications만 스캐폴딩 상태
+- vision의 YOLOv8 추론은 아직 mock, chatbot의 Gemini 연동은 `GEMINI_API_KEY` 미설정 시 mock 응답으로 대체
+- DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드(Flutter)는 아직 미착수
