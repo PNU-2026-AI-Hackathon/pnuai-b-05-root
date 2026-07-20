@@ -4,7 +4,11 @@
       "Bash(venv/Scripts/python.exe -c ' *)",
       "Bash(venv/Scripts/python.exe -m pip freeze --local)",
       "Bash(venv/Scripts/python.exe manage.py makemigrations chatbot)",
-      "Bash(venv/Scripts/python.exe manage.py migrate)"
+      "Bash(venv/Scripts/python.exe manage.py migrate)",
+      "Bash(venv/Scripts/python.exe manage.py makemigrations notifications)",
+      "Bash(venv/Scripts/python.exe manage.py test notifications seedlings -v 2)",
+      "Bash(venv/Scripts/python.exe manage.py check)",
+      "Bash(venv/Scripts/python.exe manage.py test)"
     ]
   }
 }

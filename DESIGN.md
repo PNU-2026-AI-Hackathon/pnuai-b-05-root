@@ -30,9 +30,12 @@ Pig.Fig. 서비스 플로우 및 API 설계 문서입니다.
 | `/api/accounts/login/` | POST | 로그인 (JWT 발급) |
 | `/api/seedlings/` | GET/POST | 묘목 목록 조회 / 입양 생성 |
 | `/api/seedlings/{id}/` | GET | 묘목 상세 조회 |
+| `/api/seedlings/{id}/complete/` | PATCH | 재배자 묘목 완성 신고 (입양자에게 FCM 알림 발송) |
 | `/api/diary/` | POST | 재배 일지 작성 |
 | `/api/diary/{seedling_id}/` | GET | 특정 묘목의 일지 목록 조회 |
 | `/api/sensor/data/` | POST | 센서 데이터 수집 (MQTT 연동) |
 | `/api/sensor/anomaly/{seedling_id}/` | GET | 특정 묘목의 이상치 이력 조회 |
 | `/api/vision/analyze/` | POST | YOLOv8 이미지 분석 요청 |
 | `/api/chatbot/ask/` | POST | LangChain RAG + Gemini 챗봇 질의 |
+| `/api/notifications/register-token/` | POST | FCM 디바이스 토큰 등록 |
+| `/api/notifications/test/` | POST | 본인에게 테스트 푸시 알림 발송 |
