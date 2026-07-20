@@ -13,10 +13,11 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
 ## 기술 스택
 
 - **프론트엔드**: Flutter — 최초 실행 온보딩(2장), 입양자(adopter) 플로우(회원가입/로그인/홈/케어 4종/
-  마이페이지/성장 타임라인/수령·기부 선택/기부 인증서), 재배자(grower) 플로우(대시보드/일지/환경점검
-  3탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인)와 seedlings 완성 신고
-  (`PATCH /api/seedlings/{id}/complete/`)는 실제 백엔드와 연동되며, 케어 게이지·일지·센서 값·마이페이지·
-  성장 타임라인·수령/기부 선택은 여전히 로컬 mock. 재배자용 sensor/diary/vision API 연동은 아직 미착수
+  마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(대시보드/일지/
+  환경점검 3탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인), seedlings 완성 신고
+  (`PATCH /api/seedlings/{id}/complete/`), chatbot(`POST /api/chatbot/ask/`)는 실제 백엔드와 연동되며,
+  케어 게이지·일지·센서 값·마이페이지·성장 타임라인·수령/기부 선택은 여전히 로컬 mock. 재배자용
+  sensor/diary/vision API 연동은 아직 미착수
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
 - **비전 분석**: YOLOv8 — `vision/yolo_inference.py`에 구조는 있으나 현재 mock 추론(랜덤 값 반환)
@@ -211,6 +212,15 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   시간 역순(최신이 먼저)으로 `ListView`에 나열합니다. 각 카드는 "✨ 일러스트 변환" 배지만 자리표시로
   붙어 있을 뿐 실제 사진→일러스트 변환은 하지 않으며, 최신 항목에만 재배자 코멘트 말풍선이 카드 바로
   아래 (마이너스 마진으로 카드에 겹치듯) 붙습니다 — `diary` API 연동은 하지 않습니다.
+- `chatbot_screen.dart`(마이페이지의 "AI 챗봇" 메뉴에서 진입)는 `features/adopter/data/
+  chatbot_repository.dart`를 통해 실제 `POST /api/chatbot/ask/`를 호출합니다. 이 호출도
+  `grower_repository.dart`의 완성 신고처럼 인증 토큰이 필요한데, `PATCH`용으로 이미 있던
+  `api_client.dart`의 `patch()`와 달리 이번엔 기존 `post()`에 선택적 `accessToken` 파라미터를
+  추가하는 방식으로 확장했습니다(회원가입/로그인처럼 토큰이 필요 없는 기존 `post()` 호출은 그대로
+  동작). 채팅 메시지 목록은 화면을 벗어나면 사라지는 `State` 배열이며 대화 히스토리를 서버에
+  저장하지 않습니다. `GEMINI_API_KEY` 미설정 시(로컬 기본값) 백엔드가 고정 mock 응답
+  ("챗봇 서비스 준비 중입니다.")을 내려주므로, 실제 질문 전송~응답 수신까지 API 키 없이도
+  end-to-end로 검증할 수 있습니다.
 
 ## 개발 규칙 (AGENTS.md 요약 — 전체 규칙은 [AGENTS.md](AGENTS.md) 참고)
 
@@ -234,11 +244,13 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   미설정 시 각각 mock 응답/mock 발송으로 대체되어 로컬에서도 키 없이 동작
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
-  (회원가입/로그인/홈/케어 4종/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서), 재배자 플로우
-  (대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인)와 seedlings
-  완성 신고(`PATCH /api/seedlings/{id}/complete/`, JWT 인증)는 실제 백엔드와 연동되어 동작 확인됨
-  (수동으로 `grower` 배정된 `Seedling` row를 만들어 대시보드 mock id와 실제 pk를 맞춘 뒤 end-to-end
-  테스트). 케어 게이지·재배자 일지·센서 값·대시보드 담당 묘목 목록·마이페이지 프로필/성장 타임라인/
-  수령·기부 선택은 여전히 로컬 mock 상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음
-  (diary/sensor/vision API, 묘목 목록 조회 API, `Seedling.pickup_or_donate` 갱신 API 미연동)
-- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), AI 챗봇, 게임 탭, 비전 연동 등은 아직 미착수
+  (회원가입/로그인/홈/케어 4종/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자
+  플로우(대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인),
+  seedlings 완성 신고(`PATCH /api/seedlings/{id}/complete/`, JWT 인증), chatbot
+  (`POST /api/chatbot/ask/`, JWT 인증)는 실제 백엔드와 연동되어 동작 확인됨(seedlings는 수동으로
+  `grower` 배정된 `Seedling` row를 만들어 대시보드 mock id와 실제 pk를 맞춘 뒤, chatbot은
+  `GEMINI_API_KEY` 미설정 상태에서 mock 응답으로 각각 end-to-end 테스트). 케어 게이지·재배자 일지·
+  센서 값·대시보드 담당 묘목 목록·마이페이지 프로필/성장 타임라인/수령·기부 선택은 여전히 로컬 mock
+  상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(diary/sensor/vision API, 묘목 목록
+  조회 API, `Seedling.pickup_or_donate` 갱신 API 미연동)
+- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 게임 탭, 비전 연동 등은 아직 미착수

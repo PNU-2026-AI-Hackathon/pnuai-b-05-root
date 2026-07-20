@@ -76,7 +76,8 @@ class MypageScreen extends StatelessWidget {
                     emoji: '🤖',
                     iconBg: AppColors.green500,
                     label: 'AI 챗봇 (무화과 Q&A)',
-                    onTap: () => _showComingSoon(context),
+                    onTap: () =>
+                        Navigator.of(context).pushNamed('/adopter/chatbot'),
                   ),
                   _MenuRow(
                     emoji: '🔔',

@@ -33,13 +33,17 @@ class ApiClient {
   Future<Map<String, dynamic>> post(
     String path, {
     required Map<String, dynamic> body,
+    String? accessToken,
   }) async {
     final uri = Uri.parse('$baseUrl$path');
     late final http.Response response;
     try {
       response = await http.post(
         uri,
-        headers: const {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          if (accessToken != null) 'Authorization': 'Bearer $accessToken',
+        },
         body: jsonEncode(body),
       );
     } on Exception {
