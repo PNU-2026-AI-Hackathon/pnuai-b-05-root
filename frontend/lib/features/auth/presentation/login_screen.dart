@@ -44,9 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result.role == UserRole.adopter) {
         Navigator.of(context).pushReplacementNamed('/adopter');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('재배자 화면은 준비 중이에요')),
-        );
+        Navigator.of(context).pushReplacementNamed('/grower');
       }
     } on ApiException catch (e) {
       setState(() => _errorMessage = e.message);

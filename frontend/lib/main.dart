@@ -8,6 +8,7 @@ import 'features/adopter/presentation/care/sunlight_care_screen.dart';
 import 'features/adopter/presentation/care/water_care_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/register_screen.dart';
+import 'features/grower/presentation/grower_shell.dart';
 
 void main() {
   runApp(const PigFigApp());
@@ -27,6 +28,7 @@ class PigFigApp extends StatelessWidget {
         '/': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/adopter': (context) => const AdopterShell(),
+        '/grower': (context) => const GrowerShell(),
         '/adopter/care/water': (context) => const WaterCareScreen(),
         '/adopter/care/nutrient': (context) => const NutrientCareScreen(),
         '/adopter/care/sunlight': (context) => const SunlightCareScreen(),

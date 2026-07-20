@@ -25,4 +25,5 @@ class AppColors {
   static const badgeGreenText = Color(0xFF6DAF62);
   static const errorRed = Color(0xFFF05B72);
   static const kakaoYellow = Color(0xFFFEE500);
+  static const warningPink = Color(0xFFE8879B); // 재배자 화면 "주의" 배지/경고 텍스트
 }
