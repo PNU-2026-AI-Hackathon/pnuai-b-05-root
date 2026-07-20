@@ -1,22 +1,31 @@
 import 'package:flutter/material.dart';
 
+import 'core/storage/onboarding_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'features/adopter/presentation/adopter_shell.dart';
 import 'features/adopter/presentation/care/nutrient_care_screen.dart';
 import 'features/adopter/presentation/care/pruning_care_screen.dart';
 import 'features/adopter/presentation/care/sunlight_care_screen.dart';
 import 'features/adopter/presentation/care/water_care_screen.dart';
+import 'features/adopter/presentation/donation_certificate_screen.dart';
+import 'features/adopter/presentation/pickup_donate_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/register_screen.dart';
 import 'features/grower/presentation/grower_complete_screen.dart';
 import 'features/grower/presentation/grower_shell.dart';
+import 'features/onboarding/presentation/onboarding_screen.dart';
 
-void main() {
-  runApp(const PigFigApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final hasSeenOnboarding = await OnboardingStorage().hasSeenOnboarding();
+  runApp(PigFigApp(initialRoute: hasSeenOnboarding ? '/' : '/onboarding'));
 }
 
 class PigFigApp extends StatelessWidget {
-  const PigFigApp({super.key});
+  const PigFigApp({super.key, this.initialRoute = '/'});
+
+  /// 최초 실행이면 `/onboarding`, 이미 온보딩을 봤으면 `/`(로그인)로 시작한다.
+  final String initialRoute;
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +33,9 @@ class PigFigApp extends StatelessWidget {
       title: 'Pig.Fig.',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      initialRoute: '/',
+      initialRoute: initialRoute,
       routes: {
+        '/onboarding': (context) => const OnboardingScreen(),
         '/': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/adopter': (context) => const AdopterShell(),
@@ -35,6 +45,9 @@ class PigFigApp extends StatelessWidget {
         '/adopter/care/nutrient': (context) => const NutrientCareScreen(),
         '/adopter/care/sunlight': (context) => const SunlightCareScreen(),
         '/adopter/care/pruning': (context) => const PruningCareScreen(),
+        '/adopter/pickup-donate': (context) => const PickupDonateScreen(),
+        '/adopter/donation-certificate': (context) =>
+            const DonationCertificateScreen(),
       },
     );
   }

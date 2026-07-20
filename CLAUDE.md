@@ -12,10 +12,11 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
 
 ## 기술 스택
 
-- **프론트엔드**: Flutter — 입양자(adopter) 플로우(회원가입/로그인/홈/케어 4종), 재배자(grower) 플로우
-  (대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인)와 seedlings 완성 신고
-  (`PATCH /api/seedlings/{id}/complete/`)는 실제 백엔드와 연동되며, 케어 게이지·일지·센서 값은 여전히
-  로컬 mock. 재배자용 sensor/diary/vision API 연동은 아직 미착수
+- **프론트엔드**: Flutter — 최초 실행 온보딩(2장), 입양자(adopter) 플로우(회원가입/로그인/홈/케어 4종/
+  마이페이지/수령·기부 선택/기부 인증서), 재배자(grower) 플로우(대시보드/일지/환경점검 3탭 + 묘목 완성
+  신고) 구현됨. accounts(회원가입/로그인)와 seedlings 완성 신고(`PATCH /api/seedlings/{id}/complete/`)는
+  실제 백엔드와 연동되며, 케어 게이지·일지·센서 값·마이페이지·수령/기부 선택은 여전히 로컬 mock. 재배자용
+  sensor/diary/vision API 연동은 아직 미착수
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
 - **비전 분석**: YOLOv8 — `vision/yolo_inference.py`에 구조는 있으나 현재 mock 추론(랜덤 값 반환)
@@ -151,6 +152,9 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   `10.0.2.2` 필요). DRF `ValidationError` 응답(필드명→메시지 배열 또는 `non_field_errors`)을 파싱해
   `ApiException`으로 던지는 로직이 여기 있습니다 — 새 API 연동 시 이 클라이언트를 재사용합니다.
 - `core/storage/token_storage.dart` — `shared_preferences`로 JWT access/refresh 토큰을 저장.
+  같은 패턴으로 `core/storage/onboarding_storage.dart`가 온보딩 노출 여부(`bool`)를 저장한다 — 로컬
+  플래그 하나짜리 상태도 위젯에 `SharedPreferences`를 직접 넣지 않고 `core/storage/`에 작은 래퍼
+  클래스로 분리하는 것이 컨벤션이다.
 - `core/theme/` — `AppColors`(색상 토큰)와 `AppTheme`/`AppTextStyles`(Gaegu 폰트=display,
   Noto Sans KR=본문, `google_fonts` 패키지) 디자인 시스템. 새 화면은 직접 `TextStyle`을 만들지 않고
   이 토큰을 사용합니다.
@@ -183,6 +187,26 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   돌아갑니다(패턴은 `RegisterScreen._submit`과 동일). 대시보드의 담당 묘목 목록 자체는 여전히 mock이라
   탭한 seedlingId가 실제 DB의 `Seedling.pk`와 우연히 일치할 때만 성공하며, 목록을 실제 API로 채우는
   작업은 아직 남아 있습니다.
+- `main()`이 `Future<void>`로 바뀌어 `runApp()` 전에 `OnboardingStorage().hasSeenOnboarding()`을
+  `await`하고, 그 결과로 `PigFigApp(initialRoute: ...)`을 결정합니다(`/onboarding` 또는 `/`) — 위젯
+  트리 안에서 라우팅을 늦게 리다이렉트하는 대신 첫 프레임부터 올바른 화면으로 시작합니다. `PigFigApp`의
+  `initialRoute`는 기본값이 `/`라서 `widget_test.dart`처럼 `PigFigApp()`을 인자 없이 pump하는 기존
+  테스트는 영향받지 않습니다. `features/onboarding/presentation/onboarding_screen.dart`는 `PageView` 2장
+  (서비스 소개/시니어 재배자)이며, 마지막 페이지에서만 "시작하기" 버튼이 보이고 "건너뛰기" 링크는
+  `Visibility(maintainSize: true)`로 자리만 차지한 채 숨겨집니다(디자인 문서의 세 번째 온보딩 프레임이
+  "건너뛰기" 자리에 투명 placeholder를 두는 것과 동일한 방식). claude.ai/design 문서에는 온보딩 3
+  "앱으로 케어"도 있지만 이번 범위에서 의도적으로 제외했습니다.
+- `adopter_shell.dart`도 `grower_shell.dart`처럼 실제 탭 전환이 필요해지면서 `StatefulWidget`으로
+  바뀌었습니다(`_tab`으로 홈/마이페이지를 스왑, "게임"은 여전히 범위 밖이라 스낵바만). `mypage_screen.dart`
+  는 프로필 카드 + 리스트 메뉴이며, 이번 범위 밖인 메뉴(성장 타임라인/AI 챗봇/알림 설정/입양 내역)는
+  탭하면 스낵바만 띄우고, "수령 / 기부 선택"과 "기부 인증서"만 실제로 이동합니다. "기부 인증서"는
+  마이페이지에서 곧장 진입할 때는 하드코딩된 mock 인자를 쓰고, `pickup_donate_screen.dart`에서
+  기부처를 선택해 진입할 때는 실제 선택한 기부처 이름을 `DonationCertificateArgs`로 넘깁니다(둘 다
+  `GrowerCompleteArgs`와 동일한 route-argument 패턴). `pickup_donate_screen.dart`는 수령/기부 두
+  옵션과 기부처 3곳을 모두 로컬 `State`로만 관리하며(수령 선택 시 기부처 목록·버튼 자체가 숨겨짐),
+  `Seedling.pickup_or_donate`/`donate_type` API 연동은 하지 않는 순수 정적 UI입니다. 디자인의 점선
+  테두리(일지 사진 업로드 박스, 기부 인증서 카드)는 Flutter에 내장 dashed border가 없어 실선으로
+  근사했습니다.
 
 ## 개발 규칙 (AGENTS.md 요약 — 전체 규칙은 [AGENTS.md](AGENTS.md) 참고)
 
@@ -205,11 +229,13 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 - vision의 YOLOv8 추론은 아직 mock, chatbot은 `GEMINI_API_KEY`, notifications는 `FIREBASE_CREDENTIALS_PATH`
   미설정 시 각각 mock 응답/mock 발송으로 대체되어 로컬에서도 키 없이 동작
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
-- 프론트엔드: 입양자 플로우(회원가입/로그인/홈/케어 4종), 재배자 플로우(대시보드/일지/환경점검 3탭 +
-  묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인)와 seedlings 완성 신고
+- 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
+  (회원가입/로그인/홈/케어 4종/마이페이지/수령·기부 선택/기부 인증서), 재배자 플로우(대시보드/일지/
+  환경점검 3탭 + 묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인)와 seedlings 완성 신고
   (`PATCH /api/seedlings/{id}/complete/`, JWT 인증)는 실제 백엔드와 연동되어 동작 확인됨(수동으로
   `grower` 배정된 `Seedling` row를 만들어 대시보드 mock id와 실제 pk를 맞춘 뒤 end-to-end 테스트).
-  케어 게이지·재배자 일지·센서 값·대시보드 담당 묘목 목록 자체는 여전히 로컬 mock 상태(라우트
-  이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(diary/sensor/vision API, 묘목 목록 조회 API
-  미연동)
-- 성장 타임라인, 수령/기부, 챗봇·비전 연동 등은 아직 미착수
+  케어 게이지·재배자 일지·센서 값·대시보드 담당 묘목 목록·마이페이지 프로필/수령·기부 선택은 여전히
+  로컬 mock 상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(diary/sensor/vision API,
+  묘목 목록 조회 API, `Seedling.pickup_or_donate` 갱신 API 미연동)
+- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 성장 타임라인, AI 챗봇, 게임 탭, 비전 연동 등은 아직
+  미착수
