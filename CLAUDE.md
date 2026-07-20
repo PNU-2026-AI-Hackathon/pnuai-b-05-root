@@ -12,14 +12,14 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
 
 ## 기술 스택
 
-- **프론트엔드**: Flutter (아직 미착수)
+- **프론트엔드**: Flutter (`frontend/`에 `flutter create` 기본 스캐폴딩만 존재, 실제 화면 미착수)
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
-- **비전 분석**: YOLOv8 (생육 상태/이상 탐지) — 앱 스캐폴딩만 존재, 미구현
+- **비전 분석**: YOLOv8 — `vision/yolo_inference.py`에 구조는 있으나 현재 mock 추론(랜덤 값 반환)
 - **시계열 예측**: Prophet — 센서 이상 감지에 이미 사용 중 (`sensor/anomaly.py`)
-- **챗봇**: LangChain RAG + Gemini API — 앱 스캐폴딩만 존재, 미구현
+- **챗봇**: LangChain RAG + Gemini API — 구현 완료, `GEMINI_API_KEY` 미설정 시 mock 응답
 - **IoT 연동**: MQTT (paho-mqtt) — 센서 데이터 수집 (`sensor/mqtt_client.py`)
-- **푸시 알림**: FCM (Firebase Cloud Messaging) — 앱 스캐폴딩만 존재, 미구현
+- **푸시 알림**: FCM (Firebase Cloud Messaging) — 구현 완료, `FIREBASE_CREDENTIALS_PATH` 미설정 시 mock 발송(print만)
 
 ## 자주 쓰는 명령어
 
@@ -148,4 +148,5 @@ Gemini(`gemini-1.5-flash`)로 답변을 생성합니다. 벡터스토어는 `cha
 - vision의 YOLOv8 추론은 아직 mock, chatbot은 `GEMINI_API_KEY`, notifications는 `FIREBASE_CREDENTIALS_PATH`
   미설정 시 각각 mock 응답/mock 발송으로 대체되어 로컬에서도 키 없이 동작
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
-- 프론트엔드(Flutter)는 아직 미착수
+- 프론트엔드: `frontend/` 디렉터리에 `flutter create` 기본 스캐폴딩(`lib/main.dart`가 카운터 데모)만 존재,
+  실제 화면/API 연동은 아직 미착수
