@@ -14,7 +14,8 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
 
 - **프론트엔드**: Flutter — 최초 실행 온보딩(2장), 입양자(adopter) 플로우(회원가입/로그인/홈/케어 4종/
   게임 탭/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(대시보드/일지/
-  환경점검 3탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인), seedlings(`GET /api/seedlings/` 목록
+  환경점검 3탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인/로그아웃/`DELETE /api/accounts/me/`
+  회원탈퇴), seedlings(`GET /api/seedlings/` 목록
   조회 + `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary(`POST /api/diary/` 작성 +
   `GET /api/diary/{seedling_id}/` 조회, 사진은 `image_picker`로 선택해 multipart 업로드), sensor
   (`POST /api/sensor/data/` 저장 + `GET /api/sensor/anomaly/{seedling_id}/` 이상 이력 조회), chatbot
@@ -41,6 +42,7 @@ cp .env.example .env            # DB 접속정보·API 키 등 실제 값 입력
 # DB
 python manage.py migrate
 python manage.py makemigrations <app명>   # 모델 변경 후 마이그레이션 생성
+python manage.py seed_demo              # 로컬 개발/데모용 계정·묘목·일지·센서 데이터 생성 (멱등, DB가 비어 있을 때)
 
 # 서버 실행
 python manage.py runserver
@@ -86,6 +88,13 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ### 커스텀 유저 모델
 `AUTH_USER_MODEL = accounts.User` (`accounts/models.py`). `username` 없이 `email`이 로그인 ID이며,
 `role` 필드(`adopter`/`grower` TextChoices)로 역할을 구분합니다. 별도 Profile 모델은 없습니다.
+`DELETE /api/accounts/me/`(`AccountDeleteView`, 본인만·JWT 인증 필수)는 회원탈퇴를 하드 삭제가 아니라
+`is_active=False`로만 처리합니다 — `Seedling`/`Diary` 등이 유저를 FK로 물고 있어서, 특히 재배자가
+탈퇴할 때 담당 묘목까지 CASCADE로 사라지면 그 묘목을 보던 입양자 쪽 일지/성장 타임라인까지 깨지기
+때문입니다. `is_active=False`가 되면 `LoginView`가 쓰는 `authenticate()`(Django `ModelBackend`)도,
+기존에 발급된 access 토큰을 검증하는 simplejwt의 `JWTAuthentication.get_user()`도 둘 다 기본 동작으로
+이미 `is_active`를 확인해 거부하므로, 탈퇴 후 재로그인은 물론 탈퇴 시점에 들고 있던 토큰도 즉시
+쓸모없어집니다 — 이 뷰에서 따로 로그인 차단 로직을 추가할 필요가 없었습니다.
 
 ### 권한 검사 패턴 (여러 파일에 걸쳐 있어 한눈에 파악하기 어려움)
 이 프로젝트는 DRF의 오브젝트 레벨 permission class를 쓰지 않습니다. 대신 각 view의
@@ -128,6 +137,20 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 
 `sensor/mock_sensor.py`는 Django에 의존하지 않는 순수 MQTT publisher로, 실제 하드웨어 없이
 로컬에서 파이프라인을 테스트할 때 사용합니다.
+
+### 데모 시드 데이터 (`seedlings/management/commands/seed_demo.py`)
+`python manage.py seed_demo`는 DB가 비어 있어 프론트엔드 화면이 전부 빈 상태로 보일 때 앱 전체
+흐름을 바로 확인할 수 있도록 계정 3개(`adopter@demo.com`/`adopter2@demo.com`/`grower@demo.com`,
+비밀번호 모두 `demo1234`) + 묘목 3개(재배중/완료/다른 입양자 소유 재배중 각 1개, 모두 위 재배자
+담당) + 묘목 #1에 일지 3건(6/20·7/2·7/18로 날짜 분산, 성장 타임라인이 시간 역순으로 보이도록) +
+센서 데이터 6건(정상 5건 + 습도 급등 1건)을 만듭니다. 센서 데이터는 `SensorDataCreateView.
+perform_create()`와 동일하게 `detect_anomaly()`/`build_diagnosis_text()`를 실제로 호출해
+저장하므로(직접 `is_anomaly=True`를 박아넣지 않음), 이력 5건이 쌓인 뒤 마지막 습도 85% 값이
+Prophet 기반 판정으로 실제 이상 감지되고(`GEMINI_API_KEY` 설정 시 `gemini_diagnosis`도 진짜
+Gemini 응답으로 채워짐) "최근 이상 이력"이 재현 가능하게 나타납니다. 멱등하게 동작합니다 — 이메일이
+이미 있는 계정, `(adopter, grower, status)` 조합이 이미 있는 묘목, 일지/센서 데이터가 하나라도
+있는 묘목은 건너뛰므로 재실행해도 중복 생성되지 않습니다. Django 커맨드 규칙에 따라 앱 하나(
+`seedlings`) 아래 두었지만 `accounts`/`diary`/`sensor` 모델을 모두 다룹니다.
 
 ### 비전 분석 (mock → 실제 YOLOv8로 교체 예정)
 `vision/yolo_inference.py`의 `analyze_image(image_path)`는 아직 무화과 학습 데이터가 없어
@@ -253,7 +276,20 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   옵션과 기부처 3곳을 모두 로컬 `State`로만 관리하며(수령 선택 시 기부처 목록·버튼 자체가 숨겨짐),
   `Seedling.pickup_or_donate`/`donate_type` API 연동은 하지 않는 순수 정적 UI입니다. 디자인의 점선
   테두리(일지 사진 업로드 박스, 기부 인증서 카드)는 Flutter에 내장 dashed border가 없어 실선으로
-  근사했습니다.
+  근사했습니다. `mypage_screen.dart` 하단(메뉴 리스트 밖, 별도 배치)에는 "로그아웃"(muted 텍스트)과
+  "회원탈퇴"(더 작은 회색 텍스트)가 있습니다 — 로직은 `features/auth/presentation/account_actions.dart`
+  의 `confirmLogout()`/`confirmDeleteAccount()`를 그대로 호출하는데, 이 두 함수는 `AlertDialog` 확인 →
+  `AuthRepository.logout()`(로컬 토큰 삭제만)/`deleteAccount()`(`DELETE /api/accounts/me/` 호출 후
+  토큰 삭제) → `pushNamedAndRemoveUntil('/', (route) => false)`로 로그인 화면 이동(뒤로가기로 못
+  돌아오게 네비게이션 스택을 전부 비움)까지를 한 번에 처리합니다. `GrowerShell`에는 마이페이지 탭
+  자체가 없어서(홈/일지/환경점검 3탭뿐) 재배자용 로그아웃 진입점은 디자인 문서(1r~1u)에도 없는
+  자리인데, 해당 문서 어디에도 재배자 화면엔 프로필/설정 메뉴가 없어(앱바는 로고+벨뿐) 새로 위치를
+  정해야 했습니다. `GrowerDashboardScreen`(홈 탭)의 앱바에 사람 아이콘을 하나 추가해 탭하면
+  `showModalBottomSheet`로 로그아웃/회원탈퇴 두 줄이 뜨는 방식을 택했습니다 — 이를 위해
+  `PigFigAppBar`에 `onProfileTap` 옵션을 추가했고(지정할 때만 벨 옆에 사람 아이콘이 나타남, 나머지
+  화면은 영향 없음) 기존 `showNotificationBell`/`closeLabel` 패턴과 동일하게 opt-in 방식입니다. 두
+  화면(입양자 마이페이지/재배자 대시보드)이 같은 다이얼로그 로직을 그대로 재사용하므로 코드 중복이
+  없습니다.
 - `features/adopter/data/seedling_repository.dart`는 `grower/data/grower_repository.dart`와 동일한
   패턴(같은 `GET /api/seedlings/`, 같은 `Seedling`/`SeedlingStatus` 모양)을 입양자 쪽에도 그대로
   적용한 별도 파일입니다 — 기능이 겹치더라도 feature 간 참조 없이 각 feature가 자기 데이터 계층을
@@ -327,7 +363,8 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
   (회원가입/로그인/홈/케어 4종/게임 탭/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇),
-  재배자 플로우(대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인),
+  재배자 플로우(대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인·
+  로그아웃·회원탈퇴),
   seedlings(`GET /api/seedlings/` 목록 조회, `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary
   (`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회), sensor
   (`POST /api/sensor/data/` 저장, `GET /api/sensor/anomaly/{seedling_id}/` 이력 조회),
@@ -337,7 +374,10 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   시나리오까지 확인; 입양자 홈 화면은 묘목 있는 계정/없는 계정 각각 확인; sensor는 정상 범위 값 저장
   → "정상이에요" 표시, 범위 밖 값 저장 → 실제 백엔드 판정 문구가 "이상 감지" 박스와 이력에 반영되는
   것까지 확인; chatbot은 `GEMINI_API_KEY` 미설정 상태에서 mock 응답으로 테스트, 이후 실키가 설정됨
-  — 재검증은 하지 않음). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지/환경 점검 작성이 모두
+  — 재검증은 하지 않음; 로그아웃/회원탈퇴는 입양자로 로그아웃한 뒤 곧바로 재배자로 로그인하는 전환
+  흐름과, 데모 계정이 아닌 새 테스트 계정으로 회원탈퇴 후 같은 계정으로 재로그인이 실제로 거부되는
+  것까지 확인 — 데모 계정(`adopter@demo.com` 등)은 탈퇴 검증에 쓰지 않아 seed 데이터가 그대로
+  보존됨). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지/환경 점검 작성이 모두
   실제 데이터를 쓰지만, 케어 게이지 4종·마이페이지 프로필·수령/기부 선택은 여전히 로컬 mock
   상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(vision API,
   `Seedling.pickup_or_donate` 갱신 API 미연동)

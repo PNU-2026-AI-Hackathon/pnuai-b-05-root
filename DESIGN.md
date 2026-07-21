@@ -28,6 +28,7 @@ Pig.Fig. 서비스 플로우 및 API 설계 문서입니다.
 |---|---|---|
 | `/api/accounts/register/` | POST | 회원가입 |
 | `/api/accounts/login/` | POST | 로그인 (JWT 발급) |
+| `/api/accounts/me/` | DELETE | 회원탈퇴 (본인 계정 소프트 삭제, `is_active=False`) |
 | `/api/seedlings/` | GET/POST | 묘목 목록 조회 / 입양 생성 |
 | `/api/seedlings/{id}/` | GET | 묘목 상세 조회 |
 | `/api/seedlings/{id}/complete/` | PATCH | 재배자 묘목 완성 신고 (입양자에게 FCM 알림 발송) |
