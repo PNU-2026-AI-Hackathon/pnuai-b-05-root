@@ -62,3 +62,38 @@ class LoginViewTests(APITestCase):
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
         self.assertEqual(response.data['role'], User.Role.GROWER)
+
+
+class AccountDeleteViewTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='adopter@example.com', password='testpass123', role=User.Role.ADOPTER,
+        )
+        self.url = reverse('accounts:delete-account')
+
+    def test_unauthenticated_request_is_rejected(self):
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_active)
+
+    def test_delete_account_deactivates_user(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_active)
+
+    def test_login_fails_after_account_deleted(self):
+        self.client.force_authenticate(user=self.user)
+        self.client.delete(self.url)
+
+        login_url = reverse('accounts:login')
+        response = self.client.post(
+            login_url, {'email': self.user.email, 'password': 'testpass123'},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

@@ -53,4 +53,11 @@ class AuthRepository {
   }
 
   Future<void> logout() => _tokenStorage.clear();
+
+  /// 회원탈퇴. `DELETE /api/accounts/me/` 호출 후 로컬 토큰도 함께 지운다.
+  Future<void> deleteAccount() async {
+    final accessToken = await _tokenStorage.readAccessToken();
+    await _apiClient.delete('/api/accounts/me/', accessToken: accessToken!);
+    await _tokenStorage.clear();
+  }
 }

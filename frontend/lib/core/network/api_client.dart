@@ -128,6 +128,38 @@ class ApiClient {
     );
   }
 
+  /// JWT access 토큰이 필요한 인증된 DELETE 요청.
+  Future<Map<String, dynamic>> delete(
+    String path, {
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    late final http.Response response;
+    try {
+      response = await http.delete(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+    } on Exception {
+      throw ApiException('서버에 연결할 수 없어요. 네트워크 상태를 확인해주세요.');
+    }
+
+    final decoded = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded;
+    }
+    throw ApiException(
+      _extractErrorMessage(decoded),
+      statusCode: response.statusCode,
+    );
+  }
+
   /// 인증된 `multipart/form-data` POST 요청. 파일 필드(`fileFieldName`)가 주어지면
   /// 바이트로 첨부한다 — 웹에서도 동일하게 동작하도록 파일 경로가 아닌 바이트를 받는다.
   Future<Map<String, dynamic>> postMultipart(

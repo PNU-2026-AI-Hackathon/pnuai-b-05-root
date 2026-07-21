@@ -6,6 +6,7 @@ import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/gauge_bar.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/status_badge.dart';
+import '../../auth/presentation/account_actions.dart';
 import 'donation_certificate_screen.dart';
 
 /// 1n — 마이페이지: 프로필 카드 + 리스트 메뉴. mock 데이터로 표시한다.
@@ -93,6 +94,31 @@ class MypageScreen extends StatelessWidget {
                     showDivider: false,
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 28),
+            Center(
+              child: TextButton(
+                onPressed: () => confirmLogout(context),
+                child: Text(
+                  '로그아웃',
+                  style: AppTextStyles.body(
+                    fontSize: 14,
+                    color: AppColors.textMuted,
+                  ).copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            Center(
+              child: TextButton(
+                onPressed: () => confirmDeleteAccount(context),
+                child: Text(
+                  '회원탈퇴',
+                  style: AppTextStyles.caption(
+                    fontSize: 12,
+                    color: AppColors.textCaption,
+                  ),
+                ),
               ),
             ),
           ],

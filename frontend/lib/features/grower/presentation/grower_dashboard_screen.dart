@@ -7,6 +7,7 @@ import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../../../shared/widgets/status_badge.dart';
+import '../../auth/presentation/account_actions.dart';
 import '../data/grower_repository.dart';
 import 'grower_complete_screen.dart';
 
@@ -59,10 +60,57 @@ class _GrowerDashboardScreenState extends State<GrowerDashboardScreen> {
     if (mounted) _load();
   }
 
+  void _showAccountMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.logout, color: AppColors.textPrimary),
+              title: Text('로그아웃', style: AppTextStyles.body(fontSize: 15)),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                confirmLogout(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.person_remove_outlined,
+                color: AppColors.textCaption,
+              ),
+              title: Text(
+                '회원탈퇴',
+                style: AppTextStyles.body(
+                  fontSize: 14,
+                  color: AppColors.textCaption,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                confirmDeleteAccount(context);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const PigFigAppBar(showNotificationBell: true),
+      appBar: PigFigAppBar(
+        showNotificationBell: true,
+        onProfileTap: _showAccountMenu,
+      ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
         child: _buildBody(),
