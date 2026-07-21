@@ -7,6 +7,7 @@ import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../models/game_item.dart';
 import '../models/game_result.dart';
+import '../shared/game_items.dart';
 import '../shared/game_scaffold.dart';
 import 'fig_quiz_questions.dart';
 
@@ -22,28 +23,6 @@ class FigQuizScreen extends StatefulWidget {
 class _FigQuizScreenState extends State<FigQuizScreen> {
   /// 목표 점수(이 이상이면 cleared + 아이템 획득).
   static const _clearScore = 70;
-
-  /// 70점 이상 달성 시 랜덤으로 하나 지급하는 보상 아이템 후보.
-  static const _rewardPool = <GameItem>[
-    GameItem(
-      id: 'fig_leaf_fan',
-      name: '무화과잎 부채',
-      emoji: '🍃',
-      description: '무더운 여름날 무화과나무 곁에서 부쳐 주는 시원한 잎 부채.',
-    ),
-    GameItem(
-      id: 'senior_watering_can',
-      name: '시니어의 물뿌리개',
-      emoji: '💧',
-      description: '시니어 재배자의 정성이 담긴 든든한 물뿌리개.',
-    ),
-    GameItem(
-      id: 'warm_sunlight',
-      name: '햇살 한 줌',
-      emoji: '☀️',
-      description: '묘목을 무럭무럭 자라게 하는 따뜻한 햇살 한 줌.',
-    ),
-  ];
 
   int _index = 0;
   int _correctCount = 0;
@@ -88,7 +67,7 @@ class _FigQuizScreenState extends State<FigQuizScreen> {
     final cleared = score >= _clearScore;
     // 목표 달성 시에만 후보 중 하나를 랜덤으로 지급한다.
     final GameItem? earned =
-        cleared ? _rewardPool[Random().nextInt(_rewardPool.length)] : null;
+        cleared ? rewardItems[Random().nextInt(rewardItems.length)] : null;
     final result = GameResult(score: score, cleared: cleared, itemEarned: earned);
     if (!mounted) return;
     await GameScaffold.showResultDialog(context, result);
