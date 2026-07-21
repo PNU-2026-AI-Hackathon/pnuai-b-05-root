@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/revalidatable_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/care_action_button.dart';
@@ -21,10 +22,11 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends RevalidatableState<HomeScreen> {
   final _repository = SeedlingRepository();
 
   bool _loading = true;
+  bool _hasLoadedOnce = false;
   String? _errorMessage;
   Seedling? _seedling;
 
@@ -46,6 +48,20 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _errorMessage = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
+      _hasLoadedOnce = true;
+    }
+  }
+
+  /// `AdopterShell`이 홈 탭 재진입 시 호출한다. 완성 신고 등으로 묘목 상태가 바뀌었을
+  /// 수 있으니 다시 불러오되, 기존 화면은 그대로 둔 채 응답이 오면 조용히 교체한다.
+  @override
+  Future<void> revalidate() async {
+    if (!_hasLoadedOnce) return _load();
+    try {
+      final seedlings = await _repository.fetchSeedlings();
+      if (mounted) setState(() => _seedling = pickPrimarySeedling(seedlings));
+    } on ApiException {
+      // 재조회 실패 시 기존 화면을 그대로 유지한다.
     }
   }
 

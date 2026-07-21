@@ -46,14 +46,6 @@ class MypageScreen extends StatelessWidget {
               child: Column(
                 children: [
                   _MenuRow(
-                    emoji: '📸',
-                    iconBg: AppColors.pink100,
-                    label: '성장 타임라인',
-                    onTap: () => Navigator.of(
-                      context,
-                    ).pushNamed('/adopter/growth-timeline'),
-                  ),
-                  _MenuRow(
                     emoji: '🎁',
                     iconBg: AppColors.green500,
                     label: '수령 / 기부 선택',

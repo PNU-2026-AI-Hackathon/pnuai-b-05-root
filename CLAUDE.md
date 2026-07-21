@@ -12,9 +12,9 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
 
 ## 기술 스택
 
-- **프론트엔드**: Flutter — 최초 실행 온보딩(2장), 입양자(adopter) 플로우(회원가입/로그인/홈/케어 4종/
-  게임 탭/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(대시보드/일지/
-  환경점검 3탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인/로그아웃/`DELETE /api/accounts/me/`
+- **프론트엔드**: Flutter — 최초 실행 온보딩(2장), 입양자(adopter) 플로우(회원가입/로그인/홈·타임라인·
+  게임·마이페이지 4탭/케어 4종/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(홈·일지·
+  환경점검·마이 4탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인/로그아웃/`DELETE /api/accounts/me/`
   회원탈퇴), seedlings(`GET /api/seedlings/` 목록
   조회 + `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary(`POST /api/diary/` 작성 +
   `GET /api/diary/{seedling_id}/` 조회, 사진은 `image_picker`로 선택해 multipart 업로드), sensor
@@ -219,11 +219,30 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   햇빛=`Slider`, 가지치기=`onLongPressStart` 트리거 `AnimationController.forward()`가 완료되면 1회성으로
   완료 처리. 네 화면 모두 화면을 벗어나면(라우트 pop) 상태가 초기화되는 로컬 mock 상태이며 백엔드에
   저장되지 않습니다.
-- `features/grower/presentation/grower_shell.dart`는 `adopter_shell.dart`와 달리 진짜로 탭을 전환하는
-  `StatefulWidget`입니다(`_index`로 `GrowerDashboardScreen`/`GrowerDiaryScreen`/`GrowerSensorScreen`을
-  스왑). 각 탭 화면은 `adopter`의 `HomeScreen`처럼 자기 자신도 `Scaffold`+`PigFigAppBar`를 갖고 있어
-  `GrowerShell`의 `Scaffold.body`로 들어가는 중첩 Scaffold 구조입니다 — 새 탭을 추가할 때도 이 패턴을
-  따릅니다. 대시보드/일지/환경점검 모두 mock 데이터이며 sensor/diary API를 호출하지 않습니다.
+- `features/grower/presentation/grower_shell.dart`는 홈(`GrowerDashboardScreen`)/일지
+  (`GrowerDiaryScreen`)/환경점검(`GrowerSensorScreen`)/마이(`GrowerMypageScreen`) 4탭
+  `StatefulWidget`입니다. `body: IndexedStack(index: _index, children: _screens)`로 네 화면을 전부
+  트리에 유지한 채 화면만 바꿔치기하므로, 탭을 벗어났다 돌아와도 각 화면의 `State`(불러온 데이터,
+  입력 중이던 값 등)가 사라지지 않습니다 — 예전엔 `_screens[_index]`로 매번 선택된 위젯 하나만
+  트리에 있어서 탭을 바꾸면 이전 화면의 State가 그대로 dispose됐었습니다. 대가로, 로그인 직후
+  네 탭이 한꺼번에 mount되면서 `GrowerRepository.fetchSeedlings()`를 부르는 화면(대시보드/일지/
+  환경점검/마이 전부)이 동시에 각자 한 번씩 호출해 `GET /api/seedlings/`가 여러 번 중복 요청되는데,
+  기능상 문제는 없고(각자 필요한 값만 씀) 별도 캐싱 레이어 없이 그대로 두었습니다. 각 탭 화면은
+  `adopter`의 `HomeScreen`처럼 자기 자신도 `Scaffold`+`PigFigAppBar`를 갖고 있어 `GrowerShell`의
+  `Scaffold.body`로 들어가는 중첩 Scaffold 구조입니다 — 새 탭을 추가할 때도 이 패턴을 따릅니다.
+  다만 `IndexedStack`이 State를 보존한다는 건 각 화면의 `initState`가 최초 1번만 실행된다는
+  뜻이라서, 탭을 벗어났다 돌아와도 데이터가 다시 조회되지 않는 부작용이 있었습니다(예: 재배자
+  대시보드 탭을 벗어나 일지를 쓰고 돌아와도 통계가 안 바뀜). `core/revalidatable_state.dart`의
+  `RevalidatableState<T>`(`revalidate()` 추상 메서드 하나짜리)로 이를 해결했습니다 — `Shell`이
+  재조회가 필요한 화면마다 `GlobalKey<RevalidatableState>`를 쥐고 있다가, `_switchTab()`에서 탭
+  인덱스가 실제로 바뀔 때만(같은 탭을 다시 눌러도 재조회하지 않도록 가드) 새로 활성화되는 탭의
+  키로 `.currentState?.revalidate()`를 직접 호출합니다. `revalidate()` 구현은 stale-while-revalidate
+  패턴을 따릅니다 — 로딩 스피너를 띄우거나 기존 데이터를 지우지 않고 백그라운드로만 다시 불러와
+  성공하면 조용히 교체하고, 실패하면 기존 데이터를 그대로 둡니다(첫 진입이 아직 안 끝난 예외 상황만
+  일반 로드로 대체). 현재 `HomeScreen`/`GrowthTimelineScreen`(`AdopterShell`)과
+  `GrowerDashboardScreen`/`GrowerMypageScreen`(`GrowerShell`)이 이 패턴을 쓰고, `GrowerDiaryScreen`/
+  `GrowerSensorScreen`은 입력값이 매번 새로 작성되는 화면이라 재조회 이슈가 없어 적용하지 않았습니다.
+  대시보드/일지/환경점검 모두 mock 데이터이며 sensor/diary API를 호출하지 않습니다.
   `login_screen.dart`는 로그인 응답의 `role`이 `grower`면 `pushReplacementNamed('/grower')`로 이동합니다
   (이전엔 "재배자 화면은 준비 중이에요" 스낵바만 띄웠으나 grower 플로우 구현 후 실제 이동으로 변경).
 - `GrowerDashboardScreen`은 `StatefulWidget`으로 `initState`에서 `GrowerRepository.fetchSeedlings()`
@@ -252,8 +271,12 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   `Visibility(maintainSize: true)`로 자리만 차지한 채 숨겨집니다(디자인 문서의 세 번째 온보딩 프레임이
   "건너뛰기" 자리에 투명 placeholder를 두는 것과 동일한 방식). claude.ai/design 문서에는 온보딩 3
   "앱으로 케어"도 있지만 이번 범위에서 의도적으로 제외했습니다.
-- `adopter_shell.dart`도 `grower_shell.dart`처럼 실제 탭 전환이 필요해지면서 `StatefulWidget`으로
-  바뀌었습니다(`_tab`으로 홈/게임/마이페이지 세 화면을 스왑하는 `switch` 식). `games_screen.dart`
+- `adopter_shell.dart`도 `grower_shell.dart`와 동일하게 홈/타임라인(`GrowthTimelineScreen`)/게임/
+  마이페이지 4탭을 `IndexedStack`으로 유지하는 `StatefulWidget`입니다(처음엔 `switch` 식으로 선택된
+  화면 하나만 트리에 뒀는데, 두 `Shell` 모두 `IndexedStack`으로 바꿔 상태 보존과 구현 방식을
+  통일했습니다). 홈/타임라인도 `grower_shell.dart` 문단에서 설명한 `RevalidatableState` +
+  `GlobalKey` 패턴으로 탭 재진입 시 백그라운드 재조회를 합니다(완성 신고나 새 일지처럼 다른 곳에서
+  바뀐 데이터가 반영되어야 하므로). `games_screen.dart`
   (1m)는 2x2 게임 카드 그리드(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍, 각 카드에
   `StatusBadge`로 난이도 배지) + 하단 "보유 아이템" 바로 구성되며, 게임 자체와 아이템 시스템은
   아직 미구현이라 카드/보유 아이템 모두 로컬 mock입니다. 카드를 탭하면 `_openGame()`이 `GameType`
@@ -268,8 +291,9 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   조용히 사라짐 — Playwright로 실제 렌더링을 확인하지 않았다면 놓쳤을 버그). 각 `Row`를
   `IntrinsicHeight`로 감싸 높이를 먼저 유한하게 확정시킨 뒤 `stretch`를 적용하는 방식으로
   해결했습니다. `mypage_screen.dart`
-  는 프로필 카드 + 리스트 메뉴이며, 이번 범위 밖인 메뉴(성장 타임라인/AI 챗봇/알림 설정/입양 내역)는
-  탭하면 스낵바만 띄우고, "수령 / 기부 선택"과 "기부 인증서"만 실제로 이동합니다. "기부 인증서"는
+  는 프로필 카드 + 리스트 메뉴입니다. "성장 타임라인"은 하단 탭으로 승격되면서 이 메뉴 목록에서는
+  빠졌고(아래 참고), "AI 챗봇"과 "수령 / 기부 선택"·"기부 인증서"는 실제로 이동하며, 이번 범위 밖인
+  "알림 설정"/"입양 내역"만 탭하면 스낵바만 띄웁니다. "기부 인증서"는
   마이페이지에서 곧장 진입할 때는 하드코딩된 mock 인자를 쓰고, `pickup_donate_screen.dart`에서
   기부처를 선택해 진입할 때는 실제 선택한 기부처 이름을 `DonationCertificateArgs`로 넘깁니다(둘 다
   `GrowerCompleteArgs`와 동일한 route-argument 패턴). `pickup_donate_screen.dart`는 수령/기부 두
@@ -281,15 +305,15 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   의 `confirmLogout()`/`confirmDeleteAccount()`를 그대로 호출하는데, 이 두 함수는 `AlertDialog` 확인 →
   `AuthRepository.logout()`(로컬 토큰 삭제만)/`deleteAccount()`(`DELETE /api/accounts/me/` 호출 후
   토큰 삭제) → `pushNamedAndRemoveUntil('/', (route) => false)`로 로그인 화면 이동(뒤로가기로 못
-  돌아오게 네비게이션 스택을 전부 비움)까지를 한 번에 처리합니다. `GrowerShell`에는 마이페이지 탭
-  자체가 없어서(홈/일지/환경점검 3탭뿐) 재배자용 로그아웃 진입점은 디자인 문서(1r~1u)에도 없는
-  자리인데, 해당 문서 어디에도 재배자 화면엔 프로필/설정 메뉴가 없어(앱바는 로고+벨뿐) 새로 위치를
-  정해야 했습니다. `GrowerDashboardScreen`(홈 탭)의 앱바에 사람 아이콘을 하나 추가해 탭하면
-  `showModalBottomSheet`로 로그아웃/회원탈퇴 두 줄이 뜨는 방식을 택했습니다 — 이를 위해
-  `PigFigAppBar`에 `onProfileTap` 옵션을 추가했고(지정할 때만 벨 옆에 사람 아이콘이 나타남, 나머지
-  화면은 영향 없음) 기존 `showNotificationBell`/`closeLabel` 패턴과 동일하게 opt-in 방식입니다. 두
-  화면(입양자 마이페이지/재배자 대시보드)이 같은 다이얼로그 로직을 그대로 재사용하므로 코드 중복이
-  없습니다.
+  돌아오게 네비게이션 스택을 전부 비움)까지를 한 번에 처리합니다. `GrowerShell`도 이제 홈/일지/
+  환경점검/마이 4탭이라 같은 로직을 `grower_mypage_screen.dart`(마이 탭)에서 그대로 재사용합니다 —
+  처음엔 마이페이지 탭이 없던 시절이라 `GrowerDashboardScreen` 앱바에 사람 아이콘+바텀시트로
+  로그아웃 진입점을 임시로 넣었었는데(`PigFigAppBar`의 `onProfileTap` 옵션), 마이 탭이 생기면서
+  중복이라 그 옵션과 바텀시트 코드는 완전히 제거했습니다. `grower_mypage_screen.dart`는 프로필
+  카드(이메일 + "담당 묘목 N그루", `GrowerRepository.fetchSeedlings().length`로 계산)와 로그아웃/
+  회원탈퇴만 있는 단순한 화면입니다 — 이메일은 백엔드에 프로필 조회 API가 없어서, 로그인 시점에
+  이미 알고 있는 값을 `TokenStorage`에 함께 저장해뒀다가(`AuthRepository.login()`이 토큰과 같이
+  `email`도 저장, `logout()`/`deleteAccount()`가 토큰과 함께 지움) 읽어오는 방식입니다.
 - `features/adopter/data/seedling_repository.dart`는 `grower/data/grower_repository.dart`와 동일한
   패턴(같은 `GET /api/seedlings/`, 같은 `Seedling`/`SeedlingStatus` 모양)을 입양자 쪽에도 그대로
   적용한 별도 파일입니다 — 기능이 겹치더라도 feature 간 참조 없이 각 feature가 자기 데이터 계층을
@@ -300,8 +324,13 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   고쳤습니다. `home_screen.dart`는 이제 `StatefulWidget`으로 `initState`에서 이 repository를 호출해
   로딩/에러/(묘목 없음→ 입양 유도 CTA)/데이터 4가지 상태를 분기하며, 물주기 등 케어 게이지 4종은
   여전히 로컬 mock이라 실제 묘목 데이터와 무관하게 동작합니다.
-- `growth_timeline_screen.dart`(마이페이지의 "성장 타임라인" 메뉴에서 진입)도 `StatefulWidget`으로
-  바뀌어 `seedling_repository.dart`로 대표 묘목을 고른 뒤 `features/adopter/data/diary_repository.dart`
+- `growth_timeline_screen.dart`는 `AdopterShell`의 두 번째 탭("타임라인")입니다 — 원래 마이페이지의
+  "성장 타임라인" 메뉴를 눌러야 들어갈 수 있었는데, 자주 확인하는 화면이라 하단 탭으로 승격하면서
+  마이페이지 메뉴 목록에서는 해당 항목을 뺐습니다(탭과 메뉴에 같은 목적지가 중복되는 걸 피함). 앱바도
+  다른 탭 화면과 통일하려고 `closeLabel: '닫기'`(누르면 pop) 대신 `showNotificationBell: true`로
+  바꿨습니다 — 탭 화면은 애초에 push되는 게 아니라 `IndexedStack`으로 항상 트리에 떠 있어서 "닫을"
+  대상이 없기 때문입니다. `StatefulWidget`으로
+  `seedling_repository.dart`로 대표 묘목을 고른 뒤 `features/adopter/data/diary_repository.dart`
   의 `fetchDiaries()`로 `GET /api/diary/{seedling_id}/`를 호출합니다. 실제 `Diary` 모델에는 성장
   단계·키·잎 개수 필드가 없어(그건 애초에 mock이 지어낸 값) 카드는 날짜 + `content` 본문 +
   (있으면) `yolo_status_tag` 배지로 단순화됐고, `photo` URL이 있으면 `Image.network()`로 실제 사진을,
@@ -322,9 +351,9 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   표시합니다 — 온도/습도/조도 세 값 중 어느 필드가 문제인지는 응답에 없어서(위 백엔드 섹션 참고)
   각 수치 행의 "정상/주의" 배지는 없앴고, 전체 판정만 보여줍니다. 저장 성공 시 같은 묘목의
   `GET /api/sensor/anomaly/{seedling_id}/`를 다시 호출해 화면 하단 "최근 이상 이력"(최대 3건,
-  `recorded_at` 내림차순)도 함께 갱신합니다. 이 화면도 `GrowerShell`의 탭이라 다른 탭으로 이동했다가
-  돌아오면 State가 재생성되어 입력값(스테퍼로 조정한 온도/습도/조도)이 초기값으로 리셋됩니다 — 케어
-  게이지 4종과 같은 종류의 로컬 mock 한계입니다.
+  `recorded_at` 내림차순)도 함께 갱신합니다. `GrowerShell`이 `IndexedStack`으로 바뀐 뒤로는 다른
+  탭으로 이동했다가 돌아와도 입력값(스테퍼로 조정한 온도/습도/조도)이 유지됩니다 — 이전에는
+  탭 전환마다 State가 재생성돼 초기값으로 리셋됐었습니다.
 - `chatbot_screen.dart`(마이페이지의 "AI 챗봇" 메뉴에서 진입)는 `features/adopter/data/
   chatbot_repository.dart`를 통해 실제 `POST /api/chatbot/ask/`를 호출합니다. 이 호출도
   `grower_repository.dart`의 완성 신고처럼 인증 토큰이 필요한데, `PATCH`용으로 이미 있던
@@ -362,9 +391,9 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   검증 완료(위 "RAG 챗봇 파이프라인" 참고)
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
-  (회원가입/로그인/홈/케어 4종/게임 탭/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇),
-  재배자 플로우(대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인·
-  로그아웃·회원탈퇴),
+  (회원가입/로그인/홈·타임라인·게임·마이페이지 4탭/케어 4종/수령·기부 선택/기부 인증서/AI 챗봇),
+  재배자 플로우(홈·일지·환경점검·마이 4탭 + 묘목 완성 신고) 모두 구현됨. `AdopterShell`/`GrowerShell`
+  둘 다 `IndexedStack`으로 탭 상태를 보존합니다. accounts(회원가입·로그인·로그아웃·회원탈퇴),
   seedlings(`GET /api/seedlings/` 목록 조회, `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary
   (`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회), sensor
   (`POST /api/sensor/data/` 저장, `GET /api/sensor/anomaly/{seedling_id}/` 이력 조회),
