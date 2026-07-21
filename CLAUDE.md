@@ -23,7 +23,9 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
   수령/기부 선택은 여전히 로컬 mock이며, 재배자용 vision API 연동은 아직 미착수
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
-- **비전 분석**: YOLOv8 — `vision/yolo_inference.py`에 구조는 있으나 현재 mock 추론(랜덤 값 반환)
+- **비전 분석**: YOLOv8-cls — `vision/yolo_inference.py`에서 `backend/vision/weights/best.pt`
+  (healthy/infected 이진 분류, val top1 96.1%)로 실제 추론. 가중치가 없으면(`.gitignore` 대상)
+  mock으로 폴백
 - **시계열 예측**: Prophet — 센서 이상 감지에 이미 사용 중 (`sensor/anomaly.py`)
 - **챗봇**: LangChain RAG + Gemini API — 구현 완료, `GEMINI_API_KEY` 미설정 시 mock 응답
 - **IoT 연동**: MQTT (paho-mqtt) — 센서 데이터 수집 (`sensor/mqtt_client.py`)
@@ -152,13 +154,33 @@ Gemini 응답으로 채워짐) "최근 이상 이력"이 재현 가능하게 나
 있는 묘목은 건너뛰므로 재실행해도 중복 생성되지 않습니다. Django 커맨드 규칙에 따라 앱 하나(
 `seedlings`) 아래 두었지만 `accounts`/`diary`/`sensor` 모델을 모두 다룹니다.
 
-### 비전 분석 (mock → 실제 YOLOv8로 교체 예정)
-`vision/yolo_inference.py`의 `analyze_image(image_path)`는 아직 무화과 학습 데이터가 없어
-현재는 랜덤 mock 값(result_tag/confidence/location_info)을 반환합니다. `_get_model()`이
-`ultralytics.YOLO`를 lazy하게 로드하도록 구조만 잡아뒀고, 실제 추론 코드는 붙어있지 않습니다
-(테스트에서 가중치 다운로드가 트리거되지 않도록 의도적으로 그렇게 되어 있음). `VisionAnalyzeView`는
-재배자만 호출 가능하며, `diary_id`를 함께 보내면 해당 `Diary.yolo_status_tag`도 갱신합니다
-(diary 소유권 검사 포함).
+### 비전 분석 (YOLOv8-cls 실제 추론)
+`vision/yolo_inference.py`의 `analyze_image(image_path)`는 `backend/vision/weights/best.pt`가
+있으면 실제 YOLOv8-cls(분류) 모델로 추론합니다. 이 가중치는 Mendeley "fig leaves dataset"
+(CC BY 4.0, 무화과잎마름나방 감염 여부 기준 healthy/infected로 라벨링된 2,321장)으로 학습한
+이진 분류 모델이며, val top1 정확도는 96.1%입니다. object detection이 아니라 classification이라
+이미지 전체에 대한 라벨·확률만 나오고 잎의 위치 좌표는 나오지 않습니다 — 그래서
+`_run_inference()`는 `location_info`를 항상 `None`으로 반환합니다(주석에도 "detection 모델
+도입 시 실제 위치 정보로 교체 예정"이라고 명시). 모델의 클래스명(`healthy`/`infected`)은
+`REAL_CLASS_TO_TAG`로 한국어 태그("정상"/"이상감지")에 매핑됩니다. `_get_model()`은
+`ultralytics.YOLO`를 프로세스당 한 번만 lazy 로드해 전역(`_model`)에 캐싱합니다(최초 로드에
+~8초가 걸려 매 요청마다 다시 로드하면 안 됨).
+
+`best.pt`는 `.gitignore`(`backend/vision/weights/`)에 등록돼 있어 커밋되지 않으므로, 이 파일이
+없는 환경(다른 팀원 로컬, CI)이나 추론 중 예외가 나면 `analyze_image()`가 조용히 기존 mock
+동작(`_mock_inference()`, `RESULT_TAGS`의 4개 태그 중 랜덤 선택 + 가짜 "선반X-Y번" 위치)으로
+폴백합니다 — `sensor/anomaly.py`의 Gemini 폴백과 동일한 구조(게이트 체크 → try/except → 정적
+폴백, 실제 호출부를 별도 함수로 분리해 테스트에서 mock 가능)입니다. `vision/tests.py`는 이 두
+경로를 각각 검증합니다: `VisionAnalyzeViewTests`는 `vision.views.analyze_image`를 고정값으로
+mock해 권한(재배자만 가능)·diary 연동 로직만 실제 추론 여부와 무관하게 검증하고,
+`AnalyzeImageTests`는 `yolo_inference.py` 자체를 대상으로 가중치 파일 없음/추론 예외 시
+mock 폴백 여부를 검증하며, 실제 추론 happy path(`test_real_inference_returns_valid_classification`)는
+`@unittest.skipUnless(_MODEL_PATH.exists(), ...)`로 가중치가 있을 때만 돌게 해 이 파일이 없는
+환경에서도 `manage.py test vision`이 항상 깨끗이 통과합니다. `VisionAnalyzeView`는 재배자만
+호출 가능하며, `diary_id`를 함께 보내면 해당 `Diary.yolo_status_tag`도 갱신합니다(diary 소유권
+검사 포함). `VisionAnalysis.result_tag`/`Diary.yolo_status_tag` 둘 다 `choices=` 없는 자유
+`CharField`라 mock의 4개 태그와 실제 추론의 "정상"/"이상감지"가 같은 필드에 섞여도 마이그레이션
+없이 그대로 저장됩니다.
 
 ### RAG 챗봇 파이프라인
 `chatbot/rag_pipeline.py`는 농촌진흥청 매뉴얼 기반 지식 문서 10개를 코드에 직접 하드코딩해두고
@@ -386,7 +408,9 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 ## 현재 개발 상태
 
 - 백엔드: 7개 앱(accounts/seedlings/diary/sensor/vision/chatbot/notifications) 모두 구현 완료
-- vision의 YOLOv8 추론은 아직 mock, notifications는 `FIREBASE_CREDENTIALS_PATH` 미설정 시 mock
+- vision의 YOLOv8-cls 추론은 `backend/vision/weights/best.pt`(healthy/infected 이진 분류, val
+  top1 96.1%, `.gitignore` 대상이라 로컬에만 있음)로 실제 연동 완료(위 "비전 분석" 참고, 가중치
+  없는 환경은 mock으로 자동 폴백). notifications는 `FIREBASE_CREDENTIALS_PATH` 미설정 시 mock
   발송으로 대체되어 로컬에서도 키 없이 동작. `GEMINI_API_KEY`는 이제 로컬 `.env`에 실제 값이 설정돼
   있고, `sensor/anomaly.py`의 `gemini_diagnosis`는 실제 Gemini API(`gemini-2.5-flash`)로 진단 문장을
   생성하도록 연동 완료(위 "센서 데이터 파이프라인" 참고). `chatbot` 앱도 `gemini-2.5-flash`(LLM)/
