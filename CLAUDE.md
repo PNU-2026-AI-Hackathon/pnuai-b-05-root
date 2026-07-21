@@ -16,9 +16,10 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
   마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(대시보드/일지/
   환경점검 3탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인), seedlings(`GET /api/seedlings/` 목록
   조회 + `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary(`POST /api/diary/` 작성 +
-  `GET /api/diary/{seedling_id}/` 조회, 사진은 `image_picker`로 선택해 multipart 업로드), chatbot
+  `GET /api/diary/{seedling_id}/` 조회, 사진은 `image_picker`로 선택해 multipart 업로드), sensor
+  (`POST /api/sensor/data/` 저장 + `GET /api/sensor/anomaly/{seedling_id}/` 이상 이력 조회), chatbot
   (`POST /api/chatbot/ask/`)는 실제 백엔드와 연동됩니다. 홈 화면의 케어 게이지·마이페이지 프로필·
-  수령/기부 선택은 여전히 로컬 mock이며, 재배자용 sensor/vision API 연동은 아직 미착수
+  수령/기부 선택은 여전히 로컬 mock이며, 재배자용 vision API 연동은 아직 미착수
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
 - **비전 분석**: YOLOv8 — `vision/yolo_inference.py`에 구조는 있으나 현재 mock 추론(랜덤 값 반환)
@@ -107,8 +108,15 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 - 묘목당 과거 `SensorData`가 5개 미만이면 `FALLBACK_RANGES` 기준 단순 임계값 비교
 - 5개 이상이면 Prophet으로 필드별(온도/습도/조도) 다음 값을 예측하고, 실측값과의 오차가
   `PROPHET_THRESHOLDS`를 넘으면 이상치로 판정
-- `gemini_diagnosis`는 현재 `build_diagnosis_text()`가 만드는 정적 템플릿 문자열이며, 실제 Gemini API
-  연동은 `chatbot` 앱 구현 이후로 미뤄져 있음
+- `gemini_diagnosis`는 현재도 `build_diagnosis_text()`가 만드는 정적 템플릿 문자열입니다("이상 감지:
+  {필드명} 수치 이상"). `chatbot` 앱은 이미 구현되어 실제 Gemini API(`GEMINI_API_KEY`)를 쓰고 있지만,
+  `anomaly.py`는 그 파이프라인과 완전히 별개 코드라 키가 설정돼 있어도 자동으로 연결되지 않습니다 —
+  실제 Gemini 연동은 의도적으로 미착수 상태로 남겨둔 것입니다(프론트엔드 환경 점검 화면 연동 시
+  이 사실을 확인하고 정적 템플릿을 그대로 노출하기로 결정함).
+- `SensorDataCreateSerializer`(`POST /api/sensor/data/` 응답용)는 원래 `id`/`seedling`/`temperature`/
+  `humidity`/`light`만 내려주고 `perform_create`가 채운 `is_anomaly`/`gemini_diagnosis`/`recorded_at`는
+  응답에 없었습니다 — 프론트엔드가 저장 응답에서 이상 감지 결과를 바로 보여주려면 이 값들이 필요해서
+  세 필드를 읽기 전용으로 추가했습니다. 모델 필드 자체나 판정 로직은 그대로입니다.
 
 `sensor/mock_sensor.py`는 Django에 의존하지 않는 순수 MQTT publisher로, 실제 하드웨어 없이
 로컬에서 파이프라인을 테스트할 때 사용합니다.
@@ -240,6 +248,16 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   "입양자에게 전달하기"는 `features/grower/data/diary_repository.dart`의 `createDiary()`로
   `POST /api/diary/`를 호출합니다 — 사진이 있으면 `multipart/form-data`(`ApiClient.postMultipart()`,
   신규 추가), 없으면 텍스트 필드만 보냅니다. 성공 시 폼을 초기화하고 스낵바를 띄웁니다.
+- `grower_sensor_screen.dart`도 `grower_diary_screen.dart`와 동일한 묘목 선택 칩 패턴을 씁니다
+  (`GrowerRepository.fetchSeedlings()` 재사용). "기록 저장하기"는 `features/grower/data/
+  sensor_repository.dart`의 `createSensorData()`로 `POST /api/sensor/data/`를 호출하고, 응답의
+  `is_anomaly`/`gemini_diagnosis`를 그대로 "⚠️ 이상 감지"(빨강)/"✅ 정상이에요"(초록) 박스에
+  표시합니다 — 온도/습도/조도 세 값 중 어느 필드가 문제인지는 응답에 없어서(위 백엔드 섹션 참고)
+  각 수치 행의 "정상/주의" 배지는 없앴고, 전체 판정만 보여줍니다. 저장 성공 시 같은 묘목의
+  `GET /api/sensor/anomaly/{seedling_id}/`를 다시 호출해 화면 하단 "최근 이상 이력"(최대 3건,
+  `recorded_at` 내림차순)도 함께 갱신합니다. 이 화면도 `GrowerShell`의 탭이라 다른 탭으로 이동했다가
+  돌아오면 State가 재생성되어 입력값(스테퍼로 조정한 온도/습도/조도)이 초기값으로 리셋됩니다 — 케어
+  게이지 4종과 같은 종류의 로컬 mock 한계입니다.
 - `chatbot_screen.dart`(마이페이지의 "AI 챗봇" 메뉴에서 진입)는 `features/adopter/data/
   chatbot_repository.dart`를 통해 실제 `POST /api/chatbot/ask/`를 호출합니다. 이 호출도
   `grower_repository.dart`의 완성 신고처럼 인증 토큰이 필요한데, `PATCH`용으로 이미 있던
@@ -268,20 +286,26 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 ## 현재 개발 상태
 
 - 백엔드: 7개 앱(accounts/seedlings/diary/sensor/vision/chatbot/notifications) 모두 구현 완료
-- vision의 YOLOv8 추론은 아직 mock, chatbot은 `GEMINI_API_KEY`, notifications는 `FIREBASE_CREDENTIALS_PATH`
-  미설정 시 각각 mock 응답/mock 발송으로 대체되어 로컬에서도 키 없이 동작
+- vision의 YOLOv8 추론은 아직 mock, notifications는 `FIREBASE_CREDENTIALS_PATH` 미설정 시 mock
+  발송으로 대체되어 로컬에서도 키 없이 동작. `GEMINI_API_KEY`는 이제 로컬 `.env`에 실제 값이 설정돼
+  있어 `chatbot` 앱은 mock 대신 실제 Gemini RAG 응답을 탈 수 있는 상태(단, `sensor/anomaly.py`의
+  `gemini_diagnosis`는 이 키를 쓰지 않는 별개 코드 — 위 "센서 데이터 파이프라인" 참고)
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
   (회원가입/로그인/홈/케어 4종/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자
   플로우(대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인),
   seedlings(`GET /api/seedlings/` 목록 조회, `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary
-  (`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회), chatbot(`POST /api/chatbot/ask/`)
-  는 모두 JWT 인증으로 실제 백엔드와 연동되어 동작 확인됨(서로 다른 재배자 계정 2개로 대시보드
-  목록·통계·완성 신고 자동 새로고침 테스트; 재배자로 일지를 실제로 작성한 뒤 같은 묘목의 입양자
-  계정으로 로그인해 성장 타임라인에 그 일지가 실제로 나타나는 end-to-end 시나리오까지 확인; 입양자
-  홈 화면은 묘목 있는 계정/없는 계정 각각 확인; chatbot은 `GEMINI_API_KEY` 미설정 상태에서 mock
-  응답으로 테스트). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지 작성이 모두 실제 데이터를
-  쓰지만, 케어 게이지 4종·마이페이지 프로필·수령/기부 선택은 여전히 로컬 mock 상태(라우트 이동/새 탭
-  진입 시 초기화)이며 서버에 저장되지 않음(sensor/vision API, `Seedling.pickup_or_donate` 갱신 API
-  미연동)
-- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 게임 탭, sensor·vision 연동 등은 아직 미착수
+  (`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회), sensor
+  (`POST /api/sensor/data/` 저장, `GET /api/sensor/anomaly/{seedling_id}/` 이력 조회),
+  chatbot(`POST /api/chatbot/ask/`)는 모두 JWT 인증으로 실제 백엔드와 연동되어 동작 확인됨(서로 다른
+  재배자 계정 2개로 대시보드 목록·통계·완성 신고 자동 새로고침 테스트; 재배자로 일지를 실제로 작성한
+  뒤 같은 묘목의 입양자 계정으로 로그인해 성장 타임라인에 그 일지가 실제로 나타나는 end-to-end
+  시나리오까지 확인; 입양자 홈 화면은 묘목 있는 계정/없는 계정 각각 확인; sensor는 정상 범위 값 저장
+  → "정상이에요" 표시, 범위 밖 값 저장 → 실제 백엔드 판정 문구가 "이상 감지" 박스와 이력에 반영되는
+  것까지 확인; chatbot은 `GEMINI_API_KEY` 미설정 상태에서 mock 응답으로 테스트, 이후 실키가 설정됨
+  — 재검증은 하지 않음). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지/환경 점검 작성이 모두
+  실제 데이터를 쓰지만, 케어 게이지 4종·마이페이지 프로필·수령/기부 선택은 여전히 로컬 mock
+  상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(vision API,
+  `Seedling.pickup_or_donate` 갱신 API 미연동)
+- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 게임 탭, vision 연동, `gemini_diagnosis`의 실제
+  Gemini 연동 등은 아직 미착수
