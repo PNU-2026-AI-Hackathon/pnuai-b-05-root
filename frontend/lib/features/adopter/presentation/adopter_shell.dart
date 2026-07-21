@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import 'games_screen.dart';
 import 'home_screen.dart';
 import 'mypage_screen.dart';
 
-/// 입양자 하단 내비게이션 뼈대: 홈 / 게임 / 마이페이지.
-/// 게임은 이번 범위 밖이라 탭하면 안내만 띄우고, 홈/마이페이지는 실제로 탭이 전환된다.
+/// 입양자 하단 내비게이션 뼈대: 홈 / 게임 / 마이페이지. 셋 다 실제로 탭이 전환된다.
 class AdopterShell extends StatefulWidget {
   const AdopterShell({super.key});
 
@@ -16,20 +16,19 @@ class AdopterShell extends StatefulWidget {
 
 class _AdopterShellState extends State<AdopterShell> {
   static const _home = 0;
-  static const _mypage = 1;
+  static const _games = 1;
+  static const _mypage = 2;
 
   int _tab = _home;
-
-  void _showComingSoon() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('준비 중이에요')));
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _tab == _mypage ? const MypageScreen() : const HomeScreen(),
+      body: switch (_tab) {
+        _games => const GamesScreen(),
+        _mypage => const MypageScreen(),
+        _ => const HomeScreen(),
+      },
       bottomNavigationBar: Container(
         height: 70,
         decoration: const BoxDecoration(
@@ -47,8 +46,8 @@ class _AdopterShellState extends State<AdopterShell> {
             _NavItem(
               icon: Icons.sports_esports_outlined,
               label: '게임',
-              active: false,
-              onTap: _showComingSoon,
+              active: _tab == _games,
+              onTap: () => setState(() => _tab = _games),
             ),
             _NavItem(
               icon: Icons.person_outline,

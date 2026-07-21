@@ -13,7 +13,7 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
 ## 기술 스택
 
 - **프론트엔드**: Flutter — 최초 실행 온보딩(2장), 입양자(adopter) 플로우(회원가입/로그인/홈/케어 4종/
-  마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(대시보드/일지/
+  게임 탭/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(대시보드/일지/
   환경점검 3탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인), seedlings(`GET /api/seedlings/` 목록
   조회 + `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary(`POST /api/diary/` 작성 +
   `GET /api/diary/{seedling_id}/` 조회, 사진은 `image_picker`로 선택해 multipart 업로드), sensor
@@ -230,7 +230,21 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   "건너뛰기" 자리에 투명 placeholder를 두는 것과 동일한 방식). claude.ai/design 문서에는 온보딩 3
   "앱으로 케어"도 있지만 이번 범위에서 의도적으로 제외했습니다.
 - `adopter_shell.dart`도 `grower_shell.dart`처럼 실제 탭 전환이 필요해지면서 `StatefulWidget`으로
-  바뀌었습니다(`_tab`으로 홈/마이페이지를 스왑, "게임"은 여전히 범위 밖이라 스낵바만). `mypage_screen.dart`
+  바뀌었습니다(`_tab`으로 홈/게임/마이페이지 세 화면을 스왑하는 `switch` 식). `games_screen.dart`
+  (1m)는 2x2 게임 카드 그리드(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍, 각 카드에
+  `StatusBadge`로 난이도 배지) + 하단 "보유 아이템" 바로 구성되며, 게임 자체와 아이템 시스템은
+  아직 미구현이라 카드/보유 아이템 모두 로컬 mock입니다. 카드를 탭하면 `_openGame()`이 `GameType`
+  기준 `switch`로 분기하는데, 지금은 모든 case가 "준비 중이에요" 스낵바로 귀결됩니다 — 게임별 실제
+  화면은 팀원이 별도 브랜치에서 개발할 예정이라, 이 `switch`가 카드→게임 화면 라우팅을 위한
+  스켈레톤 역할을 하고(화면이 생기면 해당 case만 `Navigator.push`로 바꾸면 됨) 실제 게임 위젯
+  자리는 비워뒀습니다. 구현 중 실제로 겪은 버그: 2x2 카드를 각 `Row`+`Expanded`로 만들고 카드
+  높이를 맞추려고 `CrossAxisAlignment.stretch`를 줬는데, 이 `Row`가 (`SingleChildScrollView` →
+  `Column`으로 이어지는) 세로 방향이 unbounded인 컨텍스트에 직접 놓여 있으면 `stretch`가 무한대
+  높이로 풀리면서 그 `Row` 이후의 형제 위젯(두 번째 카드 줄, 보유 아이템 카드)이 전부 화면 밖으로
+  밀려나 안 보이는 문제가 있었습니다(디버그 assert가 release 웹 빌드에서는 제거되어 에러도 없이
+  조용히 사라짐 — Playwright로 실제 렌더링을 확인하지 않았다면 놓쳤을 버그). 각 `Row`를
+  `IntrinsicHeight`로 감싸 높이를 먼저 유한하게 확정시킨 뒤 `stretch`를 적용하는 방식으로
+  해결했습니다. `mypage_screen.dart`
   는 프로필 카드 + 리스트 메뉴이며, 이번 범위 밖인 메뉴(성장 타임라인/AI 챗봇/알림 설정/입양 내역)는
   탭하면 스낵바만 띄우고, "수령 / 기부 선택"과 "기부 인증서"만 실제로 이동합니다. "기부 인증서"는
   마이페이지에서 곧장 진입할 때는 하드코딩된 mock 인자를 쓰고, `pickup_donate_screen.dart`에서
@@ -312,8 +326,8 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   검증 완료(위 "RAG 챗봇 파이프라인" 참고)
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
-  (회원가입/로그인/홈/케어 4종/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자
-  플로우(대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인),
+  (회원가입/로그인/홈/케어 4종/게임 탭/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇),
+  재배자 플로우(대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인),
   seedlings(`GET /api/seedlings/` 목록 조회, `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary
   (`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회), sensor
   (`POST /api/sensor/data/` 저장, `GET /api/sensor/anomaly/{seedling_id}/` 이력 조회),
@@ -327,4 +341,5 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   실제 데이터를 쓰지만, 케어 게이지 4종·마이페이지 프로필·수령/기부 선택은 여전히 로컬 mock
   상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(vision API,
   `Seedling.pickup_or_donate` 갱신 API 미연동)
-- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 게임 탭, vision 연동 등은 아직 미착수
+- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 게임 탭의 실제 게임 4종(카드 UI만 구현, 게임 자체와
+  아이템 시스템은 팀원이 별도 브랜치에서 개발 예정), vision 연동 등은 아직 미착수
