@@ -7,7 +7,7 @@ class DiarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Diary
         fields = '__all__'
-        read_only_fields = ('grower', 'created_at', 'yolo_status_tag')
+        read_only_fields = ('grower', 'created_at', 'yolo_status_tag', 'illustration')
 
 
 class DiaryCreateSerializer(serializers.ModelSerializer):

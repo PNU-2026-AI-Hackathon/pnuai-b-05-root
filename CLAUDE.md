@@ -154,6 +154,40 @@ Gemini 응답으로 채워짐) "최근 이상 이력"이 재현 가능하게 나
 있는 묘목은 건너뛰므로 재실행해도 중복 생성되지 않습니다. Django 커맨드 규칙에 따라 앱 하나(
 `seedlings`) 아래 두었지만 `accounts`/`diary`/`sensor` 모델을 모두 다룹니다.
 
+### 일지 사진 → 일러스트 변환 (Gemini 이미지 생성)
+재배자가 일지 작성 시 사진(`Diary.photo`)을 함께 올리면, `diary/gemini_illustration.py`의
+`convert_to_illustration(photo_path)`가 Gemini 이미지 생성 모델로 "따뜻하고 감성적인 동화풍
+일러스트"로 변환을 시도하고, 성공하면 `DiaryCreateView.perform_create()`가 그 결과를
+`Diary.illustration`에 저장합니다(원본 `photo`는 그대로 유지). 텍스트 모델
+`gemini-2.5-flash`로는 이미지를 생성할 수 없고, `langchain_google_genai`도 이미지 생성 전용
+클래스가 없어서(`ChatGoogleGenerativeAI`/`GoogleGenerativeAIEmbeddings`뿐) 이 파이프라인만
+`langchain`을 거치지 않고 `google-genai` SDK(`google.genai.Client`)를 직접 씁니다 —
+`requirements.txt`에도 `google-genai`를 명시적으로 추가했습니다(`langchain-google-genai`의
+전이 의존성으로 이미 설치돼 있었지만, 직접 import하는 코드가 있으면 명시적으로 선언해야
+안전합니다). 실제 사용 모델은 `LLM_MODEL = 'gemini-2.5-flash-image'`로, 호출 전
+`client.models.list()`로 이 프로젝트 API 키에서 실제로 사용 가능한지 확인했습니다(사용 가능
+목록에 있었음 — 참고로 `imagen-4.0-*` 계열도 있었지만 `generateContent`가 아니라 `predict`
+API를 쓰는 별도 인터페이스라 이번엔 지시받은 대로 `gemini-2.5-flash-image`를 그대로 사용).
+`_generate_illustration()`은 사진 bytes를 `types.Part.from_bytes()`로 프롬프트와 함께 보내고
+응답의 `candidates[0].content.parts`를 순회해 `inline_data`가 있는 첫 part의 bytes를 반환합니다.
+`convert_to_illustration()`은 `settings.GEMINI_API_KEY`가 비어있으면 호출 자체를 생략하고,
+호출이 실패하면(쿼터 초과, 네트워크 오류 등) `except Exception`으로 넓게 잡아 `None`을
+반환합니다 — `sensor/anomaly.py`/`vision/yolo_inference.py`와 동일한 게이트 체크 → try/except
+→ 폴백 구조이며, 두 경우 모두 원본 사진만 저장된 채로 일지 작성 자체는 정상 처리됩니다.
+`diary/tests.py`는 `diary.views.convert_to_illustration`(뷰 테스트: 권한/저장 로직만 검증)와
+`diary.gemini_illustration._generate_illustration`(모듈 테스트: 키 없음/성공/실패 세 경로)을
+각각 mock해 검증하며, 이미지 생성은 호출당 과금·쿼터가 있어 실제 네트워크를 타는 테스트는
+의도적으로 만들지 않았습니다(sensor/vision과 동일한 원칙). **실제로 겪은 문제**: 이 프로젝트
+API 키의 무료 티어는 이미지 생성 모델 쿼터가 0으로 설정돼 있어(`429 RESOURCE_EXHAUSTED
+... limit: 0, model: gemini-2.5-flash-preview-image`), 실서버로 사진 포함 일지를 실제로
+작성해도 `illustration`이 채워지지 않고 조용히 원본 사진만 저장되는 것까지 직접
+확인했습니다 — 코드/폴백 경로 자체는 정상 동작하는 것으로 확인됐고(`DiarySerializer` 응답에
+`photo`는 URL, `illustration`은 `null`로 정확히 내려옴), 실제 변환 성공 사례는 결제가 연결된
+API 키가 있어야 재현·검증할 수 있습니다. `growth_timeline_screen.dart`는 `illustrationUrl`이
+있으면 그것을, 없으면(지금처럼 mock 모드이거나 변환 실패) `photoUrl`을, 둘 다 없으면 기존
+placeholder 아이콘을 보여주도록 `imageUrl = entry.illustrationUrl ?? entry.photoUrl` 한 줄로
+우선순위를 정했습니다.
+
 ### 비전 분석 (YOLOv8-cls 실제 추론)
 `vision/yolo_inference.py`의 `analyze_image(image_path)`는 `backend/vision/weights/best.pt`가
 있으면 실제 YOLOv8-cls(분류) 모델로 추론합니다. 이 가중치는 Mendeley "fig leaves dataset"
@@ -355,9 +389,16 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   `seedling_repository.dart`로 대표 묘목을 고른 뒤 `features/adopter/data/diary_repository.dart`
   의 `fetchDiaries()`로 `GET /api/diary/{seedling_id}/`를 호출합니다. 실제 `Diary` 모델에는 성장
   단계·키·잎 개수 필드가 없어(그건 애초에 mock이 지어낸 값) 카드는 날짜 + `content` 본문 +
-  (있으면) `yolo_status_tag` 배지로 단순화됐고, `photo` URL이 있으면 `Image.network()`로 실제 사진을,
-  없으면 기존 "✨ 일러스트 변환" placeholder를 보여줍니다. 응답 순서가 보장되지 않아 클라이언트에서
-  `created_at` 내림차순으로 정렬합니다.
+  (있으면) `yolo_status_tag` 배지로 단순화됐고, `illustration`(Gemini 변환)이 있으면 그것을,
+  없으면(mock 모드거나 변환 실패) 원본 `photo`를 `Image.network()`로 보여주며, 둘 다 없으면 기존
+  "✨ 일러스트 변환" placeholder를 보여줍니다(`imageUrl = entry.illustrationUrl ?? entry.photoUrl`).
+  응답 순서가 보장되지 않아 클라이언트에서 `created_at` 내림차순으로 정렬합니다. 각 카드는
+  `GestureDetector`로 감싸 탭하면 `diary_detail_screen.dart`(`/adopter/diary-detail`)로 push되어
+  사진/일러스트를 화면 너비 꽉 채워 크게 보고 `content` 전문을 읽을 수 있습니다 — 라우트 인자는
+  `GrowerCompleteArgs`/`DonationCertificateArgs`와 동일한 route-argument 패턴을 따르는
+  `DiaryDetailArgs`(photoUrl/illustrationUrl/content/createdAt만 담는 값 객체)이고, 상세 화면도
+  `push`되는 화면이라 `PigFigAppBar(closeLabel: '닫기')`를 씁니다(탭 화면인 카드 목록과 대조적).
+  `yolo_status_tag` 배지는 카드 목록에만 남아 있고 상세 화면에는 넣지 않았습니다.
 - `grower_diary_screen.dart`는 이제 탭 진입 시 `GrowerRepository.fetchSeedlings()`로 담당 묘목
   목록을 불러와 상단에 선택 칩으로 보여줍니다(재배중인 묘목이 있으면 자동 선택) — 이전에는 이 화면이
   어떤 묘목에 대한 일지인지 알 방법이 전혀 없었기 때문에 실제 연동을 위해 꼭 필요했던 추가입니다.
@@ -416,7 +457,10 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   생성하도록 연동 완료(위 "센서 데이터 파이프라인" 참고). `chatbot` 앱도 `gemini-2.5-flash`(LLM)/
   `models/gemini-embedding-001`(임베딩)로 모델명을 갱신하고 `ChatbotAskView`에 예외 처리(Gemini
   호출 실패 시 500 대신 안내 메시지로 폴백)를 추가해 실키로 실제 Gemini RAG 응답이 오는 것까지
-  검증 완료(위 "RAG 챗봇 파이프라인" 참고)
+  검증 완료(위 "RAG 챗봇 파이프라인" 참고). `diary`의 사진 → 일러스트 변환(`gemini-2.5-flash-image`,
+  위 "일지 사진 → 일러스트 변환" 참고)도 코드/폴백 경로는 실서버로 검증 완료했지만, 이 프로젝트
+  API 키의 무료 티어가 이미지 생성 쿼터를 0으로 제한하고 있어(`429 RESOURCE_EXHAUSTED`) 실제
+  변환 성공 사례 자체는 아직 확인하지 못했음 — 결제가 연결된 키가 생기면 재검증 필요
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
   (회원가입/로그인/홈·타임라인·게임·마이페이지 4탭/케어 4종/수령·기부 선택/기부 인증서/AI 챗봇),

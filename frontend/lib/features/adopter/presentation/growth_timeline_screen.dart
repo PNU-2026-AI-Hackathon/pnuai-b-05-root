@@ -8,6 +8,7 @@ import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../data/diary_repository.dart';
 import '../data/seedling_repository.dart';
+import 'diary_detail_screen.dart';
 
 /// 1k — 성장 타임라인: `GET /api/diary/{seedling_id}/`와 실제 연동해 재배자 일지를
 /// 시간 역순(최신이 먼저)으로 나열한다. `AdopterShell`의 탭 화면이라 뒤로가기/닫기
@@ -154,126 +155,141 @@ class _TimelineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+    // Gemini로 변환된 일러스트가 있으면 그것을, 없으면(mock 모드거나 변환 실패) 원본
+    // 사진을, 사진 자체가 없으면 아래에서 placeholder 아이콘을 보여준다.
+    final imageUrl = entry.illustrationUrl ?? entry.photoUrl;
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pushNamed(
+        '/adopter/diary-detail',
+        arguments: DiaryDetailArgs(
+          content: entry.content,
+          createdAt: entry.createdAt,
+          photoUrl: entry.photoUrl,
+          illustrationUrl: entry.illustrationUrl,
+        ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 78,
-            height: 78,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 78,
-                  height: 78,
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    color: AppColors.badgeGreenBg,
-                    borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 78,
+              height: 78,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 78,
+                    height: 78,
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: AppColors.badgeGreenBg,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: imageUrl != null
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            width: 78,
+                            height: 78,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const FigTreeIllustration(width: 32),
+                          )
+                        : const Padding(
+                            padding: EdgeInsets.only(bottom: 10),
+                            child: FigTreeIllustration(width: 32),
+                          ),
                   ),
-                  child: entry.photoUrl != null
-                      ? Image.network(
-                          entry.photoUrl!,
-                          fit: BoxFit.cover,
-                          width: 78,
-                          height: 78,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const FigTreeIllustration(width: 32),
-                        )
-                      : const Padding(
-                          padding: EdgeInsets.only(bottom: 10),
-                          child: FigTreeIllustration(width: 32),
-                        ),
-                ),
-                if (entry.photoUrl == null)
-                  Positioned(
-                    bottom: -7,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.pink100,
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: Text(
-                          '✨ 일러스트 변환',
-                          style: AppTextStyles.body(
-                            fontSize: 10,
-                            color: AppColors.badgePinkText,
-                          ).copyWith(fontWeight: FontWeight.w700),
+                  if (entry.photoUrl == null)
+                    Positioned(
+                      bottom: -7,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.pink100,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Text(
+                            '✨ 일러스트 변환',
+                            style: AppTextStyles.body(
+                              fontSize: 10,
+                              color: AppColors.badgePinkText,
+                            ).copyWith(fontWeight: FontWeight.w700),
+                          ),
                         ),
                       ),
                     ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _formatDate(entry.createdAt),
+                        style: AppTextStyles.body(
+                          fontSize: 11,
+                          color: const Color(0xFFB7B2A4),
+                        ),
+                      ),
+                      if (entry.yoloStatusTag != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.badgeGreenBg,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            entry.yoloStatusTag!,
+                            style: AppTextStyles.body(
+                              fontSize: 11,
+                              color: AppColors.badgeGreenText,
+                            ).copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+                  const SizedBox(height: 7),
+                  Text(
+                    entry.content,
+                    style: AppTextStyles.body(
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                    ).copyWith(height: 1.5),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _formatDate(entry.createdAt),
-                      style: AppTextStyles.body(
-                        fontSize: 11,
-                        color: const Color(0xFFB7B2A4),
-                      ),
-                    ),
-                    if (entry.yoloStatusTag != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.badgeGreenBg,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          entry.yoloStatusTag!,
-                          style: AppTextStyles.body(
-                            fontSize: 11,
-                            color: AppColors.badgeGreenText,
-                          ).copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  entry.content,
-                  style: AppTextStyles.body(
-                    fontSize: 13,
-                    color: AppColors.textPrimary,
-                  ).copyWith(height: 1.5),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
