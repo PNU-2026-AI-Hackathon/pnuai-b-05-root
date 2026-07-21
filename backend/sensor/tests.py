@@ -1,3 +1,6 @@
+from unittest.mock import patch
+
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -33,6 +36,7 @@ class SensorDataCreateViewTests(APITestCase):
         self.assertFalse(sensor_data.is_anomaly)
         self.assertIsNone(sensor_data.gemini_diagnosis)
 
+    @override_settings(GEMINI_API_KEY='')
     def test_out_of_range_sensor_data_flagged_as_anomaly(self):
         self.client.force_authenticate(user=self.grower)
         data = {'seedling': self.seedling.pk, 'temperature': 50, 'humidity': 60, 'light': 500}
@@ -42,6 +46,32 @@ class SensorDataCreateViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         sensor_data = SensorData.objects.get()
         self.assertTrue(sensor_data.is_anomaly)
+        self.assertIn('온도', sensor_data.gemini_diagnosis)
+
+    @override_settings(GEMINI_API_KEY='dummy-key')
+    def test_uses_gemini_diagnosis_when_api_key_present(self):
+        self.client.force_authenticate(user=self.grower)
+        data = {'seedling': self.seedling.pk, 'temperature': 50, 'humidity': 60, 'light': 500}
+        mock_diagnosis = '온도가 조금 높아요. 통풍을 시켜주시면 좋아요.'
+
+        with patch('sensor.anomaly._generate_gemini_diagnosis', return_value=mock_diagnosis) as mock_generate:
+            response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        sensor_data = SensorData.objects.get()
+        self.assertEqual(sensor_data.gemini_diagnosis, mock_diagnosis)
+        mock_generate.assert_called_once_with(['temperature'], 50.0, 60.0, 500.0)
+
+    @override_settings(GEMINI_API_KEY='dummy-key')
+    def test_falls_back_to_static_template_when_gemini_call_fails(self):
+        self.client.force_authenticate(user=self.grower)
+        data = {'seedling': self.seedling.pk, 'temperature': 50, 'humidity': 60, 'light': 500}
+
+        with patch('sensor.anomaly._generate_gemini_diagnosis', side_effect=Exception('timeout')):
+            response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        sensor_data = SensorData.objects.get()
         self.assertIn('온도', sensor_data.gemini_diagnosis)
 
     def test_grower_cannot_save_data_for_unassigned_seedling(self):

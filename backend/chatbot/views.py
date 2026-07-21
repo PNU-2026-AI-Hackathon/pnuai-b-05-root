@@ -7,6 +7,7 @@ from .rag_pipeline import ask_question, initialize_rag
 from .serializers import ChatbotAskSerializer
 
 MOCK_ANSWER = '챗봇 서비스 준비 중입니다.'
+ERROR_ANSWER = '죄송해요, 지금은 답변을 가져오지 못했어요. 잠시 후 다시 시도해주세요.'
 
 _vectorstore = None
 
@@ -28,7 +29,12 @@ class ChatbotAskView(APIView):
         question = serializer.validated_data['question']
 
         if settings.GEMINI_API_KEY:
-            answer = ask_question(question, _get_vectorstore())
+            try:
+                answer = ask_question(question, _get_vectorstore())
+            except Exception:
+                # 네트워크 오류, 타임아웃, 모델 미지원 등 Gemini 호출 실패 시
+                # 500을 그대로 노출하지 않고 안내 메시지로 폴백한다.
+                answer = ERROR_ANSWER
         else:
             answer = MOCK_ANSWER
 

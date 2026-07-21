@@ -29,7 +29,9 @@ class SensorDataCreateView(CreateAPIView):
         light = serializer.validated_data['light']
 
         is_anomaly, anomaly_fields = detect_anomaly(seedling, temperature, humidity, light)
-        gemini_diagnosis = build_diagnosis_text(anomaly_fields) if is_anomaly else None
+        gemini_diagnosis = (
+            build_diagnosis_text(anomaly_fields, temperature, humidity, light) if is_anomaly else None
+        )
 
         serializer.save(is_anomaly=is_anomaly, gemini_diagnosis=gemini_diagnosis)
 

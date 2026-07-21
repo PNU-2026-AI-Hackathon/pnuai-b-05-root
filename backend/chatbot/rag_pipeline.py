@@ -15,8 +15,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 PERSIST_DIRECTORY = os.path.join(os.path.dirname(__file__), 'vector_store')
 
-EMBEDDING_MODEL = 'models/embedding-001'
-LLM_MODEL = 'gemini-1.5-flash'
+EMBEDDING_MODEL = 'models/gemini-embedding-001'
+LLM_MODEL = 'gemini-2.5-flash'
+LLM_TIMEOUT_SECONDS = 10
 RETRIEVAL_K = 3
 CHUNK_SIZE = 300
 CHUNK_OVERLAP = 30
@@ -109,7 +110,9 @@ def ask_question(question, vectorstore):
     Returns:
         str: 생성된 답변
     """
-    llm = ChatGoogleGenerativeAI(model=LLM_MODEL, google_api_key=settings.GEMINI_API_KEY)
+    llm = ChatGoogleGenerativeAI(
+        model=LLM_MODEL, google_api_key=settings.GEMINI_API_KEY, timeout=LLM_TIMEOUT_SECONDS,
+    )
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
         retriever=vectorstore.as_retriever(search_kwargs={'k': RETRIEVAL_K}),

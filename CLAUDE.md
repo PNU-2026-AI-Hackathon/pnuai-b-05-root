@@ -108,11 +108,19 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 - 묘목당 과거 `SensorData`가 5개 미만이면 `FALLBACK_RANGES` 기준 단순 임계값 비교
 - 5개 이상이면 Prophet으로 필드별(온도/습도/조도) 다음 값을 예측하고, 실측값과의 오차가
   `PROPHET_THRESHOLDS`를 넘으면 이상치로 판정
-- `gemini_diagnosis`는 현재도 `build_diagnosis_text()`가 만드는 정적 템플릿 문자열입니다("이상 감지:
-  {필드명} 수치 이상"). `chatbot` 앱은 이미 구현되어 실제 Gemini API(`GEMINI_API_KEY`)를 쓰고 있지만,
-  `anomaly.py`는 그 파이프라인과 완전히 별개 코드라 키가 설정돼 있어도 자동으로 연결되지 않습니다 —
-  실제 Gemini 연동은 의도적으로 미착수 상태로 남겨둔 것입니다(프론트엔드 환경 점검 화면 연동 시
-  이 사실을 확인하고 정적 템플릿을 그대로 노출하기로 결정함).
+- `gemini_diagnosis`는 `build_diagnosis_text(anomaly_fields, temperature, humidity, light)`가 만듭니다.
+  `settings.GEMINI_API_KEY`가 설정돼 있으면 `_generate_gemini_diagnosis()`가 온도/습도/조도 측정값과
+  `FALLBACK_RANGES`(정상 범위)를 프롬프트에 넣어 `ChatGoogleGenerativeAI`(`chatbot` 앱과 동일한
+  langchain 연동 방식)로 시니어 재배자용 한국어 진단·조치 문장을 2~3문장 생성합니다. 키가 비어있거나
+  Gemini 호출이 실패하면(네트워크 오류, 타임아웃 등 — `except Exception`으로 폭넓게 잡음) 기존
+  `_build_static_diagnosis_text()`("이상 감지: {필드명} 수치 이상")로 조용히 폴백합니다. 이 파일의
+  `LLM_MODEL`은 `gemini-2.5-flash`입니다(`gemini-1.5-flash`는 이 프로젝트의 API 키/버전에서 완전히
+  폐지되어 `ListModels`에 없고 404를 반환하는 것을 실제로 확인했음 — `chatbot/rag_pipeline.py`의
+  `LLM_MODEL`도 동일하게 `gemini-2.5-flash`로 맞춰져 있습니다). 테스트(`sensor/tests.py`)는
+  `@override_settings(GEMINI_API_KEY='')`로 기존 케이스를
+  네트워크 호출 없이 고정하고, `_generate_gemini_diagnosis`를 `patch`해 "키 있을 때 그 결과를 그대로
+  쓰는지"와 "호출 실패 시 폴백하는지"를 각각 검증합니다 — `chatbot/tests.py`가 `initialize_rag`/
+  `ask_question`을 mock하는 것과 동일한 패턴입니다.
 - `SensorDataCreateSerializer`(`POST /api/sensor/data/` 응답용)는 원래 `id`/`seedling`/`temperature`/
   `humidity`/`light`만 내려주고 `perform_create`가 채운 `is_anomaly`/`gemini_diagnosis`/`recorded_at`는
   응답에 없었습니다 — 프론트엔드가 저장 응답에서 이상 감지 결과를 바로 보여주려면 이 값들이 필요해서
@@ -133,10 +141,19 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 `chatbot/rag_pipeline.py`는 농촌진흥청 매뉴얼 기반 지식 문서 10개를 코드에 직접 하드코딩해두고
 (PDF 등 외부 파일 의존 없음), `initialize_rag()`가 이를 ChromaDB로 임베딩해
 `chatbot/vector_store/`에 저장(이미 저장되어 있으면 재임베딩 없이 로드)합니다. `ask_question()`은
-Gemini(`gemini-1.5-flash`)로 답변을 생성합니다. 벡터스토어는 `chatbot/views.py`의 모듈 전역
-`_vectorstore`에 프로세스당 한 번만 캐싱됩니다. `settings.GEMINI_API_KEY`가 비어있으면
-`ChatbotAskView`는 RAG를 아예 호출하지 않고 고정 mock 응답("챗봇 서비스 준비 중입니다.")을
-반환합니다 — 로컬 개발 시 API 키 없이도 앱이 동작하게 하기 위함입니다.
+Gemini(`LLM_MODEL = 'gemini-2.5-flash'`)로 답변을 생성하며, `timeout=LLM_TIMEOUT_SECONDS`(10초)를
+둬 응답이 지연되면 타임아웃으로 실패시킵니다. 임베딩은 `EMBEDDING_MODEL = 'models/gemini-embedding-001'`을
+쓰는데, 예전에 쓰던 `models/embedding-001`도 이 프로젝트의 API 키/버전에서 폐지되어 404가 나는 것을
+확인해 함께 교체했습니다(임베딩 모델을 바꾸면 기존에 그 모델로 만든 벡터가 차원이 달라 호환되지
+않으므로, `chatbot/vector_store/`를 지우고 새 모델로 재임베딩해 만들었습니다). 벡터스토어는
+`chatbot/views.py`의 모듈 전역 `_vectorstore`에 프로세스당 한 번만 캐싱됩니다. `settings.GEMINI_API_KEY`가
+비어있으면 `ChatbotAskView`는 RAG를 아예 호출하지 않고 고정 mock 응답("챗봇 서비스 준비 중입니다.")을
+반환합니다 — 로컬 개발 시 API 키 없이도 앱이 동작하게 하기 위함입니다. 키가 있어도 `ask_question()`
+호출이 실패하면(네트워크 오류, 타임아웃, 모델 오류 등 — `except Exception`으로 폭넓게 잡음)
+`ChatbotAskView`가 500을 그대로 노출하지 않고 `ERROR_ANSWER`("죄송해요, 지금은 답변을 가져오지
+못했어요. 잠시 후 다시 시도해주세요.")로 폴백합니다 — `sensor/anomaly.py`의 Gemini 폴백과 동일한
+패턴입니다. `chatbot/tests.py`는 `initialize_rag`/`ask_question`을 mock해 mock 응답/정상 RAG 응답/
+호출 실패 시 폴백까지 세 경로를 모두 네트워크 호출 없이 검증합니다.
 `langchain` 1.x부터 API가 크게 바뀌어 `RetrievalQA`는 `langchain_classic.chains`에,
 `RecursiveCharacterTextSplitter`는 `langchain_text_splitters`에 있습니다(`langchain.chains`/
 `langchain.text_splitter` 아님).
@@ -288,8 +305,11 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 - 백엔드: 7개 앱(accounts/seedlings/diary/sensor/vision/chatbot/notifications) 모두 구현 완료
 - vision의 YOLOv8 추론은 아직 mock, notifications는 `FIREBASE_CREDENTIALS_PATH` 미설정 시 mock
   발송으로 대체되어 로컬에서도 키 없이 동작. `GEMINI_API_KEY`는 이제 로컬 `.env`에 실제 값이 설정돼
-  있어 `chatbot` 앱은 mock 대신 실제 Gemini RAG 응답을 탈 수 있는 상태(단, `sensor/anomaly.py`의
-  `gemini_diagnosis`는 이 키를 쓰지 않는 별개 코드 — 위 "센서 데이터 파이프라인" 참고)
+  있고, `sensor/anomaly.py`의 `gemini_diagnosis`는 실제 Gemini API(`gemini-2.5-flash`)로 진단 문장을
+  생성하도록 연동 완료(위 "센서 데이터 파이프라인" 참고). `chatbot` 앱도 `gemini-2.5-flash`(LLM)/
+  `models/gemini-embedding-001`(임베딩)로 모델명을 갱신하고 `ChatbotAskView`에 예외 처리(Gemini
+  호출 실패 시 500 대신 안내 메시지로 폴백)를 추가해 실키로 실제 Gemini RAG 응답이 오는 것까지
+  검증 완료(위 "RAG 챗봇 파이프라인" 참고)
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
   (회원가입/로그인/홈/케어 4종/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자
@@ -307,5 +327,4 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   실제 데이터를 쓰지만, 케어 게이지 4종·마이페이지 프로필·수령/기부 선택은 여전히 로컬 mock
   상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(vision API,
   `Seedling.pickup_or_donate` 갱신 API 미연동)
-- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 게임 탭, vision 연동, `gemini_diagnosis`의 실제
-  Gemini 연동 등은 아직 미착수
+- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 게임 탭, vision 연동 등은 아직 미착수
