@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/storage/inventory_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pig_character.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/status_badge.dart';
+import 'games/fig_quiz/fig_quiz_screen.dart';
+import 'games/models/game_item.dart';
+import 'games/models/game_result.dart';
 
 /// 게임 종류. 게임별 실제 화면은 팀원이 별도 브랜치에서 개발할 예정이라
 /// 여기서는 카드 → 게임 화면으로 이어지는 라우팅 스켈레톤만 잡아둔다.
@@ -38,13 +42,34 @@ class _ItemStack {
 }
 
 /// 1m — 게임 탭: 2x2 게임 카드 그리드 + 보유 아이템 바.
-/// 게임별 화면은 팀원이 별도 브랜치에서 개발할 예정이라, 카드를 탭하면 지금은
-/// "준비 중이에요" 스낵바만 뜬다. 보유 아이템은 아이템 시스템이 게임과 함께
-/// 설계될 예정이라 로컬 mock으로만 표시한다.
-class GamesScreen extends StatelessWidget {
+/// 무화과 퀴즈만 실제 게임 화면으로 연결되며, 나머지 3종은 팀원이 별도 브랜치에서
+/// 개발할 예정이라 카드를 탭하면 "준비 중이에요" 스낵바만 뜬다.
+/// 보유 아이템은 [InventoryStorage]에서 실제로 읽어와 표시한다(퀴즈에서 아이템을
+/// 획득하고 돌아오면 갱신됨).
+class GamesScreen extends StatefulWidget {
   const GamesScreen({super.key});
 
+  @override
+  State<GamesScreen> createState() => _GamesScreenState();
+}
+
+class _GamesScreenState extends State<GamesScreen> {
   static const _mediumDifficultyBg = Color(0xFFAFD6A0);
+
+  final _inventory = InventoryStorage();
+  List<GameItem> _ownedItems = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    final items = await _inventory.getItems();
+    if (!mounted) return;
+    setState(() => _ownedItems = items);
+  }
 
   static final _games = [
     _GameCardData(
@@ -85,19 +110,22 @@ class GamesScreen extends StatelessWidget {
     ),
   ];
 
-  static const _ownedItems = [
-    _ItemStack('🧴', 2),
-    _ItemStack('👻', 1),
-    _ItemStack('🍃', 3),
-  ];
-
-  void _openGame(BuildContext context, GameType type) {
-    // 게임별 실제 화면은 팀원이 별도 브랜치에서 개발할 예정이라, 여기서는
-    // 카드 → 게임 화면으로 이어지는 라우팅 구조만 잡아두고 실제 게임 위젯
-    // 자리는 비워둔다. 화면이 준비되면 각 case에서 해당 라우트로 push하면 된다.
+  Future<void> _openGame(GameType type) async {
+    // 무화과 퀴즈만 실제 게임 화면으로 연결한다. 나머지 3종은 팀원이 별도
+    // 브랜치에서 개발할 예정이라 라우팅 자리만 스낵바로 남겨둔다.
     switch (type) {
-      case GameType.balloonPop:
       case GameType.quiz:
+        final result = await Navigator.of(context).push<GameResult>(
+          MaterialPageRoute(builder: (_) => const FigQuizScreen()),
+        );
+        if (!mounted) return;
+        // 아이템을 획득했으면 저장하고 보유 아이템 바를 갱신한다.
+        final earned = result?.itemEarned;
+        if (earned != null) {
+          await _inventory.addItem(earned);
+          await _loadItems();
+        }
+      case GameType.balloonPop:
       case GameType.pestCatch:
       case GameType.wateringTiming:
         ScaffoldMessenger.of(
@@ -131,14 +159,14 @@ class GamesScreen extends StatelessWidget {
                   Expanded(
                     child: _GameCard(
                       data: _games[0],
-                      onTap: () => _openGame(context, _games[0].type),
+                      onTap: () => _openGame(_games[0].type),
                     ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: _GameCard(
                       data: _games[1],
-                      onTap: () => _openGame(context, _games[1].type),
+                      onTap: () => _openGame(_games[1].type),
                     ),
                   ),
                 ],
@@ -152,21 +180,21 @@ class GamesScreen extends StatelessWidget {
                   Expanded(
                     child: _GameCard(
                       data: _games[2],
-                      onTap: () => _openGame(context, _games[2].type),
+                      onTap: () => _openGame(_games[2].type),
                     ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: _GameCard(
                       data: _games[3],
-                      onTap: () => _openGame(context, _games[3].type),
+                      onTap: () => _openGame(_games[3].type),
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 14),
-            const _OwnedItemsCard(items: _ownedItems),
+            _OwnedItemsCard(items: _ownedItems),
           ],
         ),
       ),
@@ -239,10 +267,17 @@ class _GameCard extends StatelessWidget {
 class _OwnedItemsCard extends StatelessWidget {
   const _OwnedItemsCard({required this.items});
 
-  final List<_ItemStack> items;
+  final List<GameItem> items;
 
   @override
   Widget build(BuildContext context) {
+    // 같은 아이템은 id 기준으로 묶어 이모지 + 개수 칩으로 표시한다.
+    final stacks = <String, _ItemStack>{};
+    for (final item in items) {
+      final prev = stacks[item.id];
+      stacks[item.id] = _ItemStack(item.emoji, (prev?.count ?? 0) + 1);
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
@@ -267,15 +302,24 @@ class _OwnedItemsCard extends StatelessWidget {
               color: AppColors.badgeGreenText,
             ).copyWith(fontWeight: FontWeight.w900),
           ),
-          Row(
-            children: [
-              for (final item in items)
-                Padding(
-                  padding: const EdgeInsets.only(left: 10),
-                  child: _ItemChip(item: item),
-                ),
-            ],
-          ),
+          if (stacks.isEmpty)
+            Text(
+              '아직 없어요',
+              style: AppTextStyles.caption(
+                fontSize: 13,
+                color: AppColors.textMuted,
+              ),
+            )
+          else
+            Row(
+              children: [
+                for (final stack in stacks.values)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: _ItemChip(item: stack),
+                  ),
+              ],
+            ),
         ],
       ),
     );
