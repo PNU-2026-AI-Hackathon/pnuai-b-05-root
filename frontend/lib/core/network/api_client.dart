@@ -33,13 +33,17 @@ class ApiClient {
   Future<Map<String, dynamic>> post(
     String path, {
     required Map<String, dynamic> body,
+    String? accessToken,
   }) async {
     final uri = Uri.parse('$baseUrl$path');
     late final http.Response response;
     try {
       response = await http.post(
         uri,
-        headers: const {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          if (accessToken != null) 'Authorization': 'Bearer $accessToken',
+        },
         body: jsonEncode(body),
       );
     } on Exception {
@@ -55,6 +59,36 @@ class ApiClient {
     }
     throw ApiException(
       _extractErrorMessage(decoded),
+      statusCode: response.statusCode,
+    );
+  }
+
+  /// JWT access 토큰이 필요한 인증된 GET 요청. 목록 엔드포인트는 최상위가 JSON 배열이라
+  /// `Map`이 아닌 `dynamic`을 반환한다 — 호출부에서 `as List<dynamic>` 등으로 캐스팅한다.
+  Future<dynamic> get(String path, {String? accessToken}) async {
+    final uri = Uri.parse('$baseUrl$path');
+    late final http.Response response;
+    try {
+      response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (accessToken != null) 'Authorization': 'Bearer $accessToken',
+        },
+      );
+    } on Exception {
+      throw ApiException('서버에 연결할 수 없어요. 네트워크 상태를 확인해주세요.');
+    }
+
+    final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded;
+    }
+    throw ApiException(
+      decoded is Map<String, dynamic>
+          ? _extractErrorMessage(decoded)
+          : '요청 처리 중 오류가 발생했어요.',
       statusCode: response.statusCode,
     );
   }

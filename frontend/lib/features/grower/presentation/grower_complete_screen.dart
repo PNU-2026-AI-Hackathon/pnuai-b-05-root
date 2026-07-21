@@ -86,7 +86,7 @@ class _GrowerCompleteScreenState extends State<GrowerCompleteScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${args.seedlingName} · 입양자 ${args.adopterName}님에게 알림이 가요',
+              '${args.seedlingName} · ${args.adopterName}님에게 알림이 가요',
               style: AppTextStyles.guide(
                 fontSize: 14,
                 color: AppColors.badgeGreenText,
