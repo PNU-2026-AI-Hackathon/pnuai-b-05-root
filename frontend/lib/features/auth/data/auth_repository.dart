@@ -35,6 +35,7 @@ class AuthRepository {
     await _tokenStorage.save(
       access: response['access'] as String,
       refresh: response['refresh'] as String,
+      email: email,
     );
     return LoginResult(
       role: UserRoleApi.fromApiValue(response['role'] as String),

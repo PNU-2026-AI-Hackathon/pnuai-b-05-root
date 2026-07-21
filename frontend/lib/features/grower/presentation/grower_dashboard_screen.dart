@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/revalidatable_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../../../shared/widgets/status_badge.dart';
-import '../../auth/presentation/account_actions.dart';
 import '../data/grower_repository.dart';
 import 'grower_complete_screen.dart';
 
@@ -19,10 +19,12 @@ class GrowerDashboardScreen extends StatefulWidget {
   State<GrowerDashboardScreen> createState() => _GrowerDashboardScreenState();
 }
 
-class _GrowerDashboardScreenState extends State<GrowerDashboardScreen> {
+class _GrowerDashboardScreenState
+    extends RevalidatableState<GrowerDashboardScreen> {
   final _repository = GrowerRepository();
 
   bool _loading = true;
+  bool _hasLoadedOnce = false;
   String? _errorMessage;
   List<Seedling> _seedlings = const [];
 
@@ -44,6 +46,21 @@ class _GrowerDashboardScreenState extends State<GrowerDashboardScreen> {
       setState(() => _errorMessage = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
+      _hasLoadedOnce = true;
+    }
+  }
+
+  /// `GrowerShell`이 홈 탭 재진입 시 호출한다. 일지/환경점검 탭에 다녀오는 동안
+  /// 통계가 바뀌었을 수 있으니 다시 불러오되, 기존 목록은 그대로 둔 채 응답이 오면
+  /// 조용히 교체한다.
+  @override
+  Future<void> revalidate() async {
+    if (!_hasLoadedOnce) return _load();
+    try {
+      final seedlings = await _repository.fetchSeedlings();
+      if (mounted) setState(() => _seedlings = seedlings);
+    } on ApiException {
+      // 재조회 실패 시 기존 목록을 그대로 유지한다.
     }
   }
 
@@ -60,57 +77,10 @@ class _GrowerDashboardScreenState extends State<GrowerDashboardScreen> {
     if (mounted) _load();
   }
 
-  void _showAccountMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.logout, color: AppColors.textPrimary),
-              title: Text('로그아웃', style: AppTextStyles.body(fontSize: 15)),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                confirmLogout(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.person_remove_outlined,
-                color: AppColors.textCaption,
-              ),
-              title: Text(
-                '회원탈퇴',
-                style: AppTextStyles.body(
-                  fontSize: 14,
-                  color: AppColors.textCaption,
-                ),
-              ),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                confirmDeleteAccount(context);
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: PigFigAppBar(
-        showNotificationBell: true,
-        onProfileTap: _showAccountMenu,
-      ),
+      appBar: const PigFigAppBar(showNotificationBell: true),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
         child: _buildBody(),

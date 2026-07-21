@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/revalidatable_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/fig_tree_illustration.dart';
@@ -9,7 +10,8 @@ import '../data/diary_repository.dart';
 import '../data/seedling_repository.dart';
 
 /// 1k — 성장 타임라인: `GET /api/diary/{seedling_id}/`와 실제 연동해 재배자 일지를
-/// 시간 역순(최신이 먼저)으로 나열한다.
+/// 시간 역순(최신이 먼저)으로 나열한다. `AdopterShell`의 탭 화면이라 뒤로가기/닫기
+/// 없이 다른 탭 화면(홈/마이페이지)과 동일한 앱바를 쓴다.
 class GrowthTimelineScreen extends StatefulWidget {
   const GrowthTimelineScreen({super.key});
 
@@ -17,11 +19,12 @@ class GrowthTimelineScreen extends StatefulWidget {
   State<GrowthTimelineScreen> createState() => _GrowthTimelineScreenState();
 }
 
-class _GrowthTimelineScreenState extends State<GrowthTimelineScreen> {
+class _GrowthTimelineScreenState extends RevalidatableState<GrowthTimelineScreen> {
   final _seedlingRepository = SeedlingRepository();
   final _diaryRepository = DiaryRepository();
 
   bool _loading = true;
+  bool _hasLoadedOnce = false;
   String? _errorMessage;
   bool _hasSeedling = false;
   List<DiaryEntry> _entries = const [];
@@ -32,37 +35,57 @@ class _GrowthTimelineScreenState extends State<GrowthTimelineScreen> {
     _load();
   }
 
+  Future<({bool hasSeedling, List<DiaryEntry> entries})> _fetchData() async {
+    final seedlings = await _seedlingRepository.fetchSeedlings();
+    final primary = pickPrimarySeedling(seedlings);
+    if (primary == null) {
+      return (hasSeedling: false, entries: const <DiaryEntry>[]);
+    }
+    final entries = await _diaryRepository.fetchDiaries(primary.id);
+    return (hasSeedling: true, entries: entries);
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _errorMessage = null;
     });
     try {
-      final seedlings = await _seedlingRepository.fetchSeedlings();
-      final primary = pickPrimarySeedling(seedlings);
-      if (primary == null) {
-        setState(() {
-          _hasSeedling = false;
-          _entries = const [];
-        });
-      } else {
-        final entries = await _diaryRepository.fetchDiaries(primary.id);
-        setState(() {
-          _hasSeedling = true;
-          _entries = entries;
-        });
-      }
+      final data = await _fetchData();
+      setState(() {
+        _hasSeedling = data.hasSeedling;
+        _entries = data.entries;
+      });
     } on ApiException catch (e) {
       setState(() => _errorMessage = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
+      _hasLoadedOnce = true;
+    }
+  }
+
+  /// `AdopterShell`이 타임라인 탭 재진입 시 호출한다. 재배자가 새 일지를 썼을 수
+  /// 있으니 다시 불러오되, 기존 목록은 그대로 둔 채 응답이 오면 조용히 교체한다.
+  @override
+  Future<void> revalidate() async {
+    if (!_hasLoadedOnce) return _load();
+    try {
+      final data = await _fetchData();
+      if (mounted) {
+        setState(() {
+          _hasSeedling = data.hasSeedling;
+          _entries = data.entries;
+        });
+      }
+    } on ApiException {
+      // 재조회 실패 시 기존 목록을 그대로 유지한다.
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const PigFigAppBar(closeLabel: '닫기'),
+      appBar: const PigFigAppBar(showNotificationBell: true),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
         child: Column(
