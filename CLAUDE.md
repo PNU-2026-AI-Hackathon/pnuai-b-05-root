@@ -378,6 +378,10 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   요약: `main` 직접 push 금지, `feat/`·`fix/`·`refactor/`·`docs/`·`chore/` 브랜치 prefix,
   push 전 `manage.py check`와 `manage.py test` 통과 필수.
 - 작업 완료 후 요약은 **한국어**로 작성합니다.
+- 반복되는 작업 절차(Flutter 화면 작업, API 연동, 백엔드 API 작업)는 Agent Skill로 정리되어
+  `.claude/skills/<이름>/SKILL.md`에 있습니다(Claude Code가 실제로 인식하는 위치이며, 원본은
+  `.agents/skills/`에도 동일하게 유지합니다 — `.claude/`는 보통 gitignore 대상이라 `.gitignore`에
+  `!.claude/skills/` 예외를 추가해뒀습니다).
 
 ## 현재 개발 상태
 
