@@ -6,7 +6,8 @@ enum UserRole { adopter, grower }
 extension UserRoleApi on UserRole {
   String get apiValue => this == UserRole.adopter ? 'adopter' : 'grower';
 
-  static UserRole fromApiValue(String value) => value == 'grower' ? UserRole.grower : UserRole.adopter;
+  static UserRole fromApiValue(String value) =>
+      value == 'grower' ? UserRole.grower : UserRole.adopter;
 }
 
 class LoginResult {
@@ -17,13 +18,16 @@ class LoginResult {
 /// backend/accounts (`/api/accounts/register/`, `/api/accounts/login/`) 연동.
 class AuthRepository {
   AuthRepository({ApiClient? apiClient, TokenStorage? tokenStorage})
-      : _apiClient = apiClient ?? ApiClient(),
-        _tokenStorage = tokenStorage ?? TokenStorage();
+    : _apiClient = apiClient ?? ApiClient(),
+      _tokenStorage = tokenStorage ?? TokenStorage();
 
   final ApiClient _apiClient;
   final TokenStorage _tokenStorage;
 
-  Future<LoginResult> login({required String email, required String password}) async {
+  Future<LoginResult> login({
+    required String email,
+    required String password,
+  }) async {
     final response = await _apiClient.post(
       '/api/accounts/login/',
       body: {'email': email, 'password': password},
@@ -32,7 +36,9 @@ class AuthRepository {
       access: response['access'] as String,
       refresh: response['refresh'] as String,
     );
-    return LoginResult(role: UserRoleApi.fromApiValue(response['role'] as String));
+    return LoginResult(
+      role: UserRoleApi.fromApiValue(response['role'] as String),
+    );
   }
 
   Future<void> register({

@@ -43,7 +43,11 @@ class PigFigAppBar extends StatelessWidget implements PreferredSizeWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                const Icon(Icons.notifications, color: AppColors.pink500, size: 22),
+                const Icon(
+                  Icons.notifications,
+                  color: AppColors.pink500,
+                  size: 22,
+                ),
                 Positioned(
                   top: 0,
                   right: -1,
@@ -61,7 +65,10 @@ class PigFigAppBar extends StatelessWidget implements PreferredSizeWidget {
           if (closeLabel != null)
             GestureDetector(
               onTap: onClose ?? () => Navigator.of(context).maybePop(),
-              child: Text(closeLabel!, style: AppTextStyles.body(color: const Color(0xFFB7B2A4))),
+              child: Text(
+                closeLabel!,
+                style: AppTextStyles.body(color: const Color(0xFFB7B2A4)),
+              ),
             ),
         ],
       ),

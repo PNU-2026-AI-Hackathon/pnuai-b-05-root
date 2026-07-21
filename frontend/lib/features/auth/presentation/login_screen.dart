@@ -78,7 +78,13 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 12),
               Text('Pig.Fig.', style: AppTextStyles.display(fontSize: 34)),
               const SizedBox(height: 4),
-              Text('나의 무화과를 만나러 가요 🌱', style: AppTextStyles.body(fontSize: 14, color: AppColors.textMuted)),
+              Text(
+                '나의 무화과를 만나러 가요 🌱',
+                style: AppTextStyles.body(
+                  fontSize: 14,
+                  color: AppColors.textMuted,
+                ),
+              ),
               const SizedBox(height: 32),
               RoleToggle(
                 selected: _selectedRole,
@@ -100,25 +106,49 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(_errorMessage!, style: AppTextStyles.body(fontSize: 13, color: AppColors.errorRed)),
+                  child: Text(
+                    _errorMessage!,
+                    style: AppTextStyles.body(
+                      fontSize: 13,
+                      color: AppColors.errorRed,
+                    ),
+                  ),
                 ),
               ],
               const SizedBox(height: 18),
-              PigFigButton.primary(label: '로그인', onPressed: _submit, loading: _loading),
+              PigFigButton.primary(
+                label: '로그인',
+                onPressed: _submit,
+                loading: _loading,
+              ),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('비밀번호 찾기', style: AppTextStyles.body(fontSize: 13, color: AppColors.textMuted)),
+                  Text(
+                    '비밀번호 찾기',
+                    style: AppTextStyles.body(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
                   const SizedBox(width: 16),
-                  Text('|', style: AppTextStyles.body(fontSize: 13, color: AppColors.dotInactive)),
+                  Text(
+                    '|',
+                    style: AppTextStyles.body(
+                      fontSize: 13,
+                      color: AppColors.dotInactive,
+                    ),
+                  ),
                   const SizedBox(width: 16),
                   GestureDetector(
                     onTap: _goToRegister,
                     child: Text(
                       '회원가입',
-                      style: AppTextStyles.body(fontSize: 13, color: AppColors.badgeGreenText)
-                          .copyWith(fontWeight: FontWeight.w700),
+                      style: AppTextStyles.body(
+                        fontSize: 13,
+                        color: AppColors.badgeGreenText,
+                      ).copyWith(fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
@@ -139,15 +169,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () => ScaffoldMessenger.of(context)
-                      .showSnackBar(const SnackBar(content: Text('카카오 로그인은 준비 중이에요'))),
+                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('카카오 로그인은 준비 중이에요')),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.kakaoYellow,
                     foregroundColor: AppColors.textPrimary,
                     elevation: 0,
                     shape: const StadiumBorder(),
                   ),
-                  child: Text('카카오로 계속하기', style: AppTextStyles.button(fontSize: 14, color: AppColors.textPrimary)),
+                  child: Text(
+                    '카카오로 계속하기',
+                    style: AppTextStyles.button(
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 40),
@@ -158,4 +195,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-

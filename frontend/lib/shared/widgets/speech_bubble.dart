@@ -4,7 +4,11 @@ import '../../core/theme/app_theme.dart';
 
 /// 꼬리가 아래쪽에 붙는 말풍선. 홈 화면에서 피그 캐릭터 대사에 사용.
 class SpeechBubble extends StatelessWidget {
-  const SpeechBubble({super.key, required this.text, this.background = Colors.white});
+  const SpeechBubble({
+    super.key,
+    required this.text,
+    this.background = Colors.white,
+  });
 
   final String text;
   final Color background;
@@ -20,10 +24,19 @@ class SpeechBubble extends StatelessWidget {
           color: background,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
-        child: Text(text, style: AppTextStyles.body(fontSize: 14).copyWith(fontWeight: FontWeight.w700)),
+        child: Text(
+          text,
+          style: AppTextStyles.body(
+            fontSize: 14,
+          ).copyWith(fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }
@@ -45,5 +58,6 @@ class _BubbleTailPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _BubbleTailPainter oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(covariant _BubbleTailPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

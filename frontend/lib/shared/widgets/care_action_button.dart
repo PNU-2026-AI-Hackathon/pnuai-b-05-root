@@ -32,14 +32,23 @@ class CareActionButton extends StatelessWidget {
               color: Colors.white,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 3)),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
               ],
             ),
             alignment: Alignment.center,
             child: Text(emoji, style: TextStyle(fontSize: size * 0.4)),
           ),
           const SizedBox(height: 4),
-          Text(label, style: AppTextStyles.body(fontSize: 13).copyWith(fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: AppTextStyles.body(
+              fontSize: 13,
+            ).copyWith(fontWeight: FontWeight.w500),
+          ),
         ],
       ),
     );

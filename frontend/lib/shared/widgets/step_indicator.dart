@@ -18,13 +18,18 @@ class StepIndicator extends StatelessWidget {
         Container(
           width: 8,
           height: 8,
-          decoration: const BoxDecoration(color: AppColors.pink500, shape: BoxShape.circle),
+          decoration: const BoxDecoration(
+            color: AppColors.pink500,
+            shape: BoxShape.circle,
+          ),
         ),
         const SizedBox(width: 6),
         Text(
           'STEP $current/$total',
-          style: AppTextStyles.body(fontSize: 14, color: AppColors.pink500)
-              .copyWith(fontWeight: FontWeight.w700),
+          style: AppTextStyles.body(
+            fontSize: 14,
+            color: AppColors.pink500,
+          ).copyWith(fontWeight: FontWeight.w700),
         ),
       ],
     );
@@ -33,7 +38,11 @@ class StepIndicator extends StatelessWidget {
 
 /// 온보딩류에서 쓰는 진행 점(dot) 인디케이터.
 class DotProgressIndicator extends StatelessWidget {
-  const DotProgressIndicator({super.key, required this.current, required this.total});
+  const DotProgressIndicator({
+    super.key,
+    required this.current,
+    required this.total,
+  });
 
   final int current;
   final int total;
