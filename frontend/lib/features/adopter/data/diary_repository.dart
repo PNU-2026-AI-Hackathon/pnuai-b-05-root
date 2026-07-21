@@ -8,6 +8,7 @@ class DiaryEntry {
     required this.content,
     required this.createdAt,
     this.photoUrl,
+    this.illustrationUrl,
     this.yoloStatusTag,
   });
 
@@ -15,6 +16,10 @@ class DiaryEntry {
   final String content;
   final DateTime createdAt;
   final String? photoUrl;
+
+  /// `photo`를 Gemini로 변환한 동화풍 일러스트. 변환이 안 됐거나 실패했으면 null
+  /// (백엔드가 원본 사진만 저장한 경우).
+  final String? illustrationUrl;
   final String? yoloStatusTag;
 
   factory DiaryEntry.fromJson(Map<String, dynamic> json) => DiaryEntry(
@@ -22,6 +27,7 @@ class DiaryEntry {
     content: json['content'] as String,
     createdAt: DateTime.parse(json['created_at'] as String),
     photoUrl: json['photo'] as String?,
+    illustrationUrl: json['illustration'] as String?,
     yoloStatusTag: json['yolo_status_tag'] as String?,
   );
 }

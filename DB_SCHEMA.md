@@ -35,6 +35,7 @@ Pig.Fig. 백엔드의 테이블(모델) 설계 문서입니다. 실제 구현 �
 | grower | FK → User | 작성한 재배자 |
 | content | TextField | 일지 내용 |
 | photo | ImageField | 생육 사진 (MEDIA_ROOT에 저장) |
+| illustration | ImageField (nullable) | photo를 Gemini로 변환한 동화풍 일러스트 (변환 실패/미설정 시 null) |
 | created_at | DateTimeField | 작성일시 |
 | yolo_status_tag | CharField | YOLOv8 분석 결과 상태 태그 |
 

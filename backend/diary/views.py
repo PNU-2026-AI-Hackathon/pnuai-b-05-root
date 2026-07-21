@@ -1,3 +1,4 @@
+from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.generics import CreateAPIView, ListAPIView
@@ -6,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from accounts.models import User
 from seedlings.models import Seedling
 
+from .gemini_illustration import convert_to_illustration
 from .models import Diary
 from .serializers import DiaryCreateSerializer, DiarySerializer
 
@@ -23,7 +25,16 @@ class DiaryCreateView(CreateAPIView):
         if seedling.grower_id != user.pk:
             raise PermissionDenied('본인이 담당하는 묘목에만 일지를 작성할 수 있습니다.')
 
-        serializer.save(grower=user)
+        diary = serializer.save(grower=user)
+
+        if diary.photo:
+            illustration_bytes = convert_to_illustration(diary.photo.path)
+            if illustration_bytes:
+                diary.illustration.save(
+                    f'diary_{diary.pk}_illustration.png',
+                    ContentFile(illustration_bytes),
+                    save=True,
+                )
 
 
 class DiaryListView(ListAPIView):

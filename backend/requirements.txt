@@ -2,6 +2,7 @@ Django==6.0.7
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 firebase-admin==7.5.0
+google-genai==2.12.1
 langchain_classic==1.0.8
 langchain_community==0.4.2
 langchain_core==1.4.9

@@ -17,6 +17,7 @@ class Diary(models.Model):
     )
     content = models.TextField()
     photo = models.ImageField(upload_to='diary/photos/', null=True, blank=True)
+    illustration = models.ImageField(upload_to='diary/illustrations/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     yolo_status_tag = models.CharField(max_length=50, null=True, blank=True)
 
