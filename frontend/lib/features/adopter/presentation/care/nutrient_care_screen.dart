@@ -37,7 +37,13 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
             children: [
               const StepIndicator(current: 1, total: 1),
               const SizedBox(height: 22),
-              Text('영양제를 주세요!', style: AppTextStyles.display(fontSize: 32, color: const Color(0xFFF7A0AE))),
+              Text(
+                '영양제를 주세요!',
+                style: AppTextStyles.display(
+                  fontSize: 32,
+                  color: const Color(0xFFF7A0AE),
+                ),
+              ),
               const SizedBox(height: 10),
               Text('영양제를 끌어서 흙에 꽂아보세요', style: AppTextStyles.guide()),
               Expanded(
@@ -48,7 +54,10 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
                       child: Draggable<String>(
                         data: 'nutrient',
                         feedback: _nutrientStick(dragging: true),
-                        childWhenDragging: Opacity(opacity: 0.3, child: _nutrientStick()),
+                        childWhenDragging: Opacity(
+                          opacity: 0.3,
+                          child: _nutrientStick(),
+                        ),
                         child: _nutrientStick(),
                       ),
                     ),
@@ -68,8 +77,14 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
               ),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                decoration: BoxDecoration(color: const Color(0xFFF2F8EF), borderRadius: BorderRadius.circular(18)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F8EF),
+                  borderRadius: BorderRadius.circular(18),
+                ),
                 child: GaugeBar(
                   value: _nutrition,
                   fillColor: AppColors.green500,
@@ -80,7 +95,13 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text('영양제는 7일에 한 번이면 충분해요 🍃', style: AppTextStyles.body(fontSize: 13, color: AppColors.textMuted)),
+              Text(
+                '영양제는 7일에 한 번이면 충분해요 🍃',
+                style: AppTextStyles.body(
+                  fontSize: 13,
+                  color: AppColors.textMuted,
+                ),
+              ),
             ],
           ),
         ),
@@ -102,14 +123,26 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
               border: Border.all(color: const Color(0xFFCBE5C4), width: 2),
               borderRadius: BorderRadius.circular(12),
               boxShadow: dragging
-                  ? [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 4))]
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
                   : null,
             ),
             alignment: Alignment.center,
             child: const Text('🍃', style: TextStyle(fontSize: 20)),
           ),
           const SizedBox(height: 6),
-          Text('잡아서 끌기', style: AppTextStyles.body(fontSize: 12, color: const Color(0xFFB7B2A4))),
+          Text(
+            '잡아서 끌기',
+            style: AppTextStyles.body(
+              fontSize: 12,
+              color: const Color(0xFFB7B2A4),
+            ),
+          ),
         ],
       ),
     );
@@ -123,12 +156,22 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
           width: 96,
           height: 64,
           decoration: BoxDecoration(
-            color: _hoveringTarget ? const Color(0xFFA9713F) : const Color(0xFFC08552),
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+            color: _hoveringTarget
+                ? const Color(0xFFA9713F)
+                : const Color(0xFFC08552),
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(22),
+            ),
           ),
         ),
         const SizedBox(height: 6),
-        Text('여기에 꽂기', style: AppTextStyles.body(fontSize: 12, color: const Color(0xFFB7B2A4))),
+        Text(
+          '여기에 꽂기',
+          style: AppTextStyles.body(
+            fontSize: 12,
+            color: const Color(0xFFB7B2A4),
+          ),
+        ),
       ],
     );
   }

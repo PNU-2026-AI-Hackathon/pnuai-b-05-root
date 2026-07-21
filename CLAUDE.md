@@ -15,10 +15,10 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
 - **프론트엔드**: Flutter — 최초 실행 온보딩(2장), 입양자(adopter) 플로우(회원가입/로그인/홈/케어 4종/
   마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(대시보드/일지/
   환경점검 3탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인), seedlings(`GET /api/seedlings/` 목록
-  조회 + `PATCH /api/seedlings/{id}/complete/` 완성 신고), chatbot(`POST /api/chatbot/ask/`)는 실제
-  백엔드와 연동되며, 케어 게이지·일지·센서 값·마이페이지·성장 타임라인·수령/기부 선택은 여전히 로컬
-  mock. 재배자용
-  sensor/diary/vision API 연동은 아직 미착수
+  조회 + `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary(`POST /api/diary/` 작성 +
+  `GET /api/diary/{seedling_id}/` 조회, 사진은 `image_picker`로 선택해 multipart 업로드), chatbot
+  (`POST /api/chatbot/ask/`)는 실제 백엔드와 연동됩니다. 홈 화면의 케어 게이지·마이페이지 프로필·
+  수령/기부 선택은 여전히 로컬 mock이며, 재배자용 sensor/vision API 연동은 아직 미착수
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
 - **비전 분석**: YOLOv8 — `vision/yolo_inference.py`에 구조는 있으나 현재 mock 추론(랜덤 값 반환)
@@ -215,10 +215,31 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   `Seedling.pickup_or_donate`/`donate_type` API 연동은 하지 않는 순수 정적 UI입니다. 디자인의 점선
   테두리(일지 사진 업로드 박스, 기부 인증서 카드)는 Flutter에 내장 dashed border가 없어 실선으로
   근사했습니다.
-- `growth_timeline_screen.dart`(마이페이지의 "성장 타임라인" 메뉴에서 진입)는 재배자 일지 mock 목록을
-  시간 역순(최신이 먼저)으로 `ListView`에 나열합니다. 각 카드는 "✨ 일러스트 변환" 배지만 자리표시로
-  붙어 있을 뿐 실제 사진→일러스트 변환은 하지 않으며, 최신 항목에만 재배자 코멘트 말풍선이 카드 바로
-  아래 (마이너스 마진으로 카드에 겹치듯) 붙습니다 — `diary` API 연동은 하지 않습니다.
+- `features/adopter/data/seedling_repository.dart`는 `grower/data/grower_repository.dart`와 동일한
+  패턴(같은 `GET /api/seedlings/`, 같은 `Seedling`/`SeedlingStatus` 모양)을 입양자 쪽에도 그대로
+  적용한 별도 파일입니다 — 기능이 겹치더라도 feature 간 참조 없이 각 feature가 자기 데이터 계층을
+  갖는 이 프로젝트 컨벤션을 따릅니다. 여기에 `pickPrimarySeedling()` 헬퍼가 있는데, 입양자가 여러
+  묘목을 가진 경우 홈/성장 타임라인에 보여줄 "대표 묘목"을 고릅니다(재배중인 것 중 가장 최근 시작한
+  것 우선, 전부 완료 상태면 가장 최근 완료된 것) — 처음에는 응답의 첫 번째 항목을 그냥 썼다가, 완료된
+  #1이 재배중인 #3보다 먼저 와서 홈 화면이 "이미 다 자란" 묘목을 보여주는 문제를 발견해 이 헬퍼로
+  고쳤습니다. `home_screen.dart`는 이제 `StatefulWidget`으로 `initState`에서 이 repository를 호출해
+  로딩/에러/(묘목 없음→ 입양 유도 CTA)/데이터 4가지 상태를 분기하며, 물주기 등 케어 게이지 4종은
+  여전히 로컬 mock이라 실제 묘목 데이터와 무관하게 동작합니다.
+- `growth_timeline_screen.dart`(마이페이지의 "성장 타임라인" 메뉴에서 진입)도 `StatefulWidget`으로
+  바뀌어 `seedling_repository.dart`로 대표 묘목을 고른 뒤 `features/adopter/data/diary_repository.dart`
+  의 `fetchDiaries()`로 `GET /api/diary/{seedling_id}/`를 호출합니다. 실제 `Diary` 모델에는 성장
+  단계·키·잎 개수 필드가 없어(그건 애초에 mock이 지어낸 값) 카드는 날짜 + `content` 본문 +
+  (있으면) `yolo_status_tag` 배지로 단순화됐고, `photo` URL이 있으면 `Image.network()`로 실제 사진을,
+  없으면 기존 "✨ 일러스트 변환" placeholder를 보여줍니다. 응답 순서가 보장되지 않아 클라이언트에서
+  `created_at` 내림차순으로 정렬합니다.
+- `grower_diary_screen.dart`는 이제 탭 진입 시 `GrowerRepository.fetchSeedlings()`로 담당 묘목
+  목록을 불러와 상단에 선택 칩으로 보여줍니다(재배중인 묘목이 있으면 자동 선택) — 이전에는 이 화면이
+  어떤 묘목에 대한 일지인지 알 방법이 전혀 없었기 때문에 실제 연동을 위해 꼭 필요했던 추가입니다.
+  "성장 단계" 칩은 `Diary` 모델에 대응 필드가 없어 여전히 로컬 장식으로만 남습니다. "사진 추가하기"는
+  `image_picker`(웹 포함 크로스플랫폼) 파일 선택기를 열어 바이트로 읽어 미리보기를 보여주고,
+  "입양자에게 전달하기"는 `features/grower/data/diary_repository.dart`의 `createDiary()`로
+  `POST /api/diary/`를 호출합니다 — 사진이 있으면 `multipart/form-data`(`ApiClient.postMultipart()`,
+  신규 추가), 없으면 텍스트 필드만 보냅니다. 성공 시 폼을 초기화하고 스낵바를 띄웁니다.
 - `chatbot_screen.dart`(마이페이지의 "AI 챗봇" 메뉴에서 진입)는 `features/adopter/data/
   chatbot_repository.dart`를 통해 실제 `POST /api/chatbot/ask/`를 호출합니다. 이 호출도
   `grower_repository.dart`의 완성 신고처럼 인증 토큰이 필요한데, `PATCH`용으로 이미 있던
@@ -253,12 +274,14 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 - 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
   (회원가입/로그인/홈/케어 4종/마이페이지/성장 타임라인/수령·기부 선택/기부 인증서/AI 챗봇), 재배자
   플로우(대시보드/일지/환경점검 3탭 + 묘목 완성 신고) 모두 구현됨. accounts(회원가입·로그인),
-  seedlings(`GET /api/seedlings/` 목록 조회, `PATCH /api/seedlings/{id}/complete/` 완성 신고, 둘 다
-  JWT 인증), chatbot(`POST /api/chatbot/ask/`, JWT 인증)는 실제 백엔드와 연동되어 동작 확인됨(서로
-  다른 재배자 계정 2개 — 재배중/완료 묘목이 섞인 계정과 담당 묘목이 0건인 계정 — 으로 목록 조회·통계
-  계산·빈 목록 상태·완성 신고 후 자동 새로고침까지 end-to-end 테스트; chatbot은 `GEMINI_API_KEY`
-  미설정 상태에서 mock 응답으로 테스트). 재배자 대시보드는 이제 실제 데이터를 쓰지만, 케어 게이지·
-  재배자 일지·센서 값·마이페이지 프로필/성장 타임라인/수령·기부 선택은 여전히 로컬 mock 상태(라우트
-  이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(diary/sensor/vision API,
-  `Seedling.pickup_or_donate` 갱신 API 미연동)
-- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 게임 탭, 비전 연동 등은 아직 미착수
+  seedlings(`GET /api/seedlings/` 목록 조회, `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary
+  (`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회), chatbot(`POST /api/chatbot/ask/`)
+  는 모두 JWT 인증으로 실제 백엔드와 연동되어 동작 확인됨(서로 다른 재배자 계정 2개로 대시보드
+  목록·통계·완성 신고 자동 새로고침 테스트; 재배자로 일지를 실제로 작성한 뒤 같은 묘목의 입양자
+  계정으로 로그인해 성장 타임라인에 그 일지가 실제로 나타나는 end-to-end 시나리오까지 확인; 입양자
+  홈 화면은 묘목 있는 계정/없는 계정 각각 확인; chatbot은 `GEMINI_API_KEY` 미설정 상태에서 mock
+  응답으로 테스트). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지 작성이 모두 실제 데이터를
+  쓰지만, 케어 게이지 4종·마이페이지 프로필·수령/기부 선택은 여전히 로컬 mock 상태(라우트 이동/새 탭
+  진입 시 초기화)이며 서버에 저장되지 않음(sensor/vision API, `Seedling.pickup_or_donate` 갱신 API
+  미연동)
+- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 게임 탭, sensor·vision 연동 등은 아직 미착수

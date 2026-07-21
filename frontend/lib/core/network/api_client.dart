@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -110,6 +111,51 @@ class ApiClient {
         },
         body: body == null ? null : jsonEncode(body),
       );
+    } on Exception {
+      throw ApiException('서버에 연결할 수 없어요. 네트워크 상태를 확인해주세요.');
+    }
+
+    final decoded = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded;
+    }
+    throw ApiException(
+      _extractErrorMessage(decoded),
+      statusCode: response.statusCode,
+    );
+  }
+
+  /// 인증된 `multipart/form-data` POST 요청. 파일 필드(`fileFieldName`)가 주어지면
+  /// 바이트로 첨부한다 — 웹에서도 동일하게 동작하도록 파일 경로가 아닌 바이트를 받는다.
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    Uint8List? fileBytes,
+    String? fileFieldName,
+    String? fileName,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $accessToken'
+      ..fields.addAll(fields);
+    if (fileBytes != null && fileFieldName != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          fileFieldName,
+          fileBytes,
+          filename: fileName ?? 'upload.jpg',
+        ),
+      );
+    }
+
+    late final http.Response response;
+    try {
+      final streamed = await request.send();
+      response = await http.Response.fromStream(streamed);
     } on Exception {
       throw ApiException('서버에 연결할 수 없어요. 네트워크 상태를 확인해주세요.');
     }

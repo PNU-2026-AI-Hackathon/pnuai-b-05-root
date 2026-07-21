@@ -29,7 +29,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _selectedRole ??= ModalRoute.of(context)?.settings.arguments as UserRole? ?? UserRole.adopter;
+    _selectedRole ??=
+        ModalRoute.of(context)?.settings.arguments as UserRole? ??
+        UserRole.adopter;
   }
 
   @override
@@ -56,9 +58,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         role: _selectedRole!,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('회원가입 성공! 로그인해주세요 🌱')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('회원가입 성공! 로그인해주세요 🌱')));
       Navigator.of(context).pop();
     } on ApiException catch (e) {
       setState(() => _errorMessage = e.message);
@@ -108,10 +110,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 12),
-                Text(_errorMessage!, style: AppTextStyles.body(fontSize: 13, color: AppColors.errorRed)),
+                Text(
+                  _errorMessage!,
+                  style: AppTextStyles.body(
+                    fontSize: 13,
+                    color: AppColors.errorRed,
+                  ),
+                ),
               ],
               const SizedBox(height: 22),
-              PigFigButton.primary(label: '회원가입', onPressed: _submit, loading: _loading),
+              PigFigButton.primary(
+                label: '회원가입',
+                onPressed: _submit,
+                loading: _loading,
+              ),
             ],
           ),
         ),

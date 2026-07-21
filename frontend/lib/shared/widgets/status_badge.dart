@@ -21,15 +21,20 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: pill ? 16 : 12, vertical: pill ? 8 : 5),
+      padding: EdgeInsets.symmetric(
+        horizontal: pill ? 16 : 12,
+        vertical: pill ? 8 : 5,
+      ),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(pill ? 20 : 14),
       ),
       child: Text(
         label,
-        style: AppTextStyles.body(fontSize: pill ? 13 : 12, color: textColor)
-            .copyWith(fontWeight: FontWeight.w700),
+        style: AppTextStyles.body(
+          fontSize: pill ? 13 : 12,
+          color: textColor,
+        ).copyWith(fontWeight: FontWeight.w700),
       ),
     );
   }

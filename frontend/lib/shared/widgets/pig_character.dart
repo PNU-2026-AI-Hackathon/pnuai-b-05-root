@@ -32,9 +32,7 @@ class PigCharacter extends StatelessWidget {
             right: width * 0.06,
             child: _circle(earSize, AppColors.pink500),
           ),
-          Positioned.fill(
-            child: _circle(width, const Color(0xFFF9A8B6)),
-          ),
+          Positioned.fill(child: _circle(width, const Color(0xFFF9A8B6))),
           Positioned(
             top: height * 0.37,
             left: width * 0.21,
@@ -74,17 +72,17 @@ class PigCharacter extends StatelessWidget {
   }
 
   Widget _circle(double size, Color color) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      );
+    width: size,
+    height: size,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  );
 
   Widget _nostril(double size) => Container(
-        width: size,
-        height: size * 1.4,
-        decoration: BoxDecoration(
-          color: const Color(0xFFC9647C),
-          borderRadius: BorderRadius.circular(size / 2),
-        ),
-      );
+    width: size,
+    height: size * 1.4,
+    decoration: BoxDecoration(
+      color: const Color(0xFFC9647C),
+      borderRadius: BorderRadius.circular(size / 2),
+    ),
+  );
 }

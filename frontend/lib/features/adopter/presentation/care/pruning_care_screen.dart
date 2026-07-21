@@ -13,19 +13,23 @@ class PruningCareScreen extends StatefulWidget {
   State<PruningCareScreen> createState() => _PruningCareScreenState();
 }
 
-class _PruningCareScreenState extends State<PruningCareScreen> with SingleTickerProviderStateMixin {
+class _PruningCareScreenState extends State<PruningCareScreen>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _progressController;
   bool _completed = false;
 
   @override
   void initState() {
     super.initState();
-    _progressController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          setState(() => _completed = true);
-        }
-      });
+    _progressController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 1200),
+        )..addStatusListener((status) {
+          if (status == AnimationStatus.completed) {
+            setState(() => _completed = true);
+          }
+        });
   }
 
   @override
@@ -49,7 +53,10 @@ class _PruningCareScreenState extends State<PruningCareScreen> with SingleTicker
               Text(
                 _completed ? '첫 가지치기 완료! 🌿' : '첫 가지치기를 해주세요!',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.display(fontSize: 32, color: const Color(0xFFF7A0AE)),
+                style: AppTextStyles.display(
+                  fontSize: 32,
+                  color: const Color(0xFFF7A0AE),
+                ),
               ),
               const SizedBox(height: 10),
               Text(
@@ -59,7 +66,11 @@ class _PruningCareScreenState extends State<PruningCareScreen> with SingleTicker
               Expanded(
                 child: Center(
                   child: GestureDetector(
-                    onLongPressStart: _completed ? null : (_) => _progressController.forward(from: _progressController.value),
+                    onLongPressStart: _completed
+                        ? null
+                        : (_) => _progressController.forward(
+                            from: _progressController.value,
+                          ),
                     onLongPressEnd: _completed
                         ? null
                         : (_) {
@@ -74,10 +85,21 @@ class _PruningCareScreenState extends State<PruningCareScreen> with SingleTicker
                           Container(
                             width: 14,
                             height: 130,
-                            decoration: BoxDecoration(color: AppColors.brown600, borderRadius: BorderRadius.circular(7)),
+                            decoration: BoxDecoration(
+                              color: AppColors.brown600,
+                              borderRadius: BorderRadius.circular(7),
+                            ),
                           ),
-                          const Positioned(left: 8, top: 20, child: Text('🌱', style: TextStyle(fontSize: 18))),
-                          const Positioned(right: 8, bottom: 20, child: Text('🌱', style: TextStyle(fontSize: 18))),
+                          const Positioned(
+                            left: 8,
+                            top: 20,
+                            child: Text('🌱', style: TextStyle(fontSize: 18)),
+                          ),
+                          const Positioned(
+                            right: 8,
+                            bottom: 20,
+                            child: Text('🌱', style: TextStyle(fontSize: 18)),
+                          ),
                           if (!_completed)
                             AnimatedBuilder(
                               animation: _progressController,
@@ -87,8 +109,12 @@ class _PruningCareScreenState extends State<PruningCareScreen> with SingleTicker
                                 child: CircularProgressIndicator(
                                   value: _progressController.value,
                                   strokeWidth: 5,
-                                  backgroundColor: AppColors.pink100.withValues(alpha: 0.4),
-                                  valueColor: const AlwaysStoppedAnimation(AppColors.pink500),
+                                  backgroundColor: AppColors.pink100.withValues(
+                                    alpha: 0.4,
+                                  ),
+                                  valueColor: const AlwaysStoppedAnimation(
+                                    AppColors.pink500,
+                                  ),
                                 ),
                               ),
                             ),
@@ -96,12 +122,23 @@ class _PruningCareScreenState extends State<PruningCareScreen> with SingleTicker
                             Container(
                               width: 64,
                               height: 64,
-                              decoration: const BoxDecoration(color: AppColors.green500, shape: BoxShape.circle),
+                              decoration: const BoxDecoration(
+                                color: AppColors.green500,
+                                shape: BoxShape.circle,
+                              ),
                               alignment: Alignment.center,
-                              child: const Icon(Icons.check, color: Colors.white, size: 32),
+                              child: const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 32,
+                              ),
                             )
                           else
-                            const Positioned(top: 24, right: -30, child: Text('✂️', style: TextStyle(fontSize: 30))),
+                            const Positioned(
+                              top: 24,
+                              right: -30,
+                              child: Text('✂️', style: TextStyle(fontSize: 30)),
+                            ),
                         ],
                       ),
                     ),
@@ -109,8 +146,13 @@ class _PruningCareScreenState extends State<PruningCareScreen> with SingleTicker
                 ),
               ),
               Text(
-                _completed ? '다음 가지치기는 다 자란 뒤에 알려드릴게요 🌳' : '처음 한 번만 하는 특별한 인터랙션이에요 🌿',
-                style: AppTextStyles.body(fontSize: 13, color: AppColors.textMuted),
+                _completed
+                    ? '다음 가지치기는 다 자란 뒤에 알려드릴게요 🌳'
+                    : '처음 한 번만 하는 특별한 인터랙션이에요 🌿',
+                style: AppTextStyles.body(
+                  fontSize: 13,
+                  color: AppColors.textMuted,
+                ),
               ),
             ],
           ),

@@ -47,9 +47,18 @@ class PigFigButton extends StatelessWidget {
         ? SizedBox(
             width: 20,
             height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2.4, color: foreground),
+            child: CircularProgressIndicator(
+              strokeWidth: 2.4,
+              color: foreground,
+            ),
           )
-        : Text(label, style: AppTextStyles.button(color: foreground, fontSize: isOutline ? 14 : 16));
+        : Text(
+            label,
+            style: AppTextStyles.button(
+              color: foreground,
+              fontSize: isOutline ? 14 : 16,
+            ),
+          );
 
     return SizedBox(
       width: double.infinity,
@@ -61,7 +70,9 @@ class PigFigButton extends StatelessWidget {
           foregroundColor: foreground,
           elevation: 0,
           shape: StadiumBorder(
-            side: isOutline ? const BorderSide(color: AppColors.outline, width: 1.5) : BorderSide.none,
+            side: isOutline
+                ? const BorderSide(color: AppColors.outline, width: 1.5)
+                : BorderSide.none,
           ),
         ),
         child: child,

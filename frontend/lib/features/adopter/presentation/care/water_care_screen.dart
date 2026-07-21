@@ -16,7 +16,8 @@ class WaterCareScreen extends StatefulWidget {
   State<WaterCareScreen> createState() => _WaterCareScreenState();
 }
 
-class _WaterCareScreenState extends State<WaterCareScreen> with SingleTickerProviderStateMixin {
+class _WaterCareScreenState extends State<WaterCareScreen>
+    with SingleTickerProviderStateMixin {
   double _moisture = 0.6;
   Timer? _holdTimer;
   late final AnimationController _pulseController;
@@ -24,7 +25,10 @@ class _WaterCareScreenState extends State<WaterCareScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
   }
 
   @override
@@ -56,7 +60,13 @@ class _WaterCareScreenState extends State<WaterCareScreen> with SingleTickerProv
             children: [
               const StepIndicator(current: 1, total: 1),
               const SizedBox(height: 22),
-              Text('물을 주세요!', style: AppTextStyles.display(fontSize: 32, color: const Color(0xFFF7A0AE))),
+              Text(
+                '물을 주세요!',
+                style: AppTextStyles.display(
+                  fontSize: 32,
+                  color: const Color(0xFFF7A0AE),
+                ),
+              ),
               const SizedBox(height: 10),
               Text('물방울을 꾹 눌러 화분에 부어보세요', style: AppTextStyles.guide()),
               Expanded(
@@ -78,7 +88,10 @@ class _WaterCareScreenState extends State<WaterCareScreen> with SingleTickerProv
                                 child: Container(
                                   width: 120,
                                   height: 120,
-                                  decoration: const BoxDecoration(color: AppColors.pink100, shape: BoxShape.circle),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.pink100,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
                               ),
                             ),
@@ -89,7 +102,10 @@ class _WaterCareScreenState extends State<WaterCareScreen> with SingleTickerProv
                       child: Container(
                         width: 84,
                         height: 84,
-                        decoration: const BoxDecoration(color: Color(0xFFFDEFF2), shape: BoxShape.circle),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFDEFF2),
+                          shape: BoxShape.circle,
+                        ),
                         alignment: Alignment.center,
                         child: const Text('💧', style: TextStyle(fontSize: 40)),
                       ),
@@ -99,8 +115,14 @@ class _WaterCareScreenState extends State<WaterCareScreen> with SingleTickerProv
               ),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                decoration: BoxDecoration(color: const Color(0xFFF3F8FD), borderRadius: BorderRadius.circular(18)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F8FD),
+                  borderRadius: BorderRadius.circular(18),
+                ),
                 child: GaugeBar(
                   value: _moisture,
                   fillColor: AppColors.blue400,
@@ -111,7 +133,13 @@ class _WaterCareScreenState extends State<WaterCareScreen> with SingleTickerProv
                 ),
               ),
               const SizedBox(height: 16),
-              Text('누르는 동안 재배자에게 물주기 요청이 기록돼요 💧', style: AppTextStyles.body(fontSize: 13, color: AppColors.textMuted)),
+              Text(
+                '누르는 동안 재배자에게 물주기 요청이 기록돼요 💧',
+                style: AppTextStyles.body(
+                  fontSize: 13,
+                  color: AppColors.textMuted,
+                ),
+              ),
             ],
           ),
         ),

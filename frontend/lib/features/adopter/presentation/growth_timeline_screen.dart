@@ -1,71 +1,63 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
+import '../data/diary_repository.dart';
+import '../data/seedling_repository.dart';
 
-class _GrowerComment {
-  const _GrowerComment({required this.growerName, required this.text});
-
-  final String growerName;
-  final String text;
-}
-
-class _TimelineEntry {
-  const _TimelineEntry({
-    required this.illustration,
-    required this.stageLabel,
-    required this.stageHighlighted,
-    required this.date,
-    required this.title,
-    required this.detail,
-    this.comment,
-  });
-
-  final Widget illustration;
-  final String stageLabel;
-  final bool stageHighlighted;
-  final String date;
-  final String title;
-  final String detail;
-  final _GrowerComment? comment;
-}
-
-/// 1k — 성장 타임라인: 재배자 일지를 시간 역순으로 나열. mock 데이터(diary API 미연동).
-class GrowthTimelineScreen extends StatelessWidget {
+/// 1k — 성장 타임라인: `GET /api/diary/{seedling_id}/`와 실제 연동해 재배자 일지를
+/// 시간 역순(최신이 먼저)으로 나열한다.
+class GrowthTimelineScreen extends StatefulWidget {
   const GrowthTimelineScreen({super.key});
 
-  static const _entries = [
-    _TimelineEntry(
-      illustration: FigTreeIllustration(width: 32),
-      stageLabel: '3단계 · 가지 발달',
-      stageHighlighted: true,
-      date: '7.18',
-      title: '가지가 3개로 늘었어요!',
-      detail: '키 24cm · 잎 9장',
-      comment: _GrowerComment(
-        growerName: '박영자 재배자님의 일지',
-        text: '"오늘 새 가지에 힘이 붙었어요. 물은 아침에 흠뻑 줬습니다."',
-      ),
-    ),
-    _TimelineEntry(
-      illustration: FigTreeIllustration(width: 22),
-      stageLabel: '2단계 · 잎 성장',
-      stageHighlighted: false,
-      date: '7.02',
-      title: '첫 잎이 활짝 펴졌어요',
-      detail: '키 12cm · 잎 4장',
-    ),
-    _TimelineEntry(
-      illustration: Text('🌱', style: TextStyle(fontSize: 24)),
-      stageLabel: '1단계 · 뿌리 내림',
-      stageHighlighted: false,
-      date: '6.20',
-      title: '입양 첫날, 새싹 인사 🌱',
-      detail: '키 4cm · 떡잎 2장',
-    ),
-  ];
+  @override
+  State<GrowthTimelineScreen> createState() => _GrowthTimelineScreenState();
+}
+
+class _GrowthTimelineScreenState extends State<GrowthTimelineScreen> {
+  final _seedlingRepository = SeedlingRepository();
+  final _diaryRepository = DiaryRepository();
+
+  bool _loading = true;
+  String? _errorMessage;
+  bool _hasSeedling = false;
+  List<DiaryEntry> _entries = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+    try {
+      final seedlings = await _seedlingRepository.fetchSeedlings();
+      final primary = pickPrimarySeedling(seedlings);
+      if (primary == null) {
+        setState(() {
+          _hasSeedling = false;
+          _entries = const [];
+        });
+      } else {
+        final entries = await _diaryRepository.fetchDiaries(primary.id);
+        setState(() {
+          _hasSeedling = true;
+          _entries = entries;
+        });
+      }
+    } on ApiException catch (e) {
+      setState(() => _errorMessage = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,35 +76,47 @@ class GrowthTimelineScreen extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '재배자의 사진이 귀여운 일러스트로 변해요',
+              '재배자가 남긴 일지를 시간 순서로 볼 수 있어요',
               style: AppTextStyles.guide(
                 fontSize: 14,
                 color: AppColors.badgeGreenText,
               ),
             ),
             const SizedBox(height: 14),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.only(bottom: 16),
-                itemCount: _entries.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final entry = _entries[index];
-                  if (entry.comment == null) return _TimelineCard(entry: entry);
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _TimelineCard(entry: entry),
-                      _GrowerCommentBubble(comment: entry.comment!),
-                    ],
-                  );
-                },
-              ),
-            ),
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.pink500),
+      );
+    }
+    if (_errorMessage != null) {
+      return _MessageState(
+        emoji: '😢',
+        message: _errorMessage!,
+        onRetry: _load,
+      );
+    }
+    if (!_hasSeedling) {
+      return const _MessageState(emoji: '🌱', message: '아직 입양한 무화과가 없어요');
+    }
+    if (_entries.isEmpty) {
+      return const _MessageState(
+        emoji: '📋',
+        message: '아직 작성된 일지가 없어요\n재배자가 곧 소식을 전해드릴게요!',
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 16),
+      itemCount: _entries.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) => _TimelineCard(entry: _entries[index]),
     );
   }
 }
@@ -120,7 +124,10 @@ class GrowthTimelineScreen extends StatelessWidget {
 class _TimelineCard extends StatelessWidget {
   const _TimelineCard({required this.entry});
 
-  final _TimelineEntry entry;
+  final DiaryEntry entry;
+
+  static String _formatDate(DateTime date) =>
+      '${date.month}.${date.day.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -149,38 +156,51 @@ class _TimelineCard extends StatelessWidget {
                 Container(
                   width: 78,
                   height: 78,
-                  alignment: Alignment.bottomCenter,
-                  padding: const EdgeInsets.only(bottom: 10),
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
                     color: AppColors.badgeGreenBg,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: entry.illustration,
+                  child: entry.photoUrl != null
+                      ? Image.network(
+                          entry.photoUrl!,
+                          fit: BoxFit.cover,
+                          width: 78,
+                          height: 78,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const FigTreeIllustration(width: 32),
+                        )
+                      : const Padding(
+                          padding: EdgeInsets.only(bottom: 10),
+                          child: FigTreeIllustration(width: 32),
+                        ),
                 ),
-                Positioned(
-                  bottom: -7,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.pink100,
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: Text(
-                        '✨ 일러스트 변환',
-                        style: AppTextStyles.body(
-                          fontSize: 10,
-                          color: AppColors.badgePinkText,
-                        ).copyWith(fontWeight: FontWeight.w700),
+                if (entry.photoUrl == null)
+                  Positioned(
+                    bottom: -7,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.pink100,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          '✨ 일러스트 변환',
+                          style: AppTextStyles.body(
+                            fontSize: 10,
+                            color: AppColors.badgePinkText,
+                          ).copyWith(fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -192,49 +212,39 @@ class _TimelineCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: entry.stageHighlighted
-                            ? AppColors.green500
-                            : AppColors.badgeGreenBg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        entry.stageLabel,
-                        style: AppTextStyles.body(
-                          fontSize: 11,
-                          color: entry.stageHighlighted
-                              ? Colors.white
-                              : AppColors.badgeGreenText,
-                        ).copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ),
                     Text(
-                      entry.date,
+                      _formatDate(entry.createdAt),
                       style: AppTextStyles.body(
                         fontSize: 11,
                         color: const Color(0xFFB7B2A4),
                       ),
                     ),
+                    if (entry.yoloStatusTag != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.badgeGreenBg,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          entry.yoloStatusTag!,
+                          style: AppTextStyles.body(
+                            fontSize: 11,
+                            color: AppColors.badgeGreenText,
+                          ).copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 7),
                 Text(
-                  entry.title,
+                  entry.content,
                   style: AppTextStyles.body(
-                    fontSize: 14,
-                  ).copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  entry.detail,
-                  style: AppTextStyles.body(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
                   ).copyWith(height: 1.5),
                 ),
               ],
@@ -246,70 +256,41 @@ class _TimelineCard extends StatelessWidget {
   }
 }
 
-class _GrowerCommentBubble extends StatelessWidget {
-  const _GrowerCommentBubble({required this.comment});
+class _MessageState extends StatelessWidget {
+  const _MessageState({
+    required this.emoji,
+    required this.message,
+    this.onRetry,
+  });
 
-  final _GrowerComment comment;
+  final String emoji;
+  final String message;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(26, 0, 0, 0),
-      transform: Matrix4.translationValues(0, -4, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFDEFF2),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(4),
-          topRight: Radius.circular(16),
-          bottomLeft: Radius.circular(16),
-          bottomRight: Radius.circular(16),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 40)),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body(
+                fontSize: 14,
+                color: AppColors.textMuted,
+              ),
+            ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 16),
+              TextButton(onPressed: onRetry, child: const Text('다시 시도')),
+            ],
+          ],
         ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: const Text('👵', style: TextStyle(fontSize: 15)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  comment.growerName,
-                  style: AppTextStyles.body(
-                    fontSize: 12,
-                    color: AppColors.badgePinkText,
-                  ).copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  comment.text,
-                  style: AppTextStyles.body(
-                    fontSize: 12,
-                    color: const Color(0xFF6B675C),
-                  ).copyWith(height: 1.55),
-                ),
-                Text(
-                  '일지 전체보기 ›',
-                  style: AppTextStyles.body(
-                    fontSize: 11,
-                    color: AppColors.warningPink,
-                  ).copyWith(fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

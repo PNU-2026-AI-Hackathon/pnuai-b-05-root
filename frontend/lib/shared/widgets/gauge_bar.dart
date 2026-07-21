@@ -46,9 +46,21 @@ class GaugeBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 if (label != null)
-                  Text(label!, style: AppTextStyles.body(fontSize: 13, color: fillColor).copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    label!,
+                    style: AppTextStyles.body(
+                      fontSize: 13,
+                      color: fillColor,
+                    ).copyWith(fontWeight: FontWeight.w700),
+                  ),
                 if (trailing != null)
-                  Text(trailing!, style: AppTextStyles.body(fontSize: 13, color: fillColor).copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    trailing!,
+                    style: AppTextStyles.body(
+                      fontSize: 13,
+                      color: fillColor,
+                    ).copyWith(fontWeight: FontWeight.w700),
+                  ),
               ],
             ),
           ),

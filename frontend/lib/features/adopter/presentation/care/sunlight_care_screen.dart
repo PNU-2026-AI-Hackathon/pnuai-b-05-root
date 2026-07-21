@@ -29,7 +29,13 @@ class _SunlightCareScreenState extends State<SunlightCareScreen> {
             children: [
               const StepIndicator(current: 1, total: 1),
               const SizedBox(height: 22),
-              Text('햇빛을 쬐어주세요!', style: AppTextStyles.display(fontSize: 32, color: const Color(0xFFF7A0AE))),
+              Text(
+                '햇빛을 쬐어주세요!',
+                style: AppTextStyles.display(
+                  fontSize: 32,
+                  color: const Color(0xFFF7A0AE),
+                ),
+              ),
               const SizedBox(height: 10),
               Text('슬라이더를 밀어 보광등을 켜보세요', style: AppTextStyles.guide()),
               Expanded(
@@ -42,7 +48,9 @@ class _SunlightCareScreenState extends State<SunlightCareScreen> {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.orange400.withValues(alpha: 0.25 * _brightness + 0.05),
+                          color: AppColors.orange400.withValues(
+                            alpha: 0.25 * _brightness + 0.05,
+                          ),
                           blurRadius: 60 * _brightness + 10,
                           spreadRadius: 20 * _brightness,
                         ),
@@ -59,8 +67,14 @@ class _SunlightCareScreenState extends State<SunlightCareScreen> {
               ),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                decoration: BoxDecoration(color: const Color(0xFFFDF8EC), borderRadius: BorderRadius.circular(18)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDF8EC),
+                  borderRadius: BorderRadius.circular(18),
+                ),
                 child: Column(
                   children: [
                     GaugeBar(
@@ -82,7 +96,13 @@ class _SunlightCareScreenState extends State<SunlightCareScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text('적정 조도 2000~3000 lux를 맞춰주세요 ☀️', style: AppTextStyles.body(fontSize: 13, color: AppColors.textMuted)),
+              Text(
+                '적정 조도 2000~3000 lux를 맞춰주세요 ☀️',
+                style: AppTextStyles.body(
+                  fontSize: 13,
+                  color: AppColors.textMuted,
+                ),
+              ),
             ],
           ),
         ),
