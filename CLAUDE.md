@@ -156,8 +156,8 @@ Gemini 응답으로 채워짐) "최근 이상 이력"이 재현 가능하게 나
 
 ### 일지 사진 → 일러스트 변환 (Gemini 이미지 생성)
 재배자가 일지 작성 시 사진(`Diary.photo`)을 함께 올리면, `diary/gemini_illustration.py`의
-`convert_to_illustration(photo_path)`가 Gemini 이미지 생성 모델로 "따뜻하고 감성적인 동화풍
-일러스트"로 변환을 시도하고, 성공하면 `DiaryCreateView.perform_create()`가 그 결과를
+`convert_to_illustration(photo_path)`가 Gemini 이미지 생성 모델로 "아동 그림책(picture book)
+스타일의 귀여운 일러스트"로 변환을 시도하고, 성공하면 `DiaryCreateView.perform_create()`가 그 결과를
 `Diary.illustration`에 저장합니다(원본 `photo`는 그대로 유지). 텍스트 모델
 `gemini-2.5-flash`로는 이미지를 생성할 수 없고, `langchain_google_genai`도 이미지 생성 전용
 클래스가 없어서(`ChatGoogleGenerativeAI`/`GoogleGenerativeAIEmbeddings`뿐) 이 파이프라인만
@@ -177,13 +177,30 @@ API를 쓰는 별도 인터페이스라 이번엔 지시받은 대로 `gemini-2.
 `diary/tests.py`는 `diary.views.convert_to_illustration`(뷰 테스트: 권한/저장 로직만 검증)와
 `diary.gemini_illustration._generate_illustration`(모듈 테스트: 키 없음/성공/실패 세 경로)을
 각각 mock해 검증하며, 이미지 생성은 호출당 과금·쿼터가 있어 실제 네트워크를 타는 테스트는
-의도적으로 만들지 않았습니다(sensor/vision과 동일한 원칙). **실제로 겪은 문제**: 이 프로젝트
-API 키의 무료 티어는 이미지 생성 모델 쿼터가 0으로 설정돼 있어(`429 RESOURCE_EXHAUSTED
-... limit: 0, model: gemini-2.5-flash-preview-image`), 실서버로 사진 포함 일지를 실제로
-작성해도 `illustration`이 채워지지 않고 조용히 원본 사진만 저장되는 것까지 직접
-확인했습니다 — 코드/폴백 경로 자체는 정상 동작하는 것으로 확인됐고(`DiarySerializer` 응답에
-`photo`는 URL, `illustration`은 `null`로 정확히 내려옴), 실제 변환 성공 사례는 결제가 연결된
-API 키가 있어야 재현·검증할 수 있습니다. `growth_timeline_screen.dart`는 `illustrationUrl`이
+의도적으로 만들지 않았습니다(sensor/vision과 동일한 원칙).
+
+`ILLUSTRATION_PROMPT`는 처음엔 "따뜻하고 감성적인 동화풍 일러스트로 변환"이라고만 지시했는데,
+실제로 생성된 결과물(초기 예시가 `media/diary/illustrations/diary_9_illustration.png`로 남아
+있음)이 색감만 살짝 보정된 사진에 가깝고 동화풍 일러스트로 보이지 않는 문제가 있었습니다. 그래서
+프롬프트에 (1) `photorealistic`/`realistic photo`처럼 보이면 안 된다는 명시적 금지 문구, (2) 아동
+그림책(picture book illustration) 스타일·flat color·부드러운 선·파스텔톤·단순화된 형태 등 원하는
+스타일을 구체적인 키워드로 나열하는 문장, (3) 잎 개수·크기·줄기 굵기·성장 정도 등 식물의 실제 상태는
+그대로 유지하라는 기존 지시를 그대로 유지하는 세 부분으로 프롬프트를 강화했습니다. **실제로 겪은
+문제**: 이 프로젝트 API 키는 초기에는 무료 티어라 이미지 생성 모델 쿼터가 0으로 설정돼 있었고
+(`429 RESOURCE_EXHAUSTED ... limit: 0, model: gemini-2.5-flash-preview-image`), 이후 결제가
+연결된 뒤에도 이번엔 프로젝트 단위 월간 지출 한도(monthly spending cap)를 이미 소진한 상태라
+(`429 RESOURCE_EXHAUSTED ... Your project has exceeded its monthly spending cap`) 강화된
+프롬프트로 실제 재검증(재배자 계정으로 사진 포함 일지 작성)을 시도해도 여전히 `illustration`이
+채워지지 않고 원본 사진만 저장되는 것까지 확인했습니다 — 이 두 오류는 서로 다른 상태입니다(전자는
+결제 자체가 안 걸려 있던 상태, 후자는 결제는 걸려 있으나 한도를 다 쓴 상태). 텍스트 모델
+(`gemini-2.5-flash`)로 직접 호출해봐도 동일한 지출 한도 오류가 나는 것으로 보아 이 차단은
+이미지 생성 모델에 국한되지 않고 **프로젝트 전체(이 API 키를 쓰는 모든 Gemini 호출)에 걸려
+있습니다** — 즉 지금은 `sensor/anomaly.py`의 `gemini_diagnosis`와 `chatbot`의 RAG 응답도 실제로는
+같은 이유로 조용히 정적 폴백/mock 응답으로 떨어지고 있을 가능성이 높습니다. 사용자가
+https://ai.studio/spend 에서 한도를 올리기 전까지는 강화된 프롬프트의 실제 생성 결과를 재현·검증할
+방법이 없습니다 — 코드/폴백 경로 자체는 정상 동작하는 것으로 확인됐고(`DiarySerializer` 응답에
+`photo`는 URL, `illustration`은 `null`로 정확히 내려옴), 프롬프트 강화가 실제로 더 동화풍에
+가까워졌는지는 한도가 풀린 뒤 재검증이 필요합니다. `growth_timeline_screen.dart`는 `illustrationUrl`이
 있으면 그것을, 없으면(지금처럼 mock 모드이거나 변환 실패) `photoUrl`을, 둘 다 없으면 기존
 placeholder 아이콘을 보여주도록 `imageUrl = entry.illustrationUrl ?? entry.photoUrl` 한 줄로
 우선순위를 정했습니다.
@@ -267,6 +284,19 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 - `features/<feature>/data/` — repository 계층(예: `auth/data/auth_repository.dart`가
   `/api/accounts/register|login/`을 감쌉니다). `features/<feature>/presentation/` — 화면 위젯.
 - `shared/widgets/` — 여러 화면에서 재사용하는 공용 위젯(게이지 바, 공용 앱바, 버튼 등).
+  `pigfig_logo.dart`의 `PigFigLogo`는 claude.ai/design "PigFig Screens" 2a(메인 심볼)/2b(앱 아이콘
+  락업) 섹션을 그대로 옮긴 로고 위젯입니다 — `FigTreeIllustration`/`PigCharacter`와 동일하게 이미지
+  파일이 아니라 `Container`+`Stack` 도형 조합으로 그리며, 색상은 전부 `AppColors` 토큰만 씁니다
+  (몸통=`pink500`, 잎=`green800`, 줄기=`brown600`). `size` 하나로 전체 크기를 받아 내부 비율을
+  유지한 채 스케일되고(디자인의 150x170 기준 좌표를 비율로 변환), `variant`로 두 형태 중 고를 수
+  있습니다 — `PigFigLogoVariant.symbol`(2a, 배경 없이 무화과+돼지 마크만 단독)과
+  `PigFigLogoVariant.iconLockup`(2b, `pink500` 라운드 사각형 안에 흰색 마크). **현재 앱 전체(로그인
+  화면 74px, `PigFigAppBar` 30px)는 `symbol`(2a)로 통일**되어 있고, 이게 위젯의 기본값이기도
+  합니다. `iconLockup`(2b)은 지금 실제로 쓰는 곳은 없지만 나중에(예: 런처 아이콘, 파비콘) 필요할 수
+  있어 위젯 자체는 지우지 않고 `variant` 옵션으로 남겨뒀습니다 — 삭제하지 말 것. 30px처럼 아주 작은
+  크기에서는 `symbol`의 눈·주둥이 디테일이 몸통 색(`pink500`)과 명도 차이가 크지 않아 사실상 잘 안
+  보이고 잎+실루엣 정도만 식별됩니다(Chrome에서 직접 크롭 확대해 확인) — 다만 임의로 `iconLockup`
+  으로 되돌리지 않고 이 상태를 그대로 유지 중이니, 필요하면 재판단해주세요.
 - 라우팅은 `main.dart`의 `MaterialApp.routes`에 이름 있는 라우트로 전부 등록합니다(중첩 라우터 없음).
   로그인 성공 시 역할이 `adopter`면 `pushReplacementNamed('/adopter')`, `grower`면 아직 미구현이라
   스낵바만 띄웁니다(`login_screen.dart`).
@@ -393,12 +423,22 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   없으면(mock 모드거나 변환 실패) 원본 `photo`를 `Image.network()`로 보여주며, 둘 다 없으면 기존
   "✨ 일러스트 변환" placeholder를 보여줍니다(`imageUrl = entry.illustrationUrl ?? entry.photoUrl`).
   응답 순서가 보장되지 않아 클라이언트에서 `created_at` 내림차순으로 정렬합니다. 각 카드는
-  `GestureDetector`로 감싸 탭하면 `diary_detail_screen.dart`(`/adopter/diary-detail`)로 push되어
-  사진/일러스트를 화면 너비 꽉 채워 크게 보고 `content` 전문을 읽을 수 있습니다 — 라우트 인자는
-  `GrowerCompleteArgs`/`DonationCertificateArgs`와 동일한 route-argument 패턴을 따르는
-  `DiaryDetailArgs`(photoUrl/illustrationUrl/content/createdAt만 담는 값 객체)이고, 상세 화면도
-  `push`되는 화면이라 `PigFigAppBar(closeLabel: '닫기')`를 씁니다(탭 화면인 카드 목록과 대조적).
-  `yolo_status_tag` 배지는 카드 목록에만 남아 있고 상세 화면에는 넣지 않았습니다.
+  `GestureDetector`로 감싸 탭하면 `diary_detail_screen.dart`의 `showDiaryDetailDialog()`가 여는
+  중앙 카드 모달로 사진/일러스트와 `content` 전문을 볼 수 있습니다 — 원래는 `PigFigAppBar(closeLabel:
+  '닫기')`를 가진 풀스크린 push 화면(`DiaryDetailArgs` route-argument로 `/adopter/diary-detail`에
+  전달)이었으나, "탭 목록 위에 살짝 띄우는 느낌"이 더 맞다고 판단해 모달로 바꿨습니다. `showDialog`의
+  기본 `barrierDismissible`(바깥 탭 시 닫힘)과 `barrierColor`(배경 dim)를 그대로 활용하고, 카드
+  자체는 `Center` + `Container`(너비는 화면의 82%, 최대 높이 화면의 80%, `borderRadius: 20`,
+  `AppColors` 기반 그림자, `clipBehavior: Clip.antiAlias`)로 기존 카드 스타일 컨벤션을 따릅니다.
+  사진은 카드의 맨 위(첫 번째 자식)에 바로 붙여 넣기만 하면 바깥 `Container`의 clip이 카드 경계와
+  맞닿은 위쪽 모서리만 자연스럽게 둥글게 잘라주므로, 이미지에 별도 `ClipRRect`를 씌울 필요가
+  없었습니다. 우측 상단에 반투명 원형 X 버튼(`Positioned` + `GestureDetector` →
+  `Navigator.of(dialogContext).pop()`)도 함께 둬 바깥 탭과 명시적 닫기 버튼 두 가지 방법을 모두
+  지원합니다. 이 화면은 이제 `Navigator.pushNamed`로 도달하는 별도 라우트가 아니라
+  `growth_timeline_screen.dart`의 카드 `onTap`이 직접 호출하는 함수이므로, 값을 라우트 arguments로
+  포장해 전달할 필요가 없어져 `DiaryDetailArgs` 클래스와 `main.dart`의 `/adopter/diary-detail` 라우트
+  등록은 삭제했습니다(다른 곳에서 참조가 없는 것을 grep으로 확인 후 제거). `yolo_status_tag` 배지는
+  여전히 카드 목록에만 남아 있고 모달에는 넣지 않았습니다.
 - `grower_diary_screen.dart`는 이제 탭 진입 시 `GrowerRepository.fetchSeedlings()`로 담당 묘목
   목록을 불러와 상단에 선택 칩으로 보여줍니다(재배중인 묘목이 있으면 자동 선택) — 이전에는 이 화면이
   어떤 묘목에 대한 일지인지 알 방법이 전혀 없었기 때문에 실제 연동을 위해 꼭 필요했던 추가입니다.
@@ -458,9 +498,13 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   `models/gemini-embedding-001`(임베딩)로 모델명을 갱신하고 `ChatbotAskView`에 예외 처리(Gemini
   호출 실패 시 500 대신 안내 메시지로 폴백)를 추가해 실키로 실제 Gemini RAG 응답이 오는 것까지
   검증 완료(위 "RAG 챗봇 파이프라인" 참고). `diary`의 사진 → 일러스트 변환(`gemini-2.5-flash-image`,
-  위 "일지 사진 → 일러스트 변환" 참고)도 코드/폴백 경로는 실서버로 검증 완료했지만, 이 프로젝트
-  API 키의 무료 티어가 이미지 생성 쿼터를 0으로 제한하고 있어(`429 RESOURCE_EXHAUSTED`) 실제
-  변환 성공 사례 자체는 아직 확인하지 못했음 — 결제가 연결된 키가 생기면 재검증 필요
+  위 "일지 사진 → 일러스트 변환" 참고)은 프롬프트를 동화풍 스타일 키워드로 강화까지 마쳤지만, 코드/
+  폴백 경로만 실서버로 검증됐을 뿐 실제 변환 성공 사례는 아직 확인하지 못했음 — 이 프로젝트 API 키가
+  현재 프로젝트 단위 월간 지출 한도(monthly spending cap)를 소진한 상태라(`429 RESOURCE_EXHAUSTED
+  ... exceeded its monthly spending cap`) 모든 Gemini 호출이 막혀 있고, 텍스트 모델로 직접 호출해도
+  동일 오류가 나는 것으로 보아 이미지 생성뿐 아니라 `sensor`의 `gemini_diagnosis`·`chatbot`의 RAG
+  응답도 지금은 실제로는 같은 이유로 조용히 정적 폴백/mock으로 떨어지고 있을 가능성이 있음 —
+  https://ai.studio/spend 에서 한도를 올린 뒤 세 기능 모두 재검증 필요
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
   (회원가입/로그인/홈·타임라인·게임·마이페이지 4탭/케어 4종/수령·기부 선택/기부 인증서/AI 챗봇),

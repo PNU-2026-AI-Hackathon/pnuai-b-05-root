@@ -15,9 +15,11 @@ LLM_MODEL = 'gemini-2.5-flash-image'
 GEMINI_TIMEOUT_SECONDS = 30
 
 ILLUSTRATION_PROMPT = (
-    '이 식물 사진을 따뜻하고 감성적인 동화풍 일러스트로 변환해주세요. '
-    '잎의 개수와 크기, 줄기 굵기, 성장 정도 등 식물의 실제 상태는 최대한 그대로 유지하면서 '
-    '부드러운 색감과 손그림 느낌의 일러스트 스타일로만 바꿔주세요.'
+    '이 식물 사진을 아동 그림책(picture book illustration) 스타일의 귀여운(cute) 일러스트로 '
+    '다시 그려주세요. photorealistic, realistic photo처럼 보이면 절대 안 됩니다 — 사진 같은 '
+    '질감이나 정교한 명암은 배제하고, flat color(플랫 컬러), 부드러운 선, 파스텔톤 색감, '
+    '단순화된(simplified) 형태로 그려주세요. 손그림 느낌의 따뜻하고 동화 같은 그림체여야 합니다. '
+    '잎의 개수와 크기, 줄기 굵기, 성장 정도 등 식물의 실제 상태는 최대한 그대로 유지해주세요.'
 )
 
 
