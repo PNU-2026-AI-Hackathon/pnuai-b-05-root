@@ -4,6 +4,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pigfig_button.dart';
+import '../../../shared/widgets/pigfig_logo.dart';
 import '../../../shared/widgets/role_toggle.dart';
 import '../data/auth_repository.dart';
 
@@ -66,15 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             children: [
               const SizedBox(height: 84),
-              Container(
-                width: 74,
-                height: 74,
-                decoration: BoxDecoration(
-                  color: AppColors.pink500,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const Icon(Icons.pets, color: Colors.white, size: 34),
-              ),
+              const PigFigLogo(size: 74, variant: PigFigLogoVariant.symbol),
               const SizedBox(height: 12),
               Text('Pig.Fig.', style: AppTextStyles.display(fontSize: 34)),
               const SizedBox(height: 4),

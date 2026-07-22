@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import 'pigfig_logo.dart';
 
 /// Pig.Fig 로고 + 우측 액션(알림종 또는 "닫기" 텍스트)이 있는 공통 상단 바.
 class PigFigAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -27,15 +28,7 @@ class PigFigAppBar extends StatelessWidget implements PreferredSizeWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: AppColors.pink500,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: const Icon(Icons.pets, color: Colors.white, size: 16),
-          ),
+          const PigFigLogo(size: 30, variant: PigFigLogoVariant.symbol),
           const SizedBox(width: 8),
           Text('Pig.Fig.', style: AppTextStyles.display(fontSize: 20)),
           const Spacer(),
