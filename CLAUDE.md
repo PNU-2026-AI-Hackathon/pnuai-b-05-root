@@ -10,6 +10,17 @@ Claude Code가 이 저장소에서 작업할 때 매 세션마다 참조하는 �
 입양자(adopter)가 무화과 묘목을 입양하면, 재배자(grower)가 도심 유휴공간에서 실제로 키워주고
 입양자는 앱을 통해 생육 과정을 지켜보다가 다 자란 무화과를 수령하거나 기부할 수 있는 서비스입니다.
 
+## 함께 참조할 문서
+
+AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규정합니다 — 모델 필드명/타입이나
+엔드포인트 목록이 이 CLAUDE.md에 없다면 여기서 확인합니다.
+
+- [DB_SCHEMA.md](DB_SCHEMA.md) — 앱별 모델(User/Seedling/Diary/SensorData/VisionAnalysis/FCMToken)
+  필드 설계. 실제 소스는 각 앱의 `models.py`이며, 모델 변경 시 이 문서도 함께 갱신합니다.
+- [DESIGN.md](DESIGN.md) — 입양자/재배자 서비스 플로우와 엔드포인트 목록(Method+설명 표).
+- [CONTRIBUTING.md](CONTRIBUTING.md) — 브랜치·커밋·PR 규칙 전문(아래 "개발 규칙"은 요약본).
+- [AGENTS.md](AGENTS.md) — 이 저장소 전용 행동 규칙 원문(아래 "개발 규칙"은 요약본).
+
 ## 기술 스택
 
 - **프론트엔드**: Flutter — 최초 실행 온보딩(2장), 입양자(adopter) 플로우(회원가입/로그인/홈·타임라인·
@@ -296,7 +307,29 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   있어 위젯 자체는 지우지 않고 `variant` 옵션으로 남겨뒀습니다 — 삭제하지 말 것. 30px처럼 아주 작은
   크기에서는 `symbol`의 눈·주둥이 디테일이 몸통 색(`pink500`)과 명도 차이가 크지 않아 사실상 잘 안
   보이고 잎+실루엣 정도만 식별됩니다(Chrome에서 직접 크롭 확대해 확인) — 다만 임의로 `iconLockup`
-  으로 되돌리지 않고 이 상태를 그대로 유지 중이니, 필요하면 재판단해주세요.
+  으로 되돌리지 않고 이 상태를 그대로 유지 중이니, 필요하면 재판단해주세요. `symbol` variant는 실제
+  로고 이미지가 준비될 자리도 함께 마련해뒀습니다 — `build()`가 먼저 `Image.asset('assets/images/
+  logo.png', width: size)`를 시도하고, `errorBuilder`로 로딩 실패(에셋 미존재)를 잡아 기존 도형
+  그리기(`_FigPigMark`)로 폴백합니다. `pubspec.yaml`의 `flutter: assets:`에 `assets/images/`
+  디렉터리를 등록해뒀지만 실제 `logo.png` 파일은 아직 없는 상태이며(디렉터리만 `.gitkeep`으로
+  존재), 이 상태에서도 `flutter analyze`와 실제 Chrome 렌더링(로그인 화면 74px·`PigFigAppBar`
+  30px 둘 다 헤드리스 Chrome + Playwright로 로그인까지 실제로 수행해 스크린샷 확인, 콘솔에는 예상된
+  `logo.png` 404만 뜨고 다른 에러 없음) 모두 정상 동작을 확인했습니다. **로고 이미지를 실제로
+  적용하려면** `assets/images/logo.png` 자리에 파일만 넣으면 코드 변경 없이 자동으로 적용됩니다
+  (재실행/재빌드만 필요). 이미지 크기·비율은 알 수 없는 상태라 `height`는 지정하지 않고 `width:
+  size`만 줘서 원본 비율을 유지한 채 스케일되게 했습니다 — `iconLockup` variant는 이미지 우선 로직
+  없이 기존 도형 그리기 그대로입니다(지금 쓰는 곳이 없고, 이미지를 넣더라도 스타일이 달라 같은
+  `logo.png`를 그대로 쓰기 애매하므로 필요해지면 별도 판단).
+- 앱 아이콘(런처 아이콘)은 `flutter_launcher_icons`(dev dependency, `pubspec.yaml` 최하단에 설정
+  블록) 패키지로 생성합니다. `image_path: "assets/icon/icon.png"`(`min_sdk_android: 24`—
+  `android/app/build.gradle.kts`가 쓰는 `flutter.minSdkVersion`의 실제 값과 맞춤)로 설정만 해두었고,
+  `assets/icon/`도 `assets/images/`와 마찬가지로 지금은 `.gitkeep`만 있는 빈 디렉터리입니다(이 설정
+  블록은 `flutter: assets:` 목록에는 등록하지 않았습니다 — Flutter 런타임이 번들링할 대상이 아니라
+  `flutter_launcher_icons` 커맨드가 직접 디스크에서 읽는 소스 파일이라 `pub get`/`analyze`/`run`
+  어느 것도 이 파일의 존재 여부를 검사하지 않습니다). **앱 아이콘을 실제로 적용하려면** `assets/icon/
+  icon.png`에 파일을 넣은 뒤 `flutter pub run flutter_launcher_icons` 명령을 직접 실행해야 합니다
+  (`image_path` 파일이 없는 지금 상태로 이 명령을 실행하면 에러가 나므로 아직 실행하지 않았습니다 —
+  아이콘 파일이 없는 지금은 기존 기본 Flutter 런처 아이콘 그대로입니다).
 - 라우팅은 `main.dart`의 `MaterialApp.routes`에 이름 있는 라우트로 전부 등록합니다(중첩 라우터 없음).
   로그인 성공 시 역할이 `adopter`면 `pushReplacementNamed('/adopter')`, `grower`면 아직 미구현이라
   스낵바만 띄웁니다(`login_screen.dart`).

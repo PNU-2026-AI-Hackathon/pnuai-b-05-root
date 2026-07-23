@@ -30,18 +30,30 @@ class PigFigLogo extends StatelessWidget {
     this.variant = PigFigLogoVariant.symbol,
   });
 
+  /// 실제 로고 이미지가 준비되면 이 경로에 넣기만 하면 자동으로 적용된다
+  /// (pubspec.yaml의 `assets/images/` 등록 참고).
+  static const String _logoAssetPath = 'assets/images/logo.png';
+
   final double size;
   final PigFigLogoVariant variant;
 
   @override
   Widget build(BuildContext context) {
     if (variant == PigFigLogoVariant.symbol) {
-      return _FigPigMark(
+      final shapeMark = _FigPigMark(
         width: size,
         bodyColor: AppColors.pink500,
         snoutColor: AppColors.pink100,
         nostrilColor: AppColors.pink500,
         eyeColor: AppColors.textPrimary,
+      );
+
+      // 에셋 번들에 logo.png가 없으면(아직 파일을 넣지 않은 상태) 런타임
+      // 에러가 나는데, errorBuilder로 잡아서 기존 도형 그리기로 폴백한다.
+      return Image.asset(
+        _logoAssetPath,
+        width: size,
+        errorBuilder: (context, error, stackTrace) => shapeMark,
       );
     }
 
