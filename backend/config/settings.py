@@ -46,9 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'cloudinary_storage',
     'django.contrib.staticfiles',
-    'cloudinary',
 
     'rest_framework',
     'rest_framework_simplejwt',
@@ -168,6 +166,14 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# 'cloudinary_storage'/'cloudinary'는 일부러 INSTALLED_APPS에 넣지 않는다. STORAGES 값이
+# 문자열 경로라 Django가 필요할 때 클래스를 그냥 import하므로 앱 등록 없이도 동작하는데,
+# 'cloudinary_storage'를 앱으로 등록하면(특히 staticfiles보다 앞에 두면, 패키지 공식 문서가
+# 권장하는 순서) 그 패키지가 함께 제공하는 collectstatic 커맨드 오버라이드가 Django 기본
+# collectstatic 대신 로드된다. 그 오버라이드는 static 파일까지 Cloudinary에 올리는
+# StaticCloudinaryStorage 조합을 위한 것이라 Django 4.2+ 에서 폐지된 STATICFILES_STORAGE를
+# 읽으려다 AttributeError를 낸다(우리는 static을 whitenoise로만 서빙하므로 이 오버라이드
+# 자체가 불필요) — 실제로 배포 중 이 에러로 collectstatic이 실패한 적이 있다.
 STORAGES = {
     'default': {
         'BACKEND': (
