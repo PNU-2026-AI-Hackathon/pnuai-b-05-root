@@ -35,7 +35,7 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
 - **비전 분석**: YOLOv8-cls — `vision/yolo_inference.py`에서 `backend/vision/weights/best.pt`
-  (healthy/infected 이진 분류, val top1 96.1%)로 실제 추론. 가중치가 없으면(`.gitignore` 대상)
+  (healthy/infected 이진 분류, val top1 96.1%, 2.9MB로 저장소에 커밋됨)로 실제 추론. 가중치가 없으면
   mock으로 폴백
 - **시계열 예측**: Prophet — 센서 이상 감지에 이미 사용 중 (`sensor/anomaly.py`)
 - **챗봇**: LangChain RAG + Gemini API — 구현 완료, `GEMINI_API_KEY` 미설정 시 mock 응답
@@ -228,8 +228,10 @@ placeholder 아이콘을 보여주도록 `imageUrl = entry.illustrationUrl ?? en
 `ultralytics.YOLO`를 프로세스당 한 번만 lazy 로드해 전역(`_model`)에 캐싱합니다(최초 로드에
 ~8초가 걸려 매 요청마다 다시 로드하면 안 됨).
 
-`best.pt`는 `.gitignore`(`backend/vision/weights/`)에 등록돼 있어 커밋되지 않으므로, 이 파일이
-없는 환경(다른 팀원 로컬, CI)이나 추론 중 예외가 나면 `analyze_image()`가 조용히 기존 mock
+`best.pt`는 저장소에 커밋되어 있어(2.9MB, `.gitignore`의 `backend/vision/weights/` 제외 라인은
+배포 시 이 가중치를 Render 등에도 그대로 가져가기 위해 제거함) 클론만 하면 바로 실제 추론이
+됩니다. 그럼에도 이 파일이 없는 환경(얕은 클론, Git LFS 미설정 등)이거나 추론 중 예외가 나면
+`analyze_image()`가 조용히 기존 mock
 동작(`_mock_inference()`, `RESULT_TAGS`의 4개 태그 중 랜덤 선택 + 가짜 "선반X-Y번" 위치)으로
 폴백합니다 — `sensor/anomaly.py`의 Gemini 폴백과 동일한 구조(게이트 체크 → try/except → 정적
 폴백, 실제 호출부를 별도 함수로 분리해 테스트에서 mock 가능)입니다. `vision/tests.py`는 이 두
@@ -310,26 +312,25 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   으로 되돌리지 않고 이 상태를 그대로 유지 중이니, 필요하면 재판단해주세요. `symbol` variant는 실제
   로고 이미지가 준비될 자리도 함께 마련해뒀습니다 — `build()`가 먼저 `Image.asset('assets/images/
   logo.png', width: size)`를 시도하고, `errorBuilder`로 로딩 실패(에셋 미존재)를 잡아 기존 도형
-  그리기(`_FigPigMark`)로 폴백합니다. `pubspec.yaml`의 `flutter: assets:`에 `assets/images/`
-  디렉터리를 등록해뒀지만 실제 `logo.png` 파일은 아직 없는 상태이며(디렉터리만 `.gitkeep`으로
-  존재), 이 상태에서도 `flutter analyze`와 실제 Chrome 렌더링(로그인 화면 74px·`PigFigAppBar`
-  30px 둘 다 헤드리스 Chrome + Playwright로 로그인까지 실제로 수행해 스크린샷 확인, 콘솔에는 예상된
-  `logo.png` 404만 뜨고 다른 에러 없음) 모두 정상 동작을 확인했습니다. **로고 이미지를 실제로
-  적용하려면** `assets/images/logo.png` 자리에 파일만 넣으면 코드 변경 없이 자동으로 적용됩니다
-  (재실행/재빌드만 필요). 이미지 크기·비율은 알 수 없는 상태라 `height`는 지정하지 않고 `width:
-  size`만 줘서 원본 비율을 유지한 채 스케일되게 했습니다 — `iconLockup` variant는 이미지 우선 로직
-  없이 기존 도형 그리기 그대로입니다(지금 쓰는 곳이 없고, 이미지를 넣더라도 스타일이 달라 같은
-  `logo.png`를 그대로 쓰기 애매하므로 필요해지면 별도 판단).
+  그리기(`_FigPigMark`)로 폴백합니다. **`assets/images/logo.png`는 이제 실제 파일(500x500 PNG)로
+  존재하며 앱 전체(로그인 화면·`PigFigAppBar`)가 이 실제 이미지를 렌더링합니다** — `errorBuilder`
+  폴백은 더 이상 정상 경로에서 타지 않고 에셋이 사라지는 예외 상황을 위한 방어 코드로만 남아
+  있습니다. 이미지 크기·비율은 처음엔 알 수 없는 상태였어서 `height`는 지정하지 않고 `width: size`만
+  줘서 원본 비율을 유지한 채 스케일되게 했는데, 지금 넣은 파일이 정사각형(500x500)이라 결과적으로는
+  차이가 없습니다 — `iconLockup` variant는 이미지 우선 로직 없이 기존 도형 그리기 그대로입니다(지금
+  쓰는 곳이 없고, 같은 `logo.png`를 그대로 쓰기 애매하므로 필요해지면 별도 판단).
 - 앱 아이콘(런처 아이콘)은 `flutter_launcher_icons`(dev dependency, `pubspec.yaml` 최하단에 설정
   블록) 패키지로 생성합니다. `image_path: "assets/icon/icon.png"`(`min_sdk_android: 24`—
-  `android/app/build.gradle.kts`가 쓰는 `flutter.minSdkVersion`의 실제 값과 맞춤)로 설정만 해두었고,
-  `assets/icon/`도 `assets/images/`와 마찬가지로 지금은 `.gitkeep`만 있는 빈 디렉터리입니다(이 설정
-  블록은 `flutter: assets:` 목록에는 등록하지 않았습니다 — Flutter 런타임이 번들링할 대상이 아니라
-  `flutter_launcher_icons` 커맨드가 직접 디스크에서 읽는 소스 파일이라 `pub get`/`analyze`/`run`
-  어느 것도 이 파일의 존재 여부를 검사하지 않습니다). **앱 아이콘을 실제로 적용하려면** `assets/icon/
-  icon.png`에 파일을 넣은 뒤 `flutter pub run flutter_launcher_icons` 명령을 직접 실행해야 합니다
-  (`image_path` 파일이 없는 지금 상태로 이 명령을 실행하면 에러가 나므로 아직 실행하지 않았습니다 —
-  아이콘 파일이 없는 지금은 기존 기본 Flutter 런처 아이콘 그대로입니다).
+  `android/app/build.gradle.kts`가 쓰는 `flutter.minSdkVersion`의 실제 값과 맞춤)로 설정돼 있고,
+  이 설정 블록은 `flutter: assets:` 목록에는 등록하지 않습니다 — Flutter 런타임이 번들링할 대상이
+  아니라 `flutter_launcher_icons` 커맨드가 직접 디스크에서 읽는 소스 파일이라 `pub get`/`analyze`/
+  `run` 어느 것도 이 파일의 존재 여부를 검사하지 않기 때문입니다. **`assets/icon/icon.png`도 이제
+  실제 파일로 존재하고(`assets/images/logo.png`와 동일한 파일), `dart run flutter_launcher_icons`가
+  이미 실행되어 Android(`android/app/src/main/res/mipmap-*/ic_launcher.png`)와 iOS
+  (`ios/Runner/Assets.xcassets/AppIcon.appiconset/`) 런처 아이콘이 실제 로고로 교체된 상태입니다**
+  — 단, `pubspec.yaml`의 `flutter_launcher_icons:` 블록 바로 위 주석은 "image_path 파일이 아직
+  없어서 지금 실행하면 에러가 난다"고 쓰여 있는데 이는 더 이상 사실이 아니므로(파일이 실행 전에
+  이미 추가됨), 다음에 이 주석을 만지게 되면 함께 정리할 것.
 - 라우팅은 `main.dart`의 `MaterialApp.routes`에 이름 있는 라우트로 전부 등록합니다(중첩 라우터 없음).
   로그인 성공 시 역할이 `adopter`면 `pushReplacementNamed('/adopter')`, `grower`면 아직 미구현이라
   스낵바만 띄웁니다(`login_screen.dart`).
@@ -523,7 +524,7 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 
 - 백엔드: 7개 앱(accounts/seedlings/diary/sensor/vision/chatbot/notifications) 모두 구현 완료
 - vision의 YOLOv8-cls 추론은 `backend/vision/weights/best.pt`(healthy/infected 이진 분류, val
-  top1 96.1%, `.gitignore` 대상이라 로컬에만 있음)로 실제 연동 완료(위 "비전 분석" 참고, 가중치
+  top1 96.1%, 2.9MB로 저장소에 커밋됨)로 실제 연동 완료(위 "비전 분석" 참고, 가중치
   없는 환경은 mock으로 자동 폴백). notifications는 `FIREBASE_CREDENTIALS_PATH` 미설정 시 mock
   발송으로 대체되어 로컬에서도 키 없이 동작. `GEMINI_API_KEY`는 이제 로컬 `.env`에 실제 값이 설정돼
   있고, `sensor/anomaly.py`의 `gemini_diagnosis`는 실제 Gemini API(`gemini-2.5-flash`)로 진단 문장을
