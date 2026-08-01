@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../data/diary_repository.dart';
 import '../data/grower_repository.dart';
+import '../data/vision_repository.dart';
 
 /// 1s — 재배자 일지 작성: 사진 업로드(선택) + 기록 입력. `POST /api/diary/`와 실제 연동한다.
 /// "성장 단계" 칩은 실제 `Diary` 모델에 대응하는 필드가 없어 여전히 로컬 UI 장식으로만 남는다.
@@ -25,6 +27,7 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
 
   final _seedlingRepository = GrowerRepository();
   final _diaryRepository = DiaryRepository();
+  final _visionRepository = VisionRepository();
   final _noteController = TextEditingController();
   final _picker = ImagePicker();
 
@@ -37,6 +40,8 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
   Uint8List? _photoBytes;
   String? _photoFileName;
   bool _submitting = false;
+  bool _analyzing = false;
+  String? _lastAnalysisTag;
 
   @override
   void initState() {
@@ -97,13 +102,16 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
       return;
     }
 
+    final photoBytes = _photoBytes;
+    final photoFileName = _photoFileName;
+
     setState(() => _submitting = true);
     try {
-      await _diaryRepository.createDiary(
+      final diaryId = await _diaryRepository.createDiary(
         seedlingId: seedlingId,
         content: content,
-        photoBytes: _photoBytes,
-        photoFileName: _photoFileName,
+        photoBytes: photoBytes,
+        photoFileName: photoFileName,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -115,6 +123,15 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
         _photoFileName = null;
         _selectedStage = 1;
       });
+      if (photoBytes != null) {
+        unawaited(
+          _analyzePhoto(
+            diaryId: diaryId,
+            photoBytes: photoBytes,
+            photoFileName: photoFileName,
+          ),
+        );
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -122,6 +139,38 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
       ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  /// 일지 생성이 끝난 뒤 같은 사진으로 vision 분석을 요청한다. 실패해도 일지 자체는
+  /// 이미 저장된 상태이므로 조용히 무시하지 않고 스낵바로 별도 안내한다.
+  Future<void> _analyzePhoto({
+    required int diaryId,
+    required Uint8List photoBytes,
+    String? photoFileName,
+  }) async {
+    setState(() {
+      _analyzing = true;
+      _lastAnalysisTag = null;
+    });
+    try {
+      final result = await _visionRepository.analyzeImage(
+        imageBytes: photoBytes,
+        imageFileName: photoFileName ?? 'upload.jpg',
+        diaryId: diaryId,
+      );
+      if (!mounted) return;
+      setState(() => _lastAnalysisTag = result.resultTag);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('AI 분석 완료: ${result.resultTag}')),
+      );
+    } on ApiException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('분석에 실패했지만 일지는 저장되었습니다')),
+      );
+    } finally {
+      if (mounted) setState(() => _analyzing = false);
     }
   }
 
@@ -339,6 +388,48 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
           onPressed: _submit,
           loading: _submitting,
         ),
+        if (_analyzing) ...[
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.pink500,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'AI가 사진을 분석하고 있어요...',
+                style: AppTextStyles.body(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ] else if (_lastAnalysisTag != null) ...[
+          const SizedBox(height: 10),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.badgeGreenBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'AI 분석 결과: $_lastAnalysisTag',
+                style: AppTextStyles.body(
+                  fontSize: 12,
+                  color: AppColors.badgeGreenText,
+                ).copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
       ],
     );
