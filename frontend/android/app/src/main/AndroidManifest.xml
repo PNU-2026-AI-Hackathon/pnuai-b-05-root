@@ -1,8 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- debug/profile 매니페스트에는 Flutter 툴이 자동으로 넣어주지만(hot reload 통신용),
+         release 빌드는 별도 override가 없어 main에 명시하지 않으면 네트워크 자체가 막힌다. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Pig.Fig."
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
