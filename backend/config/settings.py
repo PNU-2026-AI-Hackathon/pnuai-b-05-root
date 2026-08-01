@@ -14,6 +14,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+import dj_database_url
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -29,10 +30,13 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-&8%&@ot@9qzl$@qji^kv=to!zo)*8=q4dv7o*mj-0^950d-%sl')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if host.strip()
+]
 
 # Application definition
 
@@ -42,7 +46,9 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'cloudinary_storage',
     'django.contrib.staticfiles',
+    'cloudinary',
 
     'rest_framework',
     'rest_framework_simplejwt',
@@ -59,6 +65,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -90,20 +97,31 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+# Railway 등 배포 환경은 DATABASE_URL 하나로 접속 정보를 제공한다(dj-database-url로 파싱).
+# 로컬 개발은 DATABASE_URL이 없으므로 기존 .env의 DB_NAME/DB_USER 등 개별 값으로 폴백한다.
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '3306'),
-        'OPTIONS': {
-            'charset': 'utf8mb4',
-        },
+if os.getenv('DATABASE_URL'):
+    DATABASES = {
+        'default': dj_database_url.parse(
+            os.getenv('DATABASE_URL'),
+            conn_max_age=600,
+        )
     }
-}
+    DATABASES['default'].setdefault('OPTIONS', {})['charset'] = 'utf8mb4'
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.getenv('DB_NAME'),
+            'USER': os.getenv('DB_USER'),
+            'PASSWORD': os.getenv('DB_PASSWORD'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '3306'),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+            },
+        }
+    }
 
 
 # Password validation
@@ -141,10 +159,27 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files (user-uploaded images, etc.)
+# CLOUDINARY_URL이 설정돼 있으면(배포 환경) Cloudinary에 업로드하고, 없으면(로컬 개발) 기존
+# 로컬 파일시스템에 그대로 저장한다. cloudinary 패키지 자체가 CLOUDINARY_URL 환경변수를
+# 자동으로 읽으므로 여기서 별도로 파싱할 필요는 없다.
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+STORAGES = {
+    'default': {
+        'BACKEND': (
+            'cloudinary_storage.storage.MediaCloudinaryStorage'
+            if os.getenv('CLOUDINARY_URL')
+            else 'django.core.files.storage.FileSystemStorage'
+        ),
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 
 # Default primary key field type
