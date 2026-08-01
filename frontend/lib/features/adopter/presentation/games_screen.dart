@@ -9,6 +9,7 @@ import '../../../shared/widgets/status_badge.dart';
 import 'games/fig_quiz/fig_quiz_screen.dart';
 import 'games/models/game_item.dart';
 import 'games/models/game_result.dart';
+import 'games/pest_catch/pest_catch_screen.dart';
 import 'games/watering_timing/watering_timing_screen.dart';
 
 /// 게임 종류. 게임별 실제 화면은 팀원이 별도 브랜치에서 개발할 예정이라
@@ -43,10 +44,10 @@ class _ItemStack {
 }
 
 /// 1m — 게임 탭: 2x2 게임 카드 그리드 + 보유 아이템 바.
-/// 무화과 퀴즈·물주기 타이밍은 실제 게임 화면으로 연결되며, 나머지 2종은 팀원이
-/// 별도 브랜치에서 개발할 예정이라 카드를 탭하면 "준비 중이에요" 스낵바만 뜬다.
-/// 보유 아이템은 [InventoryStorage]에서 실제로 읽어와 표시한다(게임에서 아이템을
-/// 획득하고 돌아오면 갱신됨).
+/// 무화과 퀴즈·물주기 타이밍·해충 잡기는 실제 게임 화면으로 연결되며, 돼지 풍선
+/// 터뜨리기만 팀원이 별도 브랜치에서 개발할 예정이라 카드를 탭하면 "준비 중이에요"
+/// 스낵바만 뜬다. 보유 아이템은 [InventoryStorage]에서 실제로 읽어와 표시한다(게임에서
+/// 아이템을 획득하고 돌아오면 갱신됨).
 class GamesScreen extends StatefulWidget {
   const GamesScreen({super.key});
 
@@ -112,8 +113,8 @@ class _GamesScreenState extends State<GamesScreen> {
   ];
 
   Future<void> _openGame(GameType type) async {
-    // 무화과 퀴즈·물주기 타이밍은 실제 게임 화면으로 연결한다. 나머지 2종은
-    // 팀원이 별도 브랜치에서 개발할 예정이라 라우팅 자리만 스낵바로 남겨둔다.
+    // 무화과 퀴즈·물주기 타이밍·해충 잡기는 실제 게임 화면으로 연결한다. 돼지 풍선
+    // 터뜨리기만 팀원이 별도 브랜치에서 개발할 예정이라 라우팅 자리만 스낵바로 남겨둔다.
     switch (type) {
       case GameType.quiz:
         final result = await Navigator.of(context).push<GameResult>(
@@ -137,8 +138,18 @@ class _GamesScreenState extends State<GamesScreen> {
           await _inventory.addItem(earned);
           await _loadItems();
         }
-      case GameType.balloonPop:
       case GameType.pestCatch:
+        final result = await Navigator.of(context).push<GameResult>(
+          MaterialPageRoute(builder: (_) => const PestCatchScreen()),
+        );
+        if (!mounted) return;
+        // 다른 게임들과 동일한 패턴: 획득 아이템을 저장하고 보유 아이템 바를 갱신.
+        final earned = result?.itemEarned;
+        if (earned != null) {
+          await _inventory.addItem(earned);
+          await _loadItems();
+        }
+      case GameType.balloonPop:
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('준비 중이에요')));
