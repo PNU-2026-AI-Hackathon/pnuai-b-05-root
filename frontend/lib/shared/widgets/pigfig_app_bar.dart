@@ -22,48 +22,55 @@ class PigFigAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Scaffold는 앱바 슬롯에 상태바 높이만큼 여유 공간을 미리 확보해주지만, 그 안에서
+    // 실제로 내용을 밀어내는 건 위젯 몫이다(진짜 AppBar도 내부적으로 이렇게 처리한다).
     return Container(
-      height: preferredSize.height,
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          const PigFigLogo(size: 30, variant: PigFigLogoVariant.symbol),
-          const SizedBox(width: 8),
-          Text('Pig.Fig.', style: AppTextStyles.display(fontSize: 20)),
-          const Spacer(),
-          if (showNotificationBell)
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(
-                  Icons.notifications,
-                  color: AppColors.pink500,
-                  size: 22,
-                ),
-                Positioned(
-                  top: 0,
-                  right: -1,
-                  child: Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: AppColors.errorRed,
-                      shape: BoxShape.circle,
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          height: preferredSize.height,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              const PigFigLogo(size: 30, variant: PigFigLogoVariant.symbol),
+              const SizedBox(width: 8),
+              Text('Pig.Fig.', style: AppTextStyles.display(fontSize: 20)),
+              const Spacer(),
+              if (showNotificationBell)
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(
+                      Icons.notifications,
+                      color: AppColors.pink500,
+                      size: 22,
                     ),
+                    Positioned(
+                      top: 0,
+                      right: -1,
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: AppColors.errorRed,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              if (closeLabel != null)
+                GestureDetector(
+                  onTap: onClose ?? () => Navigator.of(context).maybePop(),
+                  child: Text(
+                    closeLabel!,
+                    style: AppTextStyles.body(color: const Color(0xFFB7B2A4)),
                   ),
                 ),
-              ],
-            ),
-          if (closeLabel != null)
-            GestureDetector(
-              onTap: onClose ?? () => Navigator.of(context).maybePop(),
-              child: Text(
-                closeLabel!,
-                style: AppTextStyles.body(color: const Color(0xFFB7B2A4)),
-              ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
