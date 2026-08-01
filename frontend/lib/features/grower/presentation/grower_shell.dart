@@ -48,38 +48,45 @@ class _GrowerShellState extends State<GrowerShell> {
     return Scaffold(
       body: IndexedStack(index: _index, children: _screens),
       bottomNavigationBar: Container(
-        height: 70,
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: Color(0x0A000000))),
         ),
-        child: Row(
-          children: [
-            _NavItem(
-              icon: Icons.home_rounded,
-              label: '홈',
-              active: _index == 0,
-              onTap: () => _switchTab(0),
+        // 제스처 내비게이션을 쓰는 기기에서 하단 시스템 영역과 탭 터치 영역이
+        // 겹치지 않도록 그만큼 아래로 밀어낸다(흰 배경/구분선은 이 영역까지 그대로 덮는다).
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 70,
+            child: Row(
+              children: [
+                _NavItem(
+                  icon: Icons.home_rounded,
+                  label: '홈',
+                  active: _index == 0,
+                  onTap: () => _switchTab(0),
+                ),
+                _NavItem(
+                  icon: Icons.assignment_outlined,
+                  label: '일지',
+                  active: _index == 1,
+                  onTap: () => _switchTab(1),
+                ),
+                _NavItem(
+                  icon: Icons.thermostat_outlined,
+                  label: '환경점검',
+                  active: _index == 2,
+                  onTap: () => _switchTab(2),
+                ),
+                _NavItem(
+                  icon: Icons.person_outline,
+                  label: '마이',
+                  active: _index == 3,
+                  onTap: () => _switchTab(3),
+                ),
+              ],
             ),
-            _NavItem(
-              icon: Icons.assignment_outlined,
-              label: '일지',
-              active: _index == 1,
-              onTap: () => _switchTab(1),
-            ),
-            _NavItem(
-              icon: Icons.thermostat_outlined,
-              label: '환경점검',
-              active: _index == 2,
-              onTap: () => _switchTab(2),
-            ),
-            _NavItem(
-              icon: Icons.person_outline,
-              label: '마이',
-              active: _index == 3,
-              onTap: () => _switchTab(3),
-            ),
-          ],
+          ),
         ),
       ),
     );

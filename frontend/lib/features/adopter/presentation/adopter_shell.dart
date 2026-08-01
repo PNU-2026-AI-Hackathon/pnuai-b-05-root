@@ -54,38 +54,45 @@ class _AdopterShellState extends State<AdopterShell> {
     return Scaffold(
       body: IndexedStack(index: _tab, children: _screens),
       bottomNavigationBar: Container(
-        height: 70,
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: Color(0x0A000000))),
         ),
-        child: Row(
-          children: [
-            _NavItem(
-              icon: Icons.home_rounded,
-              label: '홈',
-              active: _tab == _home,
-              onTap: () => _switchTab(_home),
+        // 제스처 내비게이션을 쓰는 기기에서 하단 시스템 영역과 탭 터치 영역이
+        // 겹치지 않도록 그만큼 아래로 밀어낸다(흰 배경/구분선은 이 영역까지 그대로 덮는다).
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 70,
+            child: Row(
+              children: [
+                _NavItem(
+                  icon: Icons.home_rounded,
+                  label: '홈',
+                  active: _tab == _home,
+                  onTap: () => _switchTab(_home),
+                ),
+                _NavItem(
+                  icon: Icons.timeline,
+                  label: '타임라인',
+                  active: _tab == _timeline,
+                  onTap: () => _switchTab(_timeline),
+                ),
+                _NavItem(
+                  icon: Icons.sports_esports_outlined,
+                  label: '게임',
+                  active: _tab == _games,
+                  onTap: () => _switchTab(_games),
+                ),
+                _NavItem(
+                  icon: Icons.person_outline,
+                  label: '마이페이지',
+                  active: _tab == _mypage,
+                  onTap: () => _switchTab(_mypage),
+                ),
+              ],
             ),
-            _NavItem(
-              icon: Icons.timeline,
-              label: '타임라인',
-              active: _tab == _timeline,
-              onTap: () => _switchTab(_timeline),
-            ),
-            _NavItem(
-              icon: Icons.sports_esports_outlined,
-              label: '게임',
-              active: _tab == _games,
-              onTap: () => _switchTab(_games),
-            ),
-            _NavItem(
-              icon: Icons.person_outline,
-              label: '마이페이지',
-              active: _tab == _mypage,
-              onTap: () => _switchTab(_mypage),
-            ),
-          ],
+          ),
         ),
       ),
     );
