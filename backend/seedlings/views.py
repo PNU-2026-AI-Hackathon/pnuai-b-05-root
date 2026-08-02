@@ -1,7 +1,7 @@
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -32,7 +32,23 @@ class SeedlingListCreateView(ListCreateAPIView):
         user = self.request.user
         if user.role != User.Role.ADOPTER:
             raise PermissionDenied('입양자만 묘목을 입양할 수 있습니다.')
-        serializer.save(adopter=user)
+
+        # 재배중인 묘목이 가장 적은(=가장 여유 있는) 재배자에게 자동 배정한다.
+        grower = (
+            User.objects.filter(role=User.Role.GROWER)
+            .annotate(
+                growing_count=Count(
+                    'growing_seedlings',
+                    filter=Q(growing_seedlings__status=Seedling.Status.GROWING),
+                )
+            )
+            .order_by('growing_count', 'pk')
+            .first()
+        )
+        if grower is None:
+            raise ValidationError('현재 배정 가능한 재배자가 없습니다. 잠시 후 다시 시도해주세요.')
+
+        serializer.save(adopter=user, grower=grower)
 
 
 class SeedlingDetailView(RetrieveAPIView):

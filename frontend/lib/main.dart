@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'core/storage/onboarding_storage.dart';
 import 'core/theme/app_theme.dart';
+import 'features/adopter/presentation/adopt/adopt_screen.dart';
 import 'features/adopter/presentation/adopter_shell.dart';
 import 'features/adopter/presentation/care/nutrient_care_screen.dart';
 import 'features/adopter/presentation/care/pruning_care_screen.dart';
@@ -49,6 +50,7 @@ class PigFigApp extends StatelessWidget {
         '/': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/adopter': (context) => const AdopterShell(),
+        '/adopter/adopt': (context) => const AdoptScreen(),
         '/grower': (context) => const GrowerShell(),
         '/grower/complete': (context) => const GrowerCompleteScreen(),
         '/adopter/care/water': (context) => const WaterCareScreen(),
