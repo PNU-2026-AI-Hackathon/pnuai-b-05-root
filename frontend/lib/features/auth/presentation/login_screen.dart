@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/notifications/fcm_service.dart';
+import '../../../core/notifications/fcm_token_repository.dart';
+import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pigfig_button.dart';
@@ -17,6 +22,9 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _authRepository = AuthRepository();
+  final _tokenStorage = TokenStorage();
+  final _fcmService = FcmService();
+  final _fcmTokenRepository = FcmTokenRepository();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -41,6 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      unawaited(_registerPushToken());
       if (!mounted) return;
       if (result.role == UserRole.adopter) {
         Navigator.of(context).pushReplacementNamed('/adopter');
@@ -51,6 +60,24 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _errorMessage = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// 로그인 성공 직후 FCM 기기 토큰을 발급받아 백엔드에 등록한다.
+  /// 권한 거부, 미지원 플랫폼, 네트워크 오류 등으로 실패해도 로그인 흐름에는
+  /// 영향을 주지 않는 부가 기능이라 넓게 catch한다.
+  Future<void> _registerPushToken() async {
+    try {
+      final deviceToken = await _fcmService.getDeviceToken();
+      if (deviceToken == null) return;
+      final accessToken = await _tokenStorage.readAccessToken();
+      if (accessToken == null) return;
+      await _fcmTokenRepository.registerToken(
+        token: deviceToken,
+        accessToken: accessToken,
+      );
+    } catch (_) {
+      // 푸시 알림은 부가 기능 — 실패해도 로그인 흐름에 영향 없음
     }
   }
 
