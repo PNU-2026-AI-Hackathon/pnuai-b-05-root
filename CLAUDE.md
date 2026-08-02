@@ -23,7 +23,7 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
 
 ## 기술 스택
 
-- **프론트엔드**: Flutter — 최초 실행 온보딩(2장), 입양자(adopter) 플로우(회원가입/로그인/홈·타임라인·
+- **프론트엔드**: Flutter — 최초 실행 온보딩(3장), 입양자(adopter) 플로우(회원가입/로그인/홈·타임라인·
   게임·마이페이지 4탭/케어 4종/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(홈·일지·
   환경점검·마이 4탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인/로그아웃/`DELETE /api/accounts/me/`
   회원탈퇴), seedlings(`GET /api/seedlings/` 목록
@@ -386,11 +386,18 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   `await`하고, 그 결과로 `PigFigApp(initialRoute: ...)`을 결정합니다(`/onboarding` 또는 `/`) — 위젯
   트리 안에서 라우팅을 늦게 리다이렉트하는 대신 첫 프레임부터 올바른 화면으로 시작합니다. `PigFigApp`의
   `initialRoute`는 기본값이 `/`라서 `widget_test.dart`처럼 `PigFigApp()`을 인자 없이 pump하는 기존
-  테스트는 영향받지 않습니다. `features/onboarding/presentation/onboarding_screen.dart`는 `PageView` 2장
-  (서비스 소개/시니어 재배자)이며, 마지막 페이지에서만 "시작하기" 버튼이 보이고 "건너뛰기" 링크는
-  `Visibility(maintainSize: true)`로 자리만 차지한 채 숨겨집니다(디자인 문서의 세 번째 온보딩 프레임이
-  "건너뛰기" 자리에 투명 placeholder를 두는 것과 동일한 방식). claude.ai/design 문서에는 온보딩 3
-  "앱으로 케어"도 있지만 이번 범위에서 의도적으로 제외했습니다.
+  테스트는 영향받지 않습니다. `features/onboarding/presentation/onboarding_screen.dart`는 `PageView` 3장
+  (서비스 소개/시니어 재배자/앱으로 케어)이며, 마지막 페이지에서만 "시작하기 🌱" 버튼(`PigFigButton.
+  positive`, `AppColors.green500`)이 보이고 "건너뛰기" 링크는 `Visibility(maintainSize: true)`로
+  자리만 차지한 채 숨겨집니다(디자인 문서가 "건너뛰기" 자리에 투명 placeholder를 두는 것과 동일한
+  방식). 세 번째 페이지("앱으로 케어") 일러스트는 새로 그리지 않고 기존
+  `shared/widgets/fig_tree_illustration.dart`의 `FigTreeIllustration(width: 44)`를 흰 카드 안에
+  중앙 배치한 뒤, 물/햇빛/가지치기 아이콘 배지 3개(영양제 배지는 디자인 원본에 없어 의도적으로
+  제외)를 감쌌습니다 — 배지는 온보딩 2가 이미 쓰던 `_EmojiBadge`를 재사용하되, 흰 배경에 옅은
+  그림자가 있는 디자인이라 기본값 `false`인 `shadow` 파라미터를 추가해 온보딩 2 호출부는 그대로
+  그림자 없이 두고 온보딩 3에서만 `true`로 켰습니다. `_pageCount` 상수 하나가 페이지 수·마지막
+  페이지 판정·점 인디케이터 개수·건너뛰기 숨김을 전부 구동하는 구조라, 페이지를 추가할 때 이
+  상수와 `PageView.children`만 바꾸면 나머지 로직은 그대로 따라옵니다.
 - `adopter_shell.dart`도 `grower_shell.dart`와 동일하게 홈/타임라인(`GrowthTimelineScreen`)/게임/
   마이페이지 4탭을 `IndexedStack`으로 유지하는 `StatefulWidget`입니다(처음엔 `switch` 식으로 선택된
   화면 하나만 트리에 뒀는데, 두 `Shell` 모두 `IndexedStack`으로 바꿔 상태 보존과 구현 방식을
@@ -540,7 +547,7 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   응답도 지금은 실제로는 같은 이유로 조용히 정적 폴백/mock으로 떨어지고 있을 가능성이 있음 —
   https://ai.studio/spend 에서 한도를 올린 뒤 세 기능 모두 재검증 필요
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
-- 프론트엔드: 최초 실행 온보딩(2장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
+- 프론트엔드: 최초 실행 온보딩(3장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
   (회원가입/로그인/홈·타임라인·게임·마이페이지 4탭/케어 4종/수령·기부 선택/기부 인증서/AI 챗봇),
   재배자 플로우(홈·일지·환경점검·마이 4탭 + 묘목 완성 신고) 모두 구현됨. `AdopterShell`/`GrowerShell`
   둘 다 `IndexedStack`으로 탭 상태를 보존합니다. accounts(회원가입·로그인·로그아웃·회원탈퇴),
@@ -560,5 +567,5 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   실제 데이터를 쓰지만, 케어 게이지 4종·마이페이지 프로필·수령/기부 선택은 여전히 로컬 mock
   상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(vision API,
   `Seedling.pickup_or_donate` 갱신 API 미연동)
-- 온보딩 3 "앱으로 케어"(claude.ai/design 문서), 게임 탭의 실제 게임 4종(카드 UI만 구현, 게임 자체와
-  아이템 시스템은 팀원이 별도 브랜치에서 개발 예정), vision 연동 등은 아직 미착수
+- 게임 탭의 실제 게임 4종(카드 UI만 구현, 게임 자체와 아이템 시스템은 팀원이 별도 브랜치에서 개발
+  예정), vision 연동 등은 아직 미착수
