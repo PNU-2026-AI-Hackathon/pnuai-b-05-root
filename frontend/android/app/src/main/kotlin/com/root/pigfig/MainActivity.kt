@@ -1,4 +1,4 @@
-package com.example.frontend
+package com.root.pigfig
 
 import io.flutter.embedding.android.FlutterActivity
 

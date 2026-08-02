@@ -2,6 +2,9 @@
     <!-- debug/profile 매니페스트에는 Flutter 툴이 자동으로 넣어주지만(hot reload 통신용),
          release 빌드는 별도 override가 없어 main에 명시하지 않으면 네트워크 자체가 막힌다. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 13+(API 33)부터는 알림 표시에 런타임 권한이 필요하다(FCM 수신 자체는 필요 없지만,
+         이 권한이 없으면 알림이 시스템 트레이에 나타나지 않는다). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="Pig.Fig."
         android:name="${applicationName}"

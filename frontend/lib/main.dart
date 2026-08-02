@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'core/storage/onboarding_storage.dart';
@@ -18,6 +22,11 @@ import 'features/onboarding/presentation/onboarding_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // google-services.json이 Android에만 설정돼 있어, 다른 플랫폼(web/windows 등)에서
+  // Firebase.initializeApp()을 호출하면 즉시 크래시한다.
+  if (!kIsWeb && Platform.isAndroid) {
+    await Firebase.initializeApp();
+  }
   final hasSeenOnboarding = await OnboardingStorage().hasSeenOnboarding();
   runApp(PigFigApp(initialRoute: hasSeenOnboarding ? '/' : '/onboarding'));
 }
