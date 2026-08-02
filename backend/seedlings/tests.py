@@ -33,6 +33,25 @@ class SeedlingListCreateViewTests(APITestCase):
         self.assertEqual(seedling.adopter, self.adopter)
         self.assertEqual(seedling.status, Seedling.Status.GROWING)
 
+    def test_adopter_creation_assigns_grower_with_fewest_growing_seedlings(self):
+        busy_grower = User.objects.create_user(
+            email='busy-grower@example.com', password='testpass123', role=User.Role.GROWER,
+        )
+        Seedling.objects.create(
+            adopter=self.other_adopter, grower=busy_grower, status=Seedling.Status.GROWING,
+        )
+        Seedling.objects.create(
+            adopter=self.other_adopter, grower=busy_grower, status=Seedling.Status.GROWING,
+        )
+        # self.grower는 재배중인 묘목이 0건이라 이쪽으로 배정돼야 한다.
+        self.client.force_authenticate(user=self.adopter)
+
+        response = self.client.post(self.url, {})
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        seedling = Seedling.objects.get(pk=response.data['id'])
+        self.assertEqual(seedling.grower, self.grower)
+
     def test_adopter_lists_only_own_seedlings(self):
         Seedling.objects.create(adopter=self.adopter)
         Seedling.objects.create(adopter=self.other_adopter)

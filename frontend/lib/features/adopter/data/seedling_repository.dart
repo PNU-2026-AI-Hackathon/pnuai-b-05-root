@@ -75,4 +75,17 @@ class SeedlingRepository {
         .map((json) => Seedling.fromJson(json as Map<String, dynamic>))
         .toList();
   }
+
+  /// 무화과 입양. 서버가 담당 재배자를 자동 배정하므로 별도 필드 없이 생성만 요청한다.
+  Future<void> createSeedling() async {
+    final accessToken = await _tokenStorage.readAccessToken();
+    if (accessToken == null) {
+      throw ApiException('로그인이 필요해요.');
+    }
+    await _apiClient.post(
+      '/api/seedlings/',
+      body: const {},
+      accessToken: accessToken,
+    );
+  }
 }

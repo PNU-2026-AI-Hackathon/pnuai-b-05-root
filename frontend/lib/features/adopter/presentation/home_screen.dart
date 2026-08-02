@@ -65,10 +65,10 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     }
   }
 
-  void _showComingSoon() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('준비 중이에요')));
+  Future<void> _goToAdopt() async {
+    await Navigator.of(context).pushNamed('/adopter/adopt');
+    // 입양 성공/실패와 무관하게 최신 상태를 다시 불러온다.
+    if (mounted) _load();
   }
 
   @override
@@ -89,7 +89,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
       return _ErrorState(message: _errorMessage!, onRetry: _load);
     }
     if (_seedling == null) {
-      return _EmptyState(onAdopt: _showComingSoon);
+      return _EmptyState(onAdopt: _goToAdopt);
     }
     return _SeedlingHome(seedling: _seedling!);
   }
