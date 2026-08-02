@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../core/storage/onboarding_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../../../shared/widgets/step_indicator.dart';
 
-/// 1b~1c — 온보딩: 서비스 소개 / 시니어 재배자. 최초 실행 시 1회만 노출된다.
-/// (디자인 문서에는 온보딩 3 "앱으로 케어"도 있으나 이번 범위는 2장으로 한정)
+/// 1b~1d — 온보딩: 서비스 소개 / 시니어 재배자 / 앱으로 케어. 최초 실행 시 1회만 노출된다.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -16,7 +16,7 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  static const _pageCount = 2;
+  static const _pageCount = 3;
 
   final _controller = PageController();
   final _storage = OnboardingStorage();
@@ -67,6 +67,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     illustration: _SeniorGrowerIllustration(),
                     title: '시니어 재배자가\n정성껏 돌봐드려요',
                     subtitle: '경험 많은 시니어 재배자가\n내 묘목을 매일 보살피고 기록해요.',
+                  ),
+                  _OnboardingPage(
+                    illustration: _AppCareIllustration(),
+                    title: '앱으로 케어하고\n성장을 지켜보세요',
+                    subtitle: '물주기·영양제·햇빛·가지치기,\n다 자라면 수령하거나 기부할 수 있어요.',
                   ),
                 ],
               ),
@@ -319,6 +324,75 @@ class _SeniorGrowerIllustration extends StatelessWidget {
   }
 }
 
+/// 온보딩 3 일러스트: 무화과나무 카드 + 케어 아이콘 3개(물/햇빛/가지치기).
+/// 영양제 아이콘은 디자인 원본에 없어 의도적으로 3개만 배치한다.
+class _AppCareIllustration extends StatelessWidget {
+  const _AppCareIllustration();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 170,
+      height: 130,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 78,
+            height: 120,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const FigTreeIllustration(width: 44),
+          ),
+          const Positioned(
+            right: 6,
+            top: 8,
+            child: _EmojiBadge(
+              size: 42,
+              background: Colors.white,
+              emoji: '💧',
+              fontSize: 20,
+              shadow: true,
+            ),
+          ),
+          const Positioned(
+            right: 0,
+            bottom: 14,
+            child: _EmojiBadge(
+              size: 42,
+              background: Colors.white,
+              emoji: '☀️',
+              fontSize: 20,
+              shadow: true,
+            ),
+          ),
+          const Positioned(
+            left: 2,
+            bottom: 4,
+            child: _EmojiBadge(
+              size: 42,
+              background: Colors.white,
+              emoji: '✂️',
+              fontSize: 20,
+              shadow: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RoundedBox extends StatelessWidget {
   const _RoundedBox({
     required this.width,
@@ -367,12 +441,14 @@ class _EmojiBadge extends StatelessWidget {
     required this.background,
     required this.emoji,
     required this.fontSize,
+    this.shadow = false,
   });
 
   final double size;
   final Color background;
   final String emoji;
   final double fontSize;
+  final bool shadow;
 
   @override
   Widget build(BuildContext context) {
@@ -380,7 +456,19 @@ class _EmojiBadge extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: background,
+        shape: BoxShape.circle,
+        boxShadow: shadow
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : null,
+      ),
       child: Text(emoji, style: TextStyle(fontSize: fontSize)),
     );
   }
