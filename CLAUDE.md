@@ -34,8 +34,9 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
   (`POST /api/vision/analyze/`, 재배자가 일지 사진 업로드 시 백그라운드로 자동 호출), chatbot
   (`POST /api/chatbot/ask/`)는 실제 백엔드와 연동됩니다. 게임 탭 4종(돼지 풍선 터뜨리기/무화과 퀴즈/
   해충 잡기/물주기 타이밍)은 모두 실제로 플레이 가능하며, 획득 아이템은 `InventoryStorage`
-  (`SharedPreferences`)에 로컬 저장됩니다. 홈 화면의 케어 게이지·마이페이지 프로필·수령/기부 선택은
-  여전히 로컬 mock입니다
+  (`SharedPreferences`)에 로컬 저장됩니다. `PATCH /api/seedlings/{id}/pickup-donate/`(완성 묘목
+  수령/기부 선택, 아래 "완성 묘목 수령/기부 선택" 참고)도 `pickup_donate_screen.dart`가 실제로
+  연동합니다. 홈 화면의 케어 게이지·마이페이지 프로필은 여전히 로컬 mock입니다
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
 - **비전 분석**: YOLOv8-cls — `vision/yolo_inference.py`에서 `backend/vision/weights/best.pt`
@@ -315,6 +316,63 @@ fcm_service.dart`의 `FcmService.getDeviceToken()`은 `kIsWeb`이거나 `Platfor
 결정적 tie-break), 재배자가 한 명도 없으면 `grower=NULL`로 조용히 생성하지 않고 `ValidationError`
 (400)로 명확히 실패시킵니다. 이 로직은 재배자가 여러 명일 때 신규 묘목이 한쪽으로 쏠리지 않게 하는
 것이 목적이며, `seedlings/tests.py`에 이 자동 배정 happy path 테스트가 있습니다.
+
+### 완성 묘목 수령/기부 선택
+`Seedling.pickup_or_donate`(`PickupOrDonate` TextChoices: `pickup`/`donate`)와 `donate_type`
+필드는 초기 마이그레이션(`0001_initial`)부터 모델에 존재했지만, 실제로 값을 갱신하는 엔드포인트가
+없어 오랫동안 죽은 필드였습니다. `donate_type`도 원래 choices 없는 자유 `CharField`였는데, 계획서의
+기부처 3가지(초등학교·복지시설 기증/도시농업 공동체·시민단체 연계/앱 내 나눔 분양)를 코드로
+강제하기 위해 `Seedling.DonateType` TextChoices(`school_welfare`/`urban_farming_community`/
+`in_app_sharing`)를 추가하고 `donate_type`에 `choices=`를 부여했습니다(`0002_alter_seedling_donate_type`
+마이그레이션, DB 스키마 자체는 안 바뀌는 `AlterField`).
+
+`PATCH /api/seedlings/{id}/pickup-donate/`(`SeedlingPickupDonateView`)는 `SeedlingCompleteView`와
+대칭되는 설계입니다 — `SeedlingCompleteView`가 담당 재배자만 완성 처리할 수 있게 하는 것처럼, 이
+뷰는 해당 묘목의 **입양자만**(`user.role == ADOPTER`이고 `seedling.adopter_id == user.pk`) 선택할
+수 있게 `PermissionDenied`로 명시적으로 검사합니다. 추가로 `seedling.status != COMPLETED`면
+`ValidationError`(400)로 막습니다 — 재배 중인 묘목에 미리 수령/기부를 선택하는 것은 의미가 없기
+때문입니다. 입력 검증은 `SeedlingPickupDonateSerializer`(`serializers.Serializer` 기반, 모델
+serializer 아님)가 담당하며, `pickup_or_donate='donate'`인데 `donate_type`이 없으면
+`validate()`에서 400을 던집니다. `pickup`을 선택하면 요청에 `donate_type`이 섞여 들어와도 뷰가
+무시하고 항상 `None`으로 정리해서 저장합니다.
+
+이 엔드포인트는 재제출(선택 변경)을 막지 않습니다 — `SeedlingCompleteView`도 재호출 가드가 없는
+것과 같은 수준을 유지했습니다. 다만 재제출을 허용하는 대신, 저장 전 기존 값과 비교해 **실제로
+값이 바뀐 경우에만** `notifications.fcm.send_notification_to_user`로 재배자에게 알림을 보냅니다
+(같은 선택을 실수로 여러 번 눌러도 재배자에게 중복 알림이 안 가도록). 알림 수신자가
+`SeedlingCompleteView`(입양자에게 발송)와 반대로 **재배자**인 이유는, 수령/기부 선택 이후 실제로
+행동해야 하는 쪽이 재배자이기 때문입니다(수령이면 픽업 방문을 준비해야 하고, 기부면 어느 기부처로
+보내야 하는지 알아야 함). 기부를 선택했을 때 알림 문구에는 `Seedling.DonateType(donate_type).label`로
+변환한 한국어 라벨을 넣습니다.
+
+`pickup_donate_screen.dart`는 이 엔드포인트와 실제로 연동됩니다. `pickPrimarySeedling()`(재배중
+묘목을 우선함)은 이 화면 목적과 맞지 않아 재사용하지 않고, `seedling_repository.dart`에 별도
+헬퍼 `pickSeedlingForPickupDonate()`를 추가했습니다 — `status == completed`인 묘목 중 가장 최근에
+완료된 것을 대상으로 삼으며, 이미 선택을 마친 완료 묘목도 포함합니다(백엔드가 재제출을 허용하므로
+다시 바꿀 수 있게). 완료된 묘목이 하나도 없으면 선택 UI 대신 안내 문구만 보여줍니다(홈 화면과
+동일한 로딩/에러/대상없음/데이터 4상태 분기). 화면 진입 시 대상 묘목의 기존
+`pickupOrDonate`/`donateType`(둘 다 `Seedling` 모델에 새로 추가한 nullable 필드, JSON의
+`pickup_or_donate`/`donate_type`을 파싱)이 있으면 그 값으로 선택 상태를 미리 채워, 이미 정한
+선택을 다시 열었을 때 빈 화면이 아니라 직전 선택이 보이게 했습니다.
+
+원래 "직접 수령" 선택 시에는 제출 버튼 자체가 렌더링되지 않았던 문제(`if (isDonate) [버튼] else
+SizedBox`)를 고쳐, 이제 두 선택 모두 항상 `PigFigButton.primary`가 보이고 라벨만 분기합니다
+("수령으로 확정하기 🧺" / "기부하고 인증서 받기 📜"). 기부처 mock 3곳(구체적 기관명, 예: "행복
+지역아동센터")은 계획서 기준 3개 카테고리("초등학교·복지시설 기증"/"도시농업 공동체·시민단체
+연계"/"앱 내 나눔 분양")로 교체했습니다 — 기존 mock 3곳을 살펴보면 셋 다 사실상 "복지시설 기증"
+한 카테고리의 변주였고 나머지 두 카테고리에 대응하는 항목이 없어서, 억지로 매핑하는 대신
+`Seedling.DonateType`과 1:1 대응하는 카테고리 자체를 카드로 노출하는 쪽을 선택했습니다.
+`_Organization`은 각 카드에 대응하는 `DonateType` 값을 함께 들고 있어 선택 시 그대로
+`updatePickupOrDonate()` 호출에 씁니다.
+
+`SeedlingRepository.updatePickupOrDonate({seedlingId, choice, donateType})`은
+`createSeedling()`과 동일한 토큰 확인 → `ApiException` 전파 패턴이며, `grower_repository.dart.
+completeSeedling()`이 쓰는 `ApiClient.patch()`를 그대로 재사용합니다(이번엔 body에
+`pickup_or_donate`/`donate_type`을 담아서 호출). 프론트 쪽 `PickupOrDonateChoice`/`DonateType`
+enum은 백엔드 문자열 키와 정확히 1:1 대응하도록 `apiValue`/`fromApiValue`를 붙여
+`SeedlingStatus`/`SeedlingStatusApi`와 같은 패턴을 따릅니다. 기부 확정 성공 시에는 기존과 동일하게
+`donation-certificate` 화면으로 이동하고(다만 이제 PATCH 성공 **후에만** 이동), 수령 확정 성공
+시에는 인증서가 필요 없으므로 스낵바("수령이 확정됐어요 🧺") + `Navigator.pop()`으로 마무리합니다.
 
 ### URL 라우팅
 루트 `config/urls.py`가 앱마다 `/api/<앱명>/` prefix로 각 앱의 `urls.py`를 include합니다
@@ -614,10 +672,15 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   것까지 확인 — 데모 계정(`adopter@demo.com` 등)은 탈퇴 검증에 쓰지 않아 seed 데이터가 그대로
   보존됨; 무화과 입양(결제) 플로우는 로그인 → 입양 → 결제 → 홈 반영 → grower 자동 배정까지
   실기기(크롬)로 확인됨). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지/환경 점검 작성·묘목
-  입양이 모두 실제 데이터를 쓰지만, 케어 게이지 4종·마이페이지 프로필·수령/기부 선택은 여전히 로컬
-  mock 상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(`Seedling.pickup_or_donate`
-  갱신 API 미연동)
+  입양·수령/기부 선택이 모두 실제 데이터를 쓰지만, 케어 게이지 4종·마이페이지 프로필은 여전히 로컬
+  mock 상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음
 - 게임 탭의 실제 게임 4종(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍)은 모두 플레이
   가능하며, 획득 아이템은 `InventoryStorage`에 로컬로만 누적됨(서버 저장 없음). vision은 백엔드
   실제 추론 + 재배자 일지 작성 시 프론트엔드 자동 호출까지 연동 완료. FCM은 Android 클라이언트가
   로그인 시 실제 토큰을 등록하도록 연동 완료(다른 플랫폼은 미지원)
+- `PATCH /api/seedlings/{id}/pickup-donate/`(완성 묘목 수령/기부 선택)는 백엔드(models/
+  serializers/views/urls + happy path·예외 케이스 테스트 15개 전부 통과)와 프론트엔드
+  (`pickup_donate_screen.dart`) 모두 연동 완료(위 "완성 묘목 수령/기부 선택" 참고). `flutter
+  analyze`/`flutter test` 통과 확인, 실행 중인 백엔드에 데모 계정으로 로그인해 PATCH 왕복(기부
+  선택 → 수령으로 변경)까지 HTTP로 직접 검증함 — Chrome에서 화면을 직접 조작하는 수동 시연 확인은
+  아직 별도로 하지 않았으므로 실제 배포/시연 전에 한 번 더 확인 권장

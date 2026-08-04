@@ -24,7 +24,7 @@ Pig.Fig. 백엔드의 테이블(모델) 설계 문서입니다. 실제 구현 �
 | started_at | DateTimeField | 재배 시작일 |
 | completed_at | DateTimeField (nullable) | 재배 완료일 |
 | pickup_or_donate | CharField (choices) | 수령(`pickup`) / 기부(`donate`) |
-| donate_type | CharField (nullable) | 기부 유형 (기부 선택 시) |
+| donate_type | CharField (choices, nullable) | 기부 유형(기부 선택 시): `school_welfare`(초등학교·복지시설 기증) / `urban_farming_community`(도시농업 공동체·시민단체 연계) / `in_app_sharing`(앱 내 나눔 분양) |
 
 ## Diary (`diary`)
 
