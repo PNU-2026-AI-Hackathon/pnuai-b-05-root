@@ -24,23 +24,30 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
 ## 기술 스택
 
 - **프론트엔드**: Flutter — 최초 실행 온보딩(3장), 입양자(adopter) 플로우(회원가입/로그인/홈·타임라인·
-  게임·마이페이지 4탭/케어 4종/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(홈·일지·
-  환경점검·마이 4탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인/로그아웃/`DELETE /api/accounts/me/`
-  회원탈퇴), seedlings(`GET /api/seedlings/` 목록
-  조회 + `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary(`POST /api/diary/` 작성 +
+  게임·마이페이지 4탭/무화과 입양(결제)/케어 4종/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower)
+  플로우(홈·일지·환경점검·마이 4탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인/로그아웃/
+  `DELETE /api/accounts/me/` 회원탈퇴, Android는 로그인 성공 시 FCM 토큰도 함께 등록), seedlings
+  (`GET /api/seedlings/` 목록 조회 + `POST /api/seedlings/` 입양(결제 후 생성, 재배자 자동 배정) +
+  `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary(`POST /api/diary/` 작성 +
   `GET /api/diary/{seedling_id}/` 조회, 사진은 `image_picker`로 선택해 multipart 업로드), sensor
-  (`POST /api/sensor/data/` 저장 + `GET /api/sensor/anomaly/{seedling_id}/` 이상 이력 조회), chatbot
-  (`POST /api/chatbot/ask/`)는 실제 백엔드와 연동됩니다. 홈 화면의 케어 게이지·마이페이지 프로필·
-  수령/기부 선택은 여전히 로컬 mock이며, 재배자용 vision API 연동은 아직 미착수
+  (`POST /api/sensor/data/` 저장 + `GET /api/sensor/anomaly/{seedling_id}/` 이상 이력 조회), vision
+  (`POST /api/vision/analyze/`, 재배자가 일지 사진 업로드 시 백그라운드로 자동 호출), chatbot
+  (`POST /api/chatbot/ask/`)는 실제 백엔드와 연동됩니다. 게임 탭 4종(돼지 풍선 터뜨리기/무화과 퀴즈/
+  해충 잡기/물주기 타이밍)은 모두 실제로 플레이 가능하며, 획득 아이템은 `InventoryStorage`
+  (`SharedPreferences`)에 로컬 저장됩니다. 홈 화면의 케어 게이지·마이페이지 프로필·수령/기부 선택은
+  여전히 로컬 mock입니다
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
 - **비전 분석**: YOLOv8-cls — `vision/yolo_inference.py`에서 `backend/vision/weights/best.pt`
   (healthy/infected 이진 분류, val top1 96.1%, 2.9MB로 저장소에 커밋됨)로 실제 추론. 가중치가 없으면
-  mock으로 폴백
+  mock으로 폴백. 프론트엔드도 연동 완료 — 재배자가 일지에 사진을 올리면 저장 직후 같은 사진으로
+  자동 분석 요청까지 이어집니다(위 "프론트엔드" 항목 참고)
 - **시계열 예측**: Prophet — 센서 이상 감지에 이미 사용 중 (`sensor/anomaly.py`)
 - **챗봇**: LangChain RAG + Gemini API — 구현 완료, `GEMINI_API_KEY` 미설정 시 mock 응답
 - **IoT 연동**: MQTT (paho-mqtt) — 센서 데이터 수집 (`sensor/mqtt_client.py`)
-- **푸시 알림**: FCM (Firebase Cloud Messaging) — 구현 완료, `FIREBASE_CREDENTIALS_PATH` 미설정 시 mock 발송(print만)
+- **푸시 알림**: FCM (Firebase Cloud Messaging) — 구현 완료, `FIREBASE_CREDENTIALS_PATH` 미설정 시 mock 발송(print만).
+  Android 클라이언트는 `google-services.json`/`firebase_messaging`으로 연동돼 로그인 성공 시 기기
+  토큰을 실제로 백엔드에 등록합니다(web/windows 등 다른 플랫폼은 미지원, 아래 "FCM 푸시 알림" 참고)
 
 ## 자주 쓰는 명령어
 
@@ -92,7 +99,7 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 - `seedlings` — 묘목 입양/재배 상태 관리 + 완성 신고 (구현됨)
 - `diary` — 재배 일지 (사진, 생육 기록) — 구현됨
 - `sensor` — IoT 센서 데이터(온습도, 조도) 수집 + Prophet 이상 감지 (구현됨)
-- `vision` — YOLOv8 기반 이미지 분석 (현재는 mock 추론) (구현됨)
+- `vision` — YOLOv8-cls 기반 이미지 분석, 실제 추론(가중치 없으면 mock 폴백) (구현됨)
 - `chatbot` — LangChain RAG + Gemini 기반 챗봇 (구현됨)
 - `notifications` — FCM 푸시 알림 (현재 기본 환경은 mock 모드) (구현됨)
 
@@ -246,6 +253,14 @@ mock 폴백 여부를 검증하며, 실제 추론 happy path(`test_real_inferenc
 `CharField`라 mock의 4개 태그와 실제 추론의 "정상"/"이상감지"가 같은 필드에 섞여도 마이그레이션
 없이 그대로 저장됩니다.
 
+프론트엔드(`grower/data/vision_repository.dart`)는 재배자가 일지를 작성해 `POST /api/diary/`가
+성공한 직후, 사진이 있으면 같은 사진 바이트로 `POST /api/vision/analyze/`를 `diary_id`와 함께
+백그라운드로 호출합니다(`diary_repository.dart`의 `createDiary()`가 생성된 diary id를 반환하도록
+바뀐 것도 이 때문). `grower_diary_screen.dart`가 진행 중(스피너)/완료(결과 태그 배지)/실패(스낵바,
+"분석에 실패했지만 일지는 저장되었습니다")를 화면에 안내하며, 분석이 실패해도 이미 저장된 일지
+자체는 그대로 유지됩니다 — 일지 저장과 vision 분석을 하나의 트랜잭션처럼 묶지 않고 순차적인 두
+API 호출로 분리한 것이 이 설계의 핵심입니다.
+
 ### RAG 챗봇 파이프라인
 `chatbot/rag_pipeline.py`는 농촌진흥청 매뉴얼 기반 지식 문서 10개를 코드에 직접 하드코딩해두고
 (PDF 등 외부 파일 의존 없음), `initialize_rag()`가 이를 ChromaDB로 임베딩해
@@ -275,6 +290,31 @@ Gemini(`LLM_MODEL = 'gemini-2.5-flash'`)로 답변을 생성하며, `timeout=LLM
 (`PATCH /api/seedlings/{id}/complete/`, 담당 재배자만 가능)가 묘목 완성 처리 후 이 함수를 호출해
 입양자에게 알림을 보냅니다 — 앱 간 참조가 `seedlings` → `notifications.fcm`로 향하는 유일한 지점입니다.
 `FCMToken.token`은 unique 필드이므로 등록 시 `(user, token)`이 아니라 `token` 하나로 중복을 판단합니다.
+
+프론트엔드에서 토큰을 실제로 발급·등록하는 쪽은 Android 한정입니다. `core/notifications/
+fcm_service.dart`의 `FcmService.getDeviceToken()`은 `kIsWeb`이거나 `Platform.isAndroid`가
+아니면(web/windows 등) `google-services.json`이 Android에만 설정돼 있어 Firebase가 초기화되지
+않으므로 항상 `null`을 반환합니다. `login_screen.dart`는 로그인 성공 직후 이 토큰을 가져와
+`core/notifications/fcm_token_repository.dart`의 `registerToken()`으로
+`POST /api/notifications/register-token/`을 호출하는데, 토큰이 `null`이거나 이 호출이 실패해도
+`except`로 조용히 무시하고 로그인 흐름(라우트 이동)은 그대로 진행합니다 — 알림 등록은 로그인 성공의
+부가 효과일 뿐 실패 조건이 아닙니다. Android 매니페스트에는 `POST_NOTIFICATIONS` 권한이 추가돼
+있습니다.
+
+### 묘목 입양(결제) 플로우 + 재배자 자동 배정
+입양자가 무화과 묘목을 처음 입양하는 진입점은 `adopt_screen.dart`(`/adopter/adopt`, 홈 화면의
+"무화과 입양하러 가기" CTA에서 진입)입니다. 실제 PG(결제) 연동은 없고, "결제하기" 버튼을 누르면
+700ms 딜레이로 결제 성공을 흉내낸 뒤(mock) `SeedlingRepository.createSeedling()`으로
+`POST /api/seedlings/`를 호출해 실제 `Seedling`을 생성합니다 — 결제 자체는 가짜지만 그 이후의
+묘목 생성·재배자 배정은 전부 실제 백엔드 로직입니다. 생성 실패 시(예: 배정 가능한 재배자 없음)
+`ApiException` 메시지를 스낵바로 보여주고 화면에 남아 재시도할 수 있습니다.
+
+`seedlings/views.py`의 `SeedlingListCreateView.perform_create()`는 입양자만 호출 가능하며(재배자면
+`PermissionDenied`), `grower`를 요청 바디가 아니라 서버가 직접 정합니다 — 전체 재배자 중
+`status=GROWING`인 담당 묘목 수가 가장 적은 사람에게 자동 배정하고(동률이면 `pk` 오름차순으로
+결정적 tie-break), 재배자가 한 명도 없으면 `grower=NULL`로 조용히 생성하지 않고 `ValidationError`
+(400)로 명확히 실패시킵니다. 이 로직은 재배자가 여러 명일 때 신규 묘목이 한쪽으로 쏠리지 않게 하는
+것이 목적이며, `seedlings/tests.py`에 이 자동 배정 happy path 테스트가 있습니다.
 
 ### URL 라우팅
 루트 `config/urls.py`가 앱마다 `/api/<앱명>/` prefix로 각 앱의 `urls.py`를 include합니다
@@ -332,8 +372,8 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   없어서 지금 실행하면 에러가 난다"고 쓰여 있는데 이는 더 이상 사실이 아니므로(파일이 실행 전에
   이미 추가됨), 다음에 이 주석을 만지게 되면 함께 정리할 것.
 - 라우팅은 `main.dart`의 `MaterialApp.routes`에 이름 있는 라우트로 전부 등록합니다(중첩 라우터 없음).
-  로그인 성공 시 역할이 `adopter`면 `pushReplacementNamed('/adopter')`, `grower`면 아직 미구현이라
-  스낵바만 띄웁니다(`login_screen.dart`).
+  로그인 성공 시 역할이 `adopter`면 `pushReplacementNamed('/adopter')`, `grower`면
+  `pushReplacementNamed('/grower')`로 이동합니다(`login_screen.dart`).
 - 케어 화면(`features/adopter/presentation/care/*.dart`) 4종은 각각 다른 제스처로 게이지 값을 올립니다:
   물주기=`onLongPressStart`/`onLongPressEnd`로 타이머 반복 증가, 영양제=`Draggable`/`DragTarget`,
   햇빛=`Slider`, 가지치기=`onLongPressStart` 트리거 `AnimationController.forward()`가 완료되면 1회성으로
@@ -405,19 +445,26 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   `GlobalKey` 패턴으로 탭 재진입 시 백그라운드 재조회를 합니다(완성 신고나 새 일지처럼 다른 곳에서
   바뀐 데이터가 반영되어야 하므로). `games_screen.dart`
   (1m)는 2x2 게임 카드 그리드(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍, 각 카드에
-  `StatusBadge`로 난이도 배지) + 하단 "보유 아이템" 바로 구성되며, 게임 자체와 아이템 시스템은
-  아직 미구현이라 카드/보유 아이템 모두 로컬 mock입니다. 카드를 탭하면 `_openGame()`이 `GameType`
-  기준 `switch`로 분기하는데, 지금은 모든 case가 "준비 중이에요" 스낵바로 귀결됩니다 — 게임별 실제
-  화면은 팀원이 별도 브랜치에서 개발할 예정이라, 이 `switch`가 카드→게임 화면 라우팅을 위한
-  스켈레톤 역할을 하고(화면이 생기면 해당 case만 `Navigator.push`로 바꾸면 됨) 실제 게임 위젯
-  자리는 비워뒀습니다. 구현 중 실제로 겪은 버그: 2x2 카드를 각 `Row`+`Expanded`로 만들고 카드
-  높이를 맞추려고 `CrossAxisAlignment.stretch`를 줬는데, 이 `Row`가 (`SingleChildScrollView` →
-  `Column`으로 이어지는) 세로 방향이 unbounded인 컨텍스트에 직접 놓여 있으면 `stretch`가 무한대
-  높이로 풀리면서 그 `Row` 이후의 형제 위젯(두 번째 카드 줄, 보유 아이템 카드)이 전부 화면 밖으로
-  밀려나 안 보이는 문제가 있었습니다(디버그 assert가 release 웹 빌드에서는 제거되어 에러도 없이
-  조용히 사라짐 — Playwright로 실제 렌더링을 확인하지 않았다면 놓쳤을 버그). 각 `Row`를
-  `IntrinsicHeight`로 감싸 높이를 먼저 유한하게 확정시킨 뒤 `stretch`를 적용하는 방식으로
-  해결했습니다. `mypage_screen.dart`
+  `StatusBadge`로 난이도 배지) + 하단 "보유 아이템" 바로 구성됩니다. 구현 중 실제로 겪은 버그: 2x2
+  카드를 각 `Row`+`Expanded`로 만들고 카드 높이를 맞추려고 `CrossAxisAlignment.stretch`를 줬는데,
+  이 `Row`가 (`SingleChildScrollView` → `Column`으로 이어지는) 세로 방향이 unbounded인 컨텍스트에
+  직접 놓여 있으면 `stretch`가 무한대 높이로 풀리면서 그 `Row` 이후의 형제 위젯(두 번째 카드 줄,
+  보유 아이템 카드)이 전부 화면 밖으로 밀려나 안 보이는 문제가 있었습니다(디버그 assert가 release
+  웹 빌드에서는 제거되어 에러도 없이 조용히 사라짐 — Playwright로 실제 렌더링을 확인하지 않았다면
+  놓쳤을 버그). 각 `Row`를 `IntrinsicHeight`로 감싸 높이를 먼저 유한하게 확정시킨 뒤 `stretch`를
+  적용하는 방식으로 해결했습니다.
+
+  게임 4종(`games/balloon_pop/`, `games/fig_quiz/`, `games/pest_catch/`, `games/watering_timing/`)은
+  모두 실제로 플레이 가능한 화면입니다. 각 게임은 `games/shared/game_scaffold.dart`의
+  `GameScaffold`(제목+점수+닫기 헤더 공통 셸)로 본문을 감싸고, 종료 시 `GameResult`(점수/목표 달성
+  여부/획득 아이템)를 만들어 `Navigator.pop(context, result)`로 `games_screen.dart`에 돌려주는
+  동일한 패턴을 따릅니다. `GameScaffold.showResultDialog()`가 결과 다이얼로그(성공/실패 문구 +
+  점수 + 획득 아이템 박스)를 공통으로 띄우는 것도 네 게임이 공유합니다. `games_screen.dart`의
+  `_openGame()`은 `GameType` 기준 `switch`로 각 게임 화면을 push하고, 돌아온 `GameResult`에
+  `itemEarned`(목표 달성 시에만 채워짐)가 있으면 `core/storage/inventory_storage.dart`의
+  `InventoryStorage.addItem()`으로 저장한 뒤 보유 아이템 바를 다시 그립니다. `InventoryStorage`는
+  `TokenStorage`/`OnboardingStorage`와 동일한 `SharedPreferences` 래퍼 컨벤션이며, 아이템 목록을
+  JSON 문자열 하나로 인코딩해 저장합니다(게임 종류·서버 저장 없이 로컬에만 누적). `mypage_screen.dart`
   는 프로필 카드 + 리스트 메뉴입니다. "성장 타임라인"은 하단 탭으로 승격되면서 이 메뉴 목록에서는
   빠졌고(아래 참고), "AI 챗봇"과 "수령 / 기부 선택"·"기부 인증서"는 실제로 이동하며, 이번 범위 밖인
   "알림 설정"/"입양 내역"만 탭하면 스낵바만 띄웁니다. "기부 인증서"는
@@ -548,11 +595,13 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   https://ai.studio/spend 에서 한도를 올린 뒤 세 기능 모두 재검증 필요
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 최초 실행 온보딩(3장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
-  (회원가입/로그인/홈·타임라인·게임·마이페이지 4탭/케어 4종/수령·기부 선택/기부 인증서/AI 챗봇),
-  재배자 플로우(홈·일지·환경점검·마이 4탭 + 묘목 완성 신고) 모두 구현됨. `AdopterShell`/`GrowerShell`
-  둘 다 `IndexedStack`으로 탭 상태를 보존합니다. accounts(회원가입·로그인·로그아웃·회원탈퇴),
-  seedlings(`GET /api/seedlings/` 목록 조회, `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary
-  (`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회), sensor
+  (회원가입/로그인/홈·타임라인·게임·마이페이지 4탭/무화과 입양(결제)/케어 4종/수령·기부 선택/기부
+  인증서/AI 챗봇), 재배자 플로우(홈·일지·환경점검·마이 4탭 + 묘목 완성 신고) 모두 구현됨.
+  `AdopterShell`/`GrowerShell` 둘 다 `IndexedStack`으로 탭 상태를 보존합니다. accounts(회원가입·
+  로그인·로그아웃·회원탈퇴, Android는 FCM 토큰 등록도 함께), seedlings(`GET /api/seedlings/` 목록
+  조회, `POST /api/seedlings/` 입양(mock 결제 후 생성, 재배자 자동 배정), `PATCH /api/seedlings/{id}/
+  complete/` 완성 신고), diary(`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회),
+  vision(`POST /api/vision/analyze/`, 일지 사진 업로드 후 자동 분석), sensor
   (`POST /api/sensor/data/` 저장, `GET /api/sensor/anomaly/{seedling_id}/` 이력 조회),
   chatbot(`POST /api/chatbot/ask/`)는 모두 JWT 인증으로 실제 백엔드와 연동되어 동작 확인됨(서로 다른
   재배자 계정 2개로 대시보드 목록·통계·완성 신고 자동 새로고침 테스트; 재배자로 일지를 실제로 작성한
@@ -563,9 +612,12 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   — 재검증은 하지 않음; 로그아웃/회원탈퇴는 입양자로 로그아웃한 뒤 곧바로 재배자로 로그인하는 전환
   흐름과, 데모 계정이 아닌 새 테스트 계정으로 회원탈퇴 후 같은 계정으로 재로그인이 실제로 거부되는
   것까지 확인 — 데모 계정(`adopter@demo.com` 등)은 탈퇴 검증에 쓰지 않아 seed 데이터가 그대로
-  보존됨). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지/환경 점검 작성이 모두
-  실제 데이터를 쓰지만, 케어 게이지 4종·마이페이지 프로필·수령/기부 선택은 여전히 로컬 mock
-  상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(vision API,
-  `Seedling.pickup_or_donate` 갱신 API 미연동)
-- 게임 탭의 실제 게임 4종(카드 UI만 구현, 게임 자체와 아이템 시스템은 팀원이 별도 브랜치에서 개발
-  예정), vision 연동 등은 아직 미착수
+  보존됨; 무화과 입양(결제) 플로우는 로그인 → 입양 → 결제 → 홈 반영 → grower 자동 배정까지
+  실기기(크롬)로 확인됨). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지/환경 점검 작성·묘목
+  입양이 모두 실제 데이터를 쓰지만, 케어 게이지 4종·마이페이지 프로필·수령/기부 선택은 여전히 로컬
+  mock 상태(라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음(`Seedling.pickup_or_donate`
+  갱신 API 미연동)
+- 게임 탭의 실제 게임 4종(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍)은 모두 플레이
+  가능하며, 획득 아이템은 `InventoryStorage`에 로컬로만 누적됨(서버 저장 없음). vision은 백엔드
+  실제 추론 + 재배자 일지 작성 시 프론트엔드 자동 호출까지 연동 완료. FCM은 Android 클라이언트가
+  로그인 시 실제 토큰을 등록하도록 연동 완료(다른 플랫폼은 미지원)
