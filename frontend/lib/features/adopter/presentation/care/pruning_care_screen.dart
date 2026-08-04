@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/storage/care_storage.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../../shared/widgets/step_indicator.dart';
 
 /// 1j — 케어: 가지치기. 처음 한 번만 하는 인터랙션: 꾹 눌러서 완료한다.
+/// 완료 여부는 로컬(로컬 저장, [CareStorage])에 영구히 기록돼, 재진입해도 다시 물어보지 않는다.
 class PruningCareScreen extends StatefulWidget {
   const PruningCareScreen({super.key});
 
@@ -15,6 +17,8 @@ class PruningCareScreen extends StatefulWidget {
 
 class _PruningCareScreenState extends State<PruningCareScreen>
     with SingleTickerProviderStateMixin {
+  final _careStorage = CareStorage();
+
   late final AnimationController _progressController;
   bool _completed = false;
 
@@ -27,9 +31,22 @@ class _PruningCareScreenState extends State<PruningCareScreen>
           duration: const Duration(milliseconds: 1200),
         )..addStatusListener((status) {
           if (status == AnimationStatus.completed) {
-            setState(() => _completed = true);
+            _markCompleted();
           }
         });
+    _loadCareStatus();
+  }
+
+  Future<void> _loadCareStatus() async {
+    final last = await _careStorage.getLastCompleted(CareType.pruning);
+    if (!mounted || last == null) return;
+    setState(() => _completed = true);
+  }
+
+  Future<void> _markCompleted() async {
+    if (_completed) return;
+    setState(() => _completed = true);
+    await _careStorage.markCompleted(CareType.pruning);
   }
 
   @override
