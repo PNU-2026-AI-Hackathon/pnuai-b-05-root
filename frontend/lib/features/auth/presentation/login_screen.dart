@@ -1,13 +1,17 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/notifications/fcm_service.dart';
 import '../../../core/notifications/fcm_token_repository.dart';
+import '../../../core/storage/notification_priming_storage.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/notification_priming_dialog.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../../../shared/widgets/pigfig_logo.dart';
 import '../../../shared/widgets/role_toggle.dart';
@@ -49,7 +53,15 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      unawaited(_registerPushToken());
+      if (!mounted) return;
+      if (await _needsNotificationPriming()) {
+        // 프라이밍 다이얼로그를 처음 보여주는 순간만 응답을 기다린다 — 사용자의 명시적
+        // 선택이 필요한 흐름이라 여기서만큼은 로그인 흐름을 잠깐 막는 게 자연스럽다.
+        await _primeThenMaybeRegister();
+      } else {
+        // 이미 한 번 판단이 끝난 기기라면 기존과 동일하게 로그인 흐름을 막지 않는다.
+        unawaited(_registerPushToken());
+      }
       if (!mounted) return;
       if (result.role == UserRole.adopter) {
         Navigator.of(context).pushReplacementNamed('/adopter');
@@ -61,6 +73,27 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// 알림 권한 프라이밍 다이얼로그를 아직 안 보여준 Android 기기인지 확인한다.
+  /// 다른 플랫폼(web/windows 등)은 [FcmService]가 애초에 아무것도 하지 않으므로
+  /// 다이얼로그 자체를 띄울 필요가 없다.
+  Future<bool> _needsNotificationPriming() async {
+    if (kIsWeb || !Platform.isAndroid) return false;
+    return !await NotificationPrimingStorage().hasSeenPriming();
+  }
+
+  /// 프라이밍 다이얼로그를 보여주고, "허용"을 선택했을 때만 실제 OS 권한 요청(토큰 등록)까지
+  /// 이어간다. 응답과 무관하게 다시 묻지 않도록 먼저 "본 적 있음"으로 기록한다.
+  Future<void> _primeThenMaybeRegister() async {
+    await NotificationPrimingStorage().markSeen();
+    if (!mounted) return;
+    final accepted = await showNotificationPrimingDialog(context);
+    if (accepted == true) {
+      await _registerPushToken();
+    }
+    // '나중에'(또는 바깥 탭)면 getDeviceToken()을 아예 호출하지 않으므로
+    // OS 권한 요청 자체가 트리거되지 않는다.
   }
 
   /// 로그인 성공 직후 FCM 기기 토큰을 발급받아 백엔드에 등록한다.
