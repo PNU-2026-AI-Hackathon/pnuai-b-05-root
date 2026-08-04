@@ -302,6 +302,36 @@ fcm_service.dart`의 `FcmService.getDeviceToken()`은 `kIsWeb`이거나 `Platfor
 부가 효과일 뿐 실패 조건이 아닙니다. Android 매니페스트에는 `POST_NOTIFICATIONS` 권한이 추가돼
 있습니다.
 
+`FcmService.getDeviceToken()` 안에서 `FirebaseMessaging.instance.requestPermission()`을 호출하는
+바로 그 순간 OS의 `POST_NOTIFICATIONS` 권한 다이얼로그가 뜨는데, 이 시스템 다이얼로그는 디자인을
+바꿀 수 없습니다. 그래서 `login_screen.dart`가 (Android에서, 최초 1회만) 그 앞에 Pig.Fig. 브랜드
+톤의 커스텀 "프라이밍" 다이얼로그(`shared/widgets/notification_priming_dialog.dart`의
+`showNotificationPrimingDialog()`)를 먼저 보여줍니다 — "허용할게요"를 누른 경우에만
+`_registerPushToken()`(=`getDeviceToken()` 호출 경로)을 실행해 실제 OS 권한 요청까지 이어가고,
+"나중에"를 누르면 `getDeviceToken()` 자체를 호출하지 않아 OS 권한 요청이 아예 트리거되지
+않습니다. `FcmService`는 `requestPermission()`/`getToken()`이 분리되지 않은 그대로 두었습니다 —
+"OS 권한 요청을 건너뛴다"는 요구가 이 메서드를 아예 호출하지 않는 것만으로 충분히 만족되기
+때문입니다.
+
+노출 여부는 `core/storage/notification_priming_storage.dart`의 `NotificationPrimingStorage`가
+`OnboardingStorage`와 동일한 `SharedPreferences` 패턴으로 기록합니다 — "허용"이든 "나중에"든
+응답과 무관하게 다시 묻지 않으며, 계정이 아니라 **기기 단위**로 플래그를 둡니다(Android의 실제
+알림 권한도 계정이 아니라 "이 기기의 이 앱" 단위이므로, 다른 계정으로 로그인해도 이미 한 번
+판단이 끝났다면 다시 물을 이유가 없습니다).
+
+이 다이얼로그를 넣기 위해 `login_screen.dart`의 `_submit()`에서 기존에 `unawaited(
+_registerPushToken())`로 완전히 fire-and-forget이던 흐름을 바꿔야 했습니다 — 그대로 두면
+`pushReplacementNamed()`가 로그인 라우트를 이미 교체한 뒤에 `showDialog()`가 유효하지 않은
+context에서 뜨려는 레이스 컨디션이 생기기 때문입니다. 다만 매 로그인마다 등록 완료를 기다리게
+하면 "로그인 흐름을 막지 않는다"는 기존 설계가 퇴보하므로, 프라이밍이 실제로 필요한
+경우(=다이얼로그를 처음 보여주는 그 순간)에만 `await`로 응답을 기다리고, 이미 판단이 끝난
+이후의 모든 로그인은 기존과 동일하게 `unawaited()`로 남겨뒀습니다 — 다이얼로그가 뜨는 것 자체가
+의도된 1회성 마찰이라 그 경우만 예외로 취급한 것입니다. 다이얼로그 UI는
+`features/auth/presentation/account_actions.dart`의 `confirmLogout()`(2버튼 `showDialog<bool>`
++ `Navigator.pop(true/false)` 시그니처)과 `games/shared/game_scaffold.dart`의
+`GameScaffold.showResultDialog()`(흰 배경 + 둥근 모서리 + `barrierDismissible: false` +
+`PigFigButton.primary`를 다이얼로그 content에 직접 넣는 시각 스타일)를 섞은 조합입니다.
+
 ### 묘목 입양(결제) 플로우 + 재배자 자동 배정
 입양자가 무화과 묘목을 처음 입양하는 진입점은 `adopt_screen.dart`(`/adopter/adopt`, 홈 화면의
 "무화과 입양하러 가기" CTA에서 진입)입니다. 실제 PG(결제) 연동은 없고, "결제하기" 버튼을 누르면
