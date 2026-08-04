@@ -62,6 +62,7 @@ class LoginViewTests(APITestCase):
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
         self.assertEqual(response.data['role'], User.Role.GROWER)
+        self.assertEqual(response.data['id'], self.user.id)
 
 
 class AccountDeleteViewTests(APITestCase):
