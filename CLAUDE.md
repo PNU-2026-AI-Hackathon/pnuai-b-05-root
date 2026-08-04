@@ -283,10 +283,28 @@ Gemini(`LLM_MODEL = 'gemini-2.5-flash'`)로 답변을 생성하며, `timeout=LLM
 `RecursiveCharacterTextSplitter`는 `langchain_text_splitters`에 있습니다(`langchain.chains`/
 `langchain.text_splitter` 아님).
 
-### FCM 푸시 알림 (mock 모드 기본)
-`notifications/fcm.py`의 `send_push_notification(token, title, body)`는 `settings.FIREBASE_CREDENTIALS_PATH`가
-비어있으면(로컬 개발 기본값) 실제 전송 없이 print만 하는 mock 모드로 동작합니다. 값이 있으면
-`firebase_admin`을 lazy 초기화해 실제 FCM 메시지를 보냅니다. `send_notification_to_user(user, title, body)`는
+### FCM 푸시 알림 (mock/실제 모드는 자격증명 설정 여부로 자동 분기)
+`notifications/fcm.py`의 `send_push_notification(token, title, body)`는
+`settings.FIREBASE_CREDENTIALS_PATH`와 `settings.FIREBASE_CREDENTIALS_JSON`이 **둘 다**
+비어있으면 실제 전송 없이 print만 하는 mock 모드로 동작합니다. 둘 중 하나라도 있으면
+`firebase_admin`을 lazy 초기화해 실제 FCM 메시지를 보냅니다. 두 값을 동시에 지원하는 이유는
+로컬 개발과 배포 환경의 자격증명 주입 방식이 다르기 때문입니다 —
+`FIREBASE_CREDENTIALS_PATH`는 로컬에 다운받은 서비스 계정 JSON 파일 경로를 가리키는 방식이고
+(로컬 `.env`는 실제로 `FIREBASE_CREDENTIALS_PATH=firebase-adminsdk.json`으로 이미 설정돼 있어
+로컬 개발 환경 자체는 이미 실제 발송 모드로 동작합니다 — mock 모드 테스트는 그래서
+`@override_settings(FIREBASE_CREDENTIALS_PATH='', FIREBASE_CREDENTIALS_JSON='')`로 명시적으로
+두 값을 비워야만 안정적으로 mock 모드를 재현할 수 있습니다), `FIREBASE_CREDENTIALS_JSON`은
+서비스 계정 JSON 전체를 문자열 그대로 담는 환경변수입니다 — Render 같은 배포 환경은 무료
+플랜에서 Shell/SSH 접근이 안 되므로(공식 문서로 확인, 파일을 서버에 직접 올릴 방법이 마땅치
+않음) 파일 대신 환경변수 하나로 자격증명을 통째로 주입할 수 있어야 했습니다(Render의 Secret
+Files 기능으로도 파일을 올릴 수는 있지만 대시보드 UI 기반이라 코드 변경이 필요 없는 대신,
+Free 플랜에서도 그 기능 자체가 열려 있는지가 문서상 불명확해 환경변수 쪽을 기본 권장안으로
+삼았습니다 — 코드는 둘 다 받아주므로 Secret Files를 쓰고 싶으면 `FIREBASE_CREDENTIALS_PATH`를
+`/etc/secrets/<파일명>`으로 지정하기만 하면 됩니다). `_get_app()`은 `FIREBASE_CREDENTIALS_JSON`이
+있으면 `json.loads()`로 파싱한 dict를(firebase_admin의 `credentials.Certificate`는 파일 경로
+문자열과 dict를 둘 다 받습니다), 없으면 기존처럼 `FIREBASE_CREDENTIALS_PATH`를 그대로 씁니다.
+`notifications/tests.py`의 `GetAppCredentialsTests`가 이 두 경로를 각각 `credentials.Certificate`
+호출 인자로 검증합니다. `send_notification_to_user(user, title, body)`는
 해당 유저의 `FCMToken`을 전부 조회해 순회 발송하며, `seedlings/views.py`의 `SeedlingCompleteView`
 (`PATCH /api/seedlings/{id}/complete/`, 담당 재배자만 가능)가 묘목 완성 처리 후 이 함수를 호출해
 입양자에게 알림을 보냅니다 — 앱 간 참조가 `seedlings` → `notifications.fcm`로 향하는 유일한 지점입니다.
@@ -685,8 +703,11 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 - 백엔드: 7개 앱(accounts/seedlings/diary/sensor/vision/chatbot/notifications) 모두 구현 완료
 - vision의 YOLOv8-cls 추론은 `backend/vision/weights/best.pt`(healthy/infected 이진 분류, val
   top1 96.1%, 2.9MB로 저장소에 커밋됨)로 실제 연동 완료(위 "비전 분석" 참고, 가중치
-  없는 환경은 mock으로 자동 폴백). notifications는 `FIREBASE_CREDENTIALS_PATH` 미설정 시 mock
-  발송으로 대체되어 로컬에서도 키 없이 동작. `GEMINI_API_KEY`는 이제 로컬 `.env`에 실제 값이 설정돼
+  없는 환경은 mock으로 자동 폴백). notifications는 `FIREBASE_CREDENTIALS_PATH`/
+  `FIREBASE_CREDENTIALS_JSON`이 둘 다 미설정이면 mock 발송으로 대체되어(신규 클론 등 키 없는
+  환경에서도 동작), 로컬 `.env`에는 이미 실제 서비스 계정 파일(`FIREBASE_CREDENTIALS_PATH=
+  firebase-adminsdk.json`)이 설정돼 있어 로컬 개발 환경 자체는 실제 발송 모드로 동작 중.
+  `GEMINI_API_KEY`는 이제 로컬 `.env`에 실제 값이 설정돼
   있고, `sensor/anomaly.py`의 `gemini_diagnosis`는 실제 Gemini API(`gemini-2.5-flash`)로 진단 문장을
   생성하도록 연동 완료(위 "센서 데이터 파이프라인" 참고). `chatbot` 앱도 `gemini-2.5-flash`(LLM)/
   `models/gemini-embedding-001`(임베딩)로 모델명을 갱신하고 `ChatbotAskView`에 예외 처리(Gemini
