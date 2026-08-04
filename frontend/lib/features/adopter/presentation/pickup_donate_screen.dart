@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
+import '../data/seedling_repository.dart';
 import 'donation_certificate_screen.dart';
 
 enum _Choice { pickup, donate }
@@ -13,14 +16,39 @@ class _Organization {
     required this.emoji,
     required this.name,
     required this.detail,
+    required this.donateType,
   });
 
   final String emoji;
   final String name;
   final String detail;
+  final DonateType donateType;
 }
 
-/// 1o — 수령/기부 선택. mock UI(선택 상태만 로컬로 관리하며 API 연동은 하지 않는다).
+/// 계획서 기준 기부처 3개 카테고리. `Seedling.DonateType`(backend TextChoices)과 1:1 대응한다.
+const _organizations = [
+  _Organization(
+    emoji: '🏫',
+    name: '초등학교·복지시설 기증',
+    detail: '지역 초등학교나 복지시설에 무화과를 기증해요',
+    donateType: DonateType.schoolWelfare,
+  ),
+  _Organization(
+    emoji: '🌱',
+    name: '도시농업 공동체·시민단체 연계',
+    detail: '도시농업 공동체·시민단체와 나눔해요',
+    donateType: DonateType.urbanFarmingCommunity,
+  ),
+  _Organization(
+    emoji: '🎁',
+    name: '앱 내 나눔 분양',
+    detail: '다른 Pig.Fig. 이용자에게 나눔 분양해요',
+    donateType: DonateType.inAppSharing,
+  ),
+];
+
+/// 1o — 수령/기부 선택. 완성된 묘목을 대상으로
+/// `PATCH /api/seedlings/{id}/pickup-donate/`와 실제로 연동한다.
 class PickupDonateScreen extends StatefulWidget {
   const PickupDonateScreen({super.key});
 
@@ -29,118 +57,263 @@ class PickupDonateScreen extends StatefulWidget {
 }
 
 class _PickupDonateScreenState extends State<PickupDonateScreen> {
-  static const _seedlingName = '무화과 #001';
-  static const _organizations = [
-    _Organization(
-      emoji: '🧒',
-      name: '행복 지역아동센터',
-      detail: '도보 10분 · 아이들 원예 수업에 사용',
-    ),
-    _Organization(emoji: '🏥', name: '푸른 종합복지관', detail: '차량 15분 · 로비 정원 조성'),
-    _Organization(emoji: '🏡', name: '은빛 경로당', detail: '도보 5분 · 어르신 텃밭에 식재'),
-  ];
+  final _repository = SeedlingRepository();
+
+  bool _loading = true;
+  String? _loadErrorMessage;
+  Seedling? _seedling;
 
   _Choice _choice = _Choice.donate;
   int _selectedOrgIndex = 0;
 
-  void _submit() {
-    Navigator.of(context).pushNamed(
-      '/adopter/donation-certificate',
-      arguments: DonationCertificateArgs(
-        seedlingName: _seedlingName,
-        organizationName: _organizations[_selectedOrgIndex].name,
-      ),
-    );
+  bool _submitting = false;
+  String? _submitErrorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadErrorMessage = null;
+    });
+    try {
+      final seedlings = await _repository.fetchSeedlings();
+      final seedling = pickSeedlingForPickupDonate(seedlings);
+      setState(() {
+        _seedling = seedling;
+        // 이미 선택을 마친 묘목이면 그 값으로 초기 상태를 맞춰 보여준다(재선택 가능).
+        if (seedling?.pickupOrDonate == PickupOrDonateChoice.pickup) {
+          _choice = _Choice.pickup;
+        } else if (seedling?.pickupOrDonate == PickupOrDonateChoice.donate) {
+          _choice = _Choice.donate;
+          final index = _organizations.indexWhere(
+            (org) => org.donateType == seedling!.donateType,
+          );
+          if (index != -1) _selectedOrgIndex = index;
+        }
+      });
+    } on ApiException catch (e) {
+      setState(() => _loadErrorMessage = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _submit() async {
+    final seedling = _seedling;
+    if (seedling == null) return;
+    final isDonate = _choice == _Choice.donate;
+
+    setState(() {
+      _submitting = true;
+      _submitErrorMessage = null;
+    });
+    try {
+      await _repository.updatePickupOrDonate(
+        seedlingId: seedling.id,
+        choice: isDonate
+            ? PickupOrDonateChoice.donate
+            : PickupOrDonateChoice.pickup,
+        donateType: isDonate ? _organizations[_selectedOrgIndex].donateType : null,
+      );
+      if (!mounted) return;
+      if (isDonate) {
+        Navigator.of(context).pushNamed(
+          '/adopter/donation-certificate',
+          arguments: DonationCertificateArgs(
+            seedlingName: '무화과 #${seedling.id}',
+            organizationName: _organizations[_selectedOrgIndex].name,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('수령이 확정됐어요 🧺')));
+        Navigator.of(context).pop();
+      }
+    } on ApiException catch (e) {
+      setState(() => _submitErrorMessage = e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDonate = _choice == _Choice.donate;
-
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: _buildBody(),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.pink500),
+      );
+    }
+    if (_loadErrorMessage != null) {
+      return _ErrorState(message: _loadErrorMessage!, onRetry: _load);
+    }
+    if (_seedling == null) {
+      return const _EmptyState();
+    }
+    return _buildSelection();
+  }
+
+  Widget _buildSelection() {
+    final isDonate = _choice == _Choice.donate;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
           children: [
-            Column(
-              children: [
-                Text(
-                  '다 자란 무화과,\n어떻게 할까요?',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.display(
-                    fontSize: 28,
-                    color: const Color(0xFFF7A0AE),
-                  ).copyWith(letterSpacing: 2.8),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '묘목 완성! 수령하거나 기부할 수 있어요 🎉',
-                  style: AppTextStyles.body(
-                    fontSize: 14,
-                    color: AppColors.badgeGreenText,
-                  ).copyWith(fontWeight: FontWeight.w500),
+            Text(
+              '다 자란 무화과,\n어떻게 할까요?',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.display(
+                fontSize: 28,
+                color: const Color(0xFFF7A0AE),
+              ).copyWith(letterSpacing: 2.8),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '묘목 완성! 수령하거나 기부할 수 있어요 🎉',
+              style: AppTextStyles.body(
+                fontSize: 14,
+                color: AppColors.badgeGreenText,
+              ).copyWith(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _ChoiceCard(
+                emoji: '🧺',
+                title: '직접 수령',
+                description: '재배 상가에서\n픽업해요',
+                selected: !isDonate,
+                onTap: () => setState(() => _choice = _Choice.pickup),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _ChoiceCard(
+                emoji: '🎁',
+                title: '기부하기',
+                description: '따뜻한 곳으로\n보내요',
+                selected: isDonate,
+                onTap: () => setState(() => _choice = _Choice.donate),
+              ),
+            ),
+          ],
+        ),
+        if (isDonate) ...[
+          const SizedBox(height: 16),
+          Text(
+            '기부처를 골라주세요',
+            style: AppTextStyles.title(
+              fontSize: 15,
+            ).copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 10),
+          Column(
+            children: [
+              for (var i = 0; i < _organizations.length; i++) ...[
+                if (i > 0) const SizedBox(height: 10),
+                _OrganizationRow(
+                  organization: _organizations[i],
+                  selected: i == _selectedOrgIndex,
+                  onTap: () => setState(() => _selectedOrgIndex = i),
                 ),
               ],
+            ],
+          ),
+        ],
+        if (_submitErrorMessage != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _submitErrorMessage!,
+            style: AppTextStyles.body(fontSize: 13, color: AppColors.errorRed),
+          ),
+        ],
+        const Spacer(),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 24),
+          child: PigFigButton.primary(
+            label: isDonate ? '기부하고 인증서 받기 📜' : '수령으로 확정하기 🧺',
+            onPressed: _submit,
+            loading: _submitting,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const FigTreeIllustration(width: 100),
+            const SizedBox(height: 20),
+            Text('아직 완성된 무화과가 없어요', style: AppTextStyles.title(fontSize: 17)),
+            const SizedBox(height: 6),
+            Text(
+              '묘목이 완성되면 그때 수령이나 기부를 선택할 수 있어요',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body(fontSize: 13, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('😢', style: TextStyle(fontSize: 40)),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body(fontSize: 14, color: AppColors.textMuted),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _ChoiceCard(
-                    emoji: '🧺',
-                    title: '직접 수령',
-                    description: '재배 상가에서\n픽업해요',
-                    selected: !isDonate,
-                    onTap: () => setState(() => _choice = _Choice.pickup),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _ChoiceCard(
-                    emoji: '🎁',
-                    title: '기부하기',
-                    description: '따뜻한 곳으로\n보내요',
-                    selected: isDonate,
-                    onTap: () => setState(() => _choice = _Choice.donate),
-                  ),
-                ),
-              ],
+            SizedBox(
+              width: 140,
+              child: PigFigButton.outline(label: '다시 시도', onPressed: onRetry),
             ),
-            if (isDonate) ...[
-              const SizedBox(height: 16),
-              Text(
-                '기부처를 골라주세요',
-                style: AppTextStyles.title(
-                  fontSize: 15,
-                ).copyWith(fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 10),
-              Column(
-                children: [
-                  for (var i = 0; i < _organizations.length; i++) ...[
-                    if (i > 0) const SizedBox(height: 10),
-                    _OrganizationRow(
-                      organization: _organizations[i],
-                      selected: i == _selectedOrgIndex,
-                      onTap: () => setState(() => _selectedOrgIndex = i),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-            const Spacer(),
-            if (isDonate) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: PigFigButton.primary(
-                  label: '기부하고 인증서 받기 📜',
-                  onPressed: _submit,
-                ),
-              ),
-            ] else
-              const SizedBox(height: 24),
           ],
         ),
       ),

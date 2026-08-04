@@ -32,6 +32,7 @@ Pig.Fig. 서비스 플로우 및 API 설계 문서입니다.
 | `/api/seedlings/` | GET/POST | 묘목 목록 조회 / 입양 생성 |
 | `/api/seedlings/{id}/` | GET | 묘목 상세 조회 |
 | `/api/seedlings/{id}/complete/` | PATCH | 재배자 묘목 완성 신고 (입양자에게 FCM 알림 발송) |
+| `/api/seedlings/{id}/pickup-donate/` | PATCH | 입양자 수령/기부 선택 (완성된 묘목만, 재배자에게 FCM 알림 발송) |
 | `/api/diary/` | POST | 재배 일지 작성 |
 | `/api/diary/{seedling_id}/` | GET | 특정 묘목의 일지 목록 조회 |
 | `/api/sensor/data/` | POST | 센서 데이터 수집 (MQTT 연동) |

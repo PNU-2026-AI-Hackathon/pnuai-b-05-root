@@ -126,3 +126,106 @@ class SeedlingCompleteViewTests(APITestCase):
         response = self.client.patch(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class SeedlingPickupDonateViewTests(APITestCase):
+    def setUp(self):
+        self.adopter = User.objects.create_user(
+            email='adopter@example.com', password='testpass123', role=User.Role.ADOPTER,
+        )
+        self.other_adopter = User.objects.create_user(
+            email='other-adopter@example.com', password='testpass123', role=User.Role.ADOPTER,
+        )
+        self.grower = User.objects.create_user(
+            email='grower@example.com', password='testpass123', role=User.Role.GROWER,
+        )
+        self.seedling = Seedling.objects.create(
+            adopter=self.adopter, grower=self.grower, status=Seedling.Status.COMPLETED,
+        )
+        self.url = reverse('seedlings:pickup-donate', kwargs={'pk': self.seedling.pk})
+
+    @patch('seedlings.views.send_notification_to_user')
+    def test_adopter_can_choose_pickup(self, mock_send_notification):
+        self.client.force_authenticate(user=self.adopter)
+
+        response = self.client.patch(self.url, {'pickup_or_donate': 'pickup'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.seedling.refresh_from_db()
+        self.assertEqual(self.seedling.pickup_or_donate, Seedling.PickupOrDonate.PICKUP)
+        self.assertIsNone(self.seedling.donate_type)
+        mock_send_notification.assert_called_once_with(
+            self.grower,
+            '수령 안내',
+            f'묘목 #{self.seedling.pk} 입양자가 직접 수령을 선택했어요. 방문 시 안내해주세요.',
+        )
+
+    @patch('seedlings.views.send_notification_to_user')
+    def test_adopter_can_choose_donate_with_type(self, mock_send_notification):
+        self.client.force_authenticate(user=self.adopter)
+
+        response = self.client.patch(
+            self.url, {'pickup_or_donate': 'donate', 'donate_type': 'in_app_sharing'},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.seedling.refresh_from_db()
+        self.assertEqual(self.seedling.pickup_or_donate, Seedling.PickupOrDonate.DONATE)
+        self.assertEqual(self.seedling.donate_type, Seedling.DonateType.IN_APP_SHARING)
+        mock_send_notification.assert_called_once_with(
+            self.grower,
+            '기부 안내',
+            f'묘목 #{self.seedling.pk}가 "앱 내 나눔 분양"로 기부하기로 결정됐어요.',
+        )
+
+    def test_other_adopter_cannot_choose(self):
+        self.client.force_authenticate(user=self.other_adopter)
+
+        response = self.client.patch(self.url, {'pickup_or_donate': 'pickup'})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_grower_cannot_choose(self):
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.patch(self.url, {'pickup_or_donate': 'pickup'})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_growing_seedling_rejected(self):
+        growing_seedling = Seedling.objects.create(
+            adopter=self.adopter, grower=self.grower, status=Seedling.Status.GROWING,
+        )
+        url = reverse('seedlings:pickup-donate', kwargs={'pk': growing_seedling.pk})
+        self.client.force_authenticate(user=self.adopter)
+
+        response = self.client.patch(url, {'pickup_or_donate': 'pickup'})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_donate_without_donate_type_rejected(self):
+        self.client.force_authenticate(user=self.adopter)
+
+        response = self.client.patch(self.url, {'pickup_or_donate': 'donate'})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_invalid_donate_type_rejected(self):
+        self.client.force_authenticate(user=self.adopter)
+
+        response = self.client.patch(
+            self.url, {'pickup_or_donate': 'donate', 'donate_type': 'not-a-real-type'},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('seedlings.views.send_notification_to_user')
+    def test_resubmitting_same_choice_does_not_resend_notification(self, mock_send_notification):
+        self.client.force_authenticate(user=self.adopter)
+        self.client.patch(self.url, {'pickup_or_donate': 'pickup'})
+        mock_send_notification.reset_mock()
+
+        response = self.client.patch(self.url, {'pickup_or_donate': 'pickup'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_send_notification.assert_not_called()

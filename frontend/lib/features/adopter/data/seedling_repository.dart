@@ -8,19 +8,55 @@ extension SeedlingStatusApi on SeedlingStatus {
       value == 'completed' ? SeedlingStatus.completed : SeedlingStatus.growing;
 }
 
-/// `GET /api/seedlings/` 응답 한 건. 입양자 화면(홈/성장 타임라인)에서 쓰는 필드만 파싱한다.
+/// `Seedling.pickup_or_donate`(backend `PickupOrDonate` TextChoices)와 1:1 대응.
+enum PickupOrDonateChoice { pickup, donate }
+
+extension PickupOrDonateChoiceApi on PickupOrDonateChoice {
+  String get apiValue => this == PickupOrDonateChoice.pickup ? 'pickup' : 'donate';
+
+  static PickupOrDonateChoice? fromApiValue(String? value) => switch (value) {
+    'pickup' => PickupOrDonateChoice.pickup,
+    'donate' => PickupOrDonateChoice.donate,
+    _ => null,
+  };
+}
+
+/// `Seedling.donate_type`(backend `DonateType` TextChoices)와 1:1 대응.
+enum DonateType { schoolWelfare, urbanFarmingCommunity, inAppSharing }
+
+extension DonateTypeApi on DonateType {
+  String get apiValue => switch (this) {
+    DonateType.schoolWelfare => 'school_welfare',
+    DonateType.urbanFarmingCommunity => 'urban_farming_community',
+    DonateType.inAppSharing => 'in_app_sharing',
+  };
+
+  static DonateType? fromApiValue(String? value) => switch (value) {
+    'school_welfare' => DonateType.schoolWelfare,
+    'urban_farming_community' => DonateType.urbanFarmingCommunity,
+    'in_app_sharing' => DonateType.inAppSharing,
+    _ => null,
+  };
+}
+
+/// `GET /api/seedlings/` 응답 한 건. 입양자 화면(홈/성장 타임라인/수령·기부 선택)에서 쓰는
+/// 필드만 파싱한다.
 class Seedling {
   const Seedling({
     required this.id,
     required this.status,
     required this.startedAt,
     this.completedAt,
+    this.pickupOrDonate,
+    this.donateType,
   });
 
   final int id;
   final SeedlingStatus status;
   final DateTime startedAt;
   final DateTime? completedAt;
+  final PickupOrDonateChoice? pickupOrDonate;
+  final DonateType? donateType;
 
   factory Seedling.fromJson(Map<String, dynamic> json) => Seedling(
     id: json['id'] as int,
@@ -29,6 +65,10 @@ class Seedling {
     completedAt: json['completed_at'] == null
         ? null
         : DateTime.parse(json['completed_at'] as String),
+    pickupOrDonate: PickupOrDonateChoiceApi.fromApiValue(
+      json['pickup_or_donate'] as String?,
+    ),
+    donateType: DonateTypeApi.fromApiValue(json['donate_type'] as String?),
   );
 }
 
@@ -48,6 +88,19 @@ Seedling? pickPrimarySeedling(List<Seedling> seedlings) {
       ),
     );
   return byCompletion.first;
+}
+
+/// 수령/기부를 선택할 대상 묘목을 고른다 — 완료된 묘목 중 가장 최근에 완료된 것.
+/// 이미 선택을 마친 묘목도 대상에 포함한다(백엔드가 재제출을 허용하므로 다시 바꿀 수 있음).
+Seedling? pickSeedlingForPickupDonate(List<Seedling> seedlings) {
+  final completed =
+      seedlings.where((s) => s.status == SeedlingStatus.completed).toList()
+        ..sort(
+          (a, b) => (b.completedAt ?? b.startedAt).compareTo(
+            a.completedAt ?? a.startedAt,
+          ),
+        );
+  return completed.isEmpty ? null : completed.first;
 }
 
 /// backend/seedlings (`GET /api/seedlings/`) 연동 — 입양자용.
@@ -87,5 +140,27 @@ class SeedlingRepository {
       body: const {},
       accessToken: accessToken,
     );
+  }
+
+  /// 완성된 묘목의 수령/기부를 선택(또는 변경)한다.
+  /// `choice`가 `donate`일 때는 `donateType`이 필수다.
+  Future<Seedling> updatePickupOrDonate({
+    required int seedlingId,
+    required PickupOrDonateChoice choice,
+    DonateType? donateType,
+  }) async {
+    final accessToken = await _tokenStorage.readAccessToken();
+    if (accessToken == null) {
+      throw ApiException('로그인이 필요해요.');
+    }
+    final response = await _apiClient.patch(
+      '/api/seedlings/$seedlingId/pickup-donate/',
+      body: {
+        'pickup_or_donate': choice.apiValue,
+        if (choice == PickupOrDonateChoice.donate) 'donate_type': donateType!.apiValue,
+      },
+      accessToken: accessToken,
+    );
+    return Seedling.fromJson(response);
   }
 }

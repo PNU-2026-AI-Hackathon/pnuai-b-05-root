@@ -11,7 +11,11 @@ from accounts.models import User
 from notifications.fcm import send_notification_to_user
 
 from .models import Seedling
-from .serializers import SeedlingCreateSerializer, SeedlingSerializer
+from .serializers import (
+    SeedlingCreateSerializer,
+    SeedlingPickupDonateSerializer,
+    SeedlingSerializer,
+)
 
 
 class SeedlingListCreateView(ListCreateAPIView):
@@ -81,5 +85,55 @@ class SeedlingCompleteView(APIView):
             '묘목 완성!',
             '무화과 묘목이 완성됐어요. 수령 또는 기부를 선택해주세요.',
         )
+
+        return Response(SeedlingSerializer(seedling).data)
+
+
+class SeedlingPickupDonateView(APIView):
+    """완성된 묘목의 수령/기부 선택. 담당 입양자만 가능하며, 완성(completed) 상태에서만 허용한다."""
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        user = request.user
+        seedling = get_object_or_404(Seedling, pk=pk)
+
+        if user.role != User.Role.ADOPTER or seedling.adopter_id != user.pk:
+            raise PermissionDenied('본인이 입양한 묘목만 수령/기부를 선택할 수 있습니다.')
+        if seedling.status != Seedling.Status.COMPLETED:
+            raise ValidationError('완성된 묘목만 수령/기부를 선택할 수 있습니다.')
+
+        serializer = SeedlingPickupDonateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        pickup_or_donate = serializer.validated_data['pickup_or_donate']
+        donate_type = (
+            serializer.validated_data.get('donate_type')
+            if pickup_or_donate == Seedling.PickupOrDonate.DONATE
+            else None
+        )
+
+        changed = (
+            seedling.pickup_or_donate != pickup_or_donate
+            or seedling.donate_type != donate_type
+        )
+        seedling.pickup_or_donate = pickup_or_donate
+        seedling.donate_type = donate_type
+        seedling.save(update_fields=['pickup_or_donate', 'donate_type'])
+
+        # 재제출로 값이 바뀌지 않았으면 재배자에게 같은 알림을 중복 발송하지 않는다.
+        if changed and seedling.grower_id is not None:
+            if pickup_or_donate == Seedling.PickupOrDonate.PICKUP:
+                send_notification_to_user(
+                    seedling.grower,
+                    '수령 안내',
+                    f'묘목 #{seedling.pk} 입양자가 직접 수령을 선택했어요. 방문 시 안내해주세요.',
+                )
+            else:
+                donate_label = Seedling.DonateType(donate_type).label
+                send_notification_to_user(
+                    seedling.grower,
+                    '기부 안내',
+                    f'묘목 #{seedling.pk}가 "{donate_label}"로 기부하기로 결정됐어요.',
+                )
 
         return Response(SeedlingSerializer(seedling).data)
