@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/storage/inventory_storage.dart';
 import '../../../core/storage/token_storage.dart';
 
 enum UserRole { adopter, grower }
@@ -36,6 +37,7 @@ class AuthRepository {
       access: response['access'] as String,
       refresh: response['refresh'] as String,
       email: email,
+      userId: response['id'].toString(),
     );
     return LoginResult(
       role: UserRoleApi.fromApiValue(response['role'] as String),
@@ -55,10 +57,14 @@ class AuthRepository {
 
   Future<void> logout() => _tokenStorage.clear();
 
-  /// 회원탈퇴. `DELETE /api/accounts/me/` 호출 후 로컬 토큰도 함께 지운다.
+  /// 회원탈퇴. `DELETE /api/accounts/me/` 호출 성공 후 이 계정의 로컬 보유 아이템
+  /// ([InventoryStorage])과 토큰([TokenStorage])을 함께 지운다. 계정이 사라지므로
+  /// 남겨둘 이유가 없어 로그아웃(계정 유지)과 달리 인벤토리까지 삭제한다.
   Future<void> deleteAccount() async {
     final accessToken = await _tokenStorage.readAccessToken();
     await _apiClient.delete('/api/accounts/me/', accessToken: accessToken!);
+    final userId = await _tokenStorage.readUserId();
+    if (userId != null) await InventoryStorage(userId: userId).clear();
     await _tokenStorage.clear();
   }
 }

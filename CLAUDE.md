@@ -34,7 +34,8 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
   (`POST /api/vision/analyze/`, 재배자가 일지 사진 업로드 시 백그라운드로 자동 호출), chatbot
   (`POST /api/chatbot/ask/`)는 실제 백엔드와 연동됩니다. 게임 탭 4종(돼지 풍선 터뜨리기/무화과 퀴즈/
   해충 잡기/물주기 타이밍)은 모두 실제로 플레이 가능하며, 획득 아이템은 `InventoryStorage`
-  (`SharedPreferences`)에 로컬 저장됩니다. `PATCH /api/seedlings/{id}/pickup-donate/`(완성 묘목
+  (`SharedPreferences`, 로그인한 사용자 id별로 키를 분리해 계정 간 아이템이 섞이지 않음)에 로컬
+  저장됩니다. `PATCH /api/seedlings/{id}/pickup-donate/`(완성 묘목
   수령/기부 선택, 아래 "완성 묘목 수령/기부 선택" 참고)도 `pickup_donate_screen.dart`가 실제로
   연동합니다. 홈 화면의 케어 게이지·마이페이지 프로필은 여전히 로컬 mock입니다
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
@@ -587,7 +588,26 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   `itemEarned`(목표 달성 시에만 채워짐)가 있으면 `core/storage/inventory_storage.dart`의
   `InventoryStorage.addItem()`으로 저장한 뒤 보유 아이템 바를 다시 그립니다. `InventoryStorage`는
   `TokenStorage`/`OnboardingStorage`와 동일한 `SharedPreferences` 래퍼 컨벤션이며, 아이템 목록을
-  JSON 문자열 하나로 인코딩해 저장합니다(게임 종류·서버 저장 없이 로컬에만 누적). `mypage_screen.dart`
+  JSON 문자열 하나로 인코딩해 저장합니다(게임 종류·서버 저장 없이 로컬에만 누적).
+
+  처음에는 `TokenStorage`/`OnboardingStorage`처럼 고정 키(`pigfig.inventory_items`) 하나로
+  저장했는데, 이러면 같은 기기에서 A 계정으로 게임해 아이템을 모은 뒤 로그아웃하고 B 계정으로
+  로그인해도 A의 아이템이 그대로 보이는 실제 버그가 있었다(로그아웃/회원탈퇴가 `TokenStorage`만
+  지우고 `InventoryStorage`는 건드리지 않았기 때문). 아이템이 게임 탭 표시 외에 다른 기능(케어
+  소비 등)에 쓰이는 곳이 없어 서버 모델을 새로 만들 정도는 아니라고 판단해, 대신 저장 키를
+  `pigfig.inventory_items.$userId`로 바꿔 **계정별로 분리**했다 — 생성자에서
+  `InventoryStorage({required userId})`로 userId를 고정해 받는 방식이라(메서드마다 인자로
+  넘기지 않음), `games_screen.dart`는 `initState`에서 `TokenStorage.readUserId()`로 로그인한
+  사용자 id를 먼저 조회한 뒤에만 `InventoryStorage` 인스턴스를 만든다(조회 전에는 `_inventory`가
+  `null`이라 아이템 획득 콜백은 `_inventory?.addItem()`으로 안전하게 무시된다). userId는
+  `AuthRepository.login()`이 로그인 응답의 `id`(accounts 앱의 `LoginView`가 `role`과 함께 내려줌)를
+  받아 `email`과 동일한 패턴으로 `TokenStorage`에 함께 저장해둔 값이다. 로그아웃은 계정이 그대로
+  남으므로 인벤토리를 지우지 않지만(다음에 같은 계정으로 로그인하면 자연히 그 계정 것만 다시
+  보임), 회원탈퇴는 `AuthRepository.deleteAccount()`가 `DELETE /api/accounts/me/` 성공 직후 —
+  `TokenStorage.clear()`로 userId를 지우기 전에 — `TokenStorage.readUserId()`로 얻은 값으로
+  `InventoryStorage(userId: ...).clear()`를 호출해 그 계정의 로컬 아이템까지 함께 삭제한다.
+  `frontend/test/inventory_storage_test.dart`가 userId별 키 분리와 `clear()`가 다른 계정 데이터에
+  영향을 주지 않는지를 `SharedPreferences.setMockInitialValues`로 검증한다. `mypage_screen.dart`
   는 프로필 카드 + 리스트 메뉴입니다. "성장 타임라인"은 하단 탭으로 승격되면서 이 메뉴 목록에서는
   빠졌고(아래 참고), "AI 챗봇"과 "수령 / 기부 선택"·"기부 인증서"는 실제로 이동하며, 이번 범위 밖인
   "알림 설정"/"입양 내역"만 탭하면 스낵바만 띄웁니다. "기부 인증서"는
@@ -746,7 +766,8 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   가지치기 3종은 `CareStorage`로 로컬 영속화, 햇빛은 완료 개념이 없어 제외)은 계획서상 "실제
   재배와 분리된 미션형 연출"이라는 의도적 설계라 서버에는 연동하지 않음(위 "케어 화면" 문단 참고)
 - 게임 탭의 실제 게임 4종(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍)은 모두 플레이
-  가능하며, 획득 아이템은 `InventoryStorage`에 로컬로만 누적됨(서버 저장 없음). vision은 백엔드
+  가능하며, 획득 아이템은 `InventoryStorage`에 로컬로만 누적됨(서버 저장 없음, `pigfig.
+  inventory_items.$userId`로 계정별 키 분리 완료 — 로그아웃 시 유지, 회원탈퇴 시 삭제). vision은 백엔드
   실제 추론 + 재배자 일지 작성 시 프론트엔드 자동 호출까지 연동 완료. FCM은 Android 클라이언트가
   로그인 시 실제 토큰을 등록하도록 연동 완료(다른 플랫폼은 미지원)
 - `PATCH /api/seedlings/{id}/pickup-donate/`(완성 묘목 수령/기부 선택)는 백엔드(models/

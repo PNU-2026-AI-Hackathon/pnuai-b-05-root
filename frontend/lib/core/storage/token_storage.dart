@@ -5,16 +5,19 @@ class TokenStorage {
   static const _accessKey = 'pigfig.access_token';
   static const _refreshKey = 'pigfig.refresh_token';
   static const _emailKey = 'pigfig.email';
+  static const _userIdKey = 'pigfig.user_id';
 
   Future<void> save({
     required String access,
     required String refresh,
     String? email,
+    String? userId,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accessKey, access);
     await prefs.setString(_refreshKey, refresh);
     if (email != null) await prefs.setString(_emailKey, email);
+    if (userId != null) await prefs.setString(_userIdKey, userId);
   }
 
   Future<String?> readAccessToken() async {
@@ -29,10 +32,18 @@ class TokenStorage {
     return prefs.getString(_emailKey);
   }
 
+  /// 로그인한 사용자의 서버 id(문자열). [core/storage/inventory_storage.dart]처럼
+  /// 계정별로 로컬 데이터를 분리해야 할 때 이 값을 키에 사용한다.
+  Future<String?> readUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_userIdKey);
+  }
+
   Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessKey);
     await prefs.remove(_refreshKey);
     await prefs.remove(_emailKey);
+    await prefs.remove(_userIdKey);
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/storage/inventory_storage.dart';
+import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pig_character.dart';
@@ -58,17 +59,27 @@ class GamesScreen extends StatefulWidget {
 class _GamesScreenState extends State<GamesScreen> {
   static const _mediumDifficultyBg = Color(0xFFAFD6A0);
 
-  final _inventory = InventoryStorage();
+  final _tokenStorage = TokenStorage();
+  InventoryStorage? _inventory;
   List<GameItem> _ownedItems = [];
 
   @override
   void initState() {
     super.initState();
-    _loadItems();
+    _initInventory();
+  }
+
+  // 보유 아이템은 계정별로 분리 저장되므로([InventoryStorage] 참고), 로그인한
+  // 사용자의 id를 먼저 조회한 뒤에야 인스턴스를 만들 수 있다.
+  Future<void> _initInventory() async {
+    final userId = await _tokenStorage.readUserId();
+    if (!mounted || userId == null) return;
+    _inventory = InventoryStorage(userId: userId);
+    await _loadItems();
   }
 
   Future<void> _loadItems() async {
-    final items = await _inventory.getItems();
+    final items = await _inventory!.getItems();
     if (!mounted) return;
     setState(() => _ownedItems = items);
   }
@@ -124,7 +135,7 @@ class _GamesScreenState extends State<GamesScreen> {
         // 아이템을 획득했으면 저장하고 보유 아이템 바를 갱신한다.
         final earned = result?.itemEarned;
         if (earned != null) {
-          await _inventory.addItem(earned);
+          await _inventory?.addItem(earned);
           await _loadItems();
         }
       case GameType.wateringTiming:
@@ -135,7 +146,7 @@ class _GamesScreenState extends State<GamesScreen> {
         // 무화과 퀴즈와 동일한 패턴: 획득 아이템을 저장하고 보유 아이템 바를 갱신.
         final earned = result?.itemEarned;
         if (earned != null) {
-          await _inventory.addItem(earned);
+          await _inventory?.addItem(earned);
           await _loadItems();
         }
       case GameType.pestCatch:
@@ -146,7 +157,7 @@ class _GamesScreenState extends State<GamesScreen> {
         // 다른 게임들과 동일한 패턴: 획득 아이템을 저장하고 보유 아이템 바를 갱신.
         final earned = result?.itemEarned;
         if (earned != null) {
-          await _inventory.addItem(earned);
+          await _inventory?.addItem(earned);
           await _loadItems();
         }
       case GameType.balloonPop:
@@ -157,7 +168,7 @@ class _GamesScreenState extends State<GamesScreen> {
         // 다른 게임들과 동일한 패턴: 획득 아이템을 저장하고 보유 아이템 바를 갱신.
         final earned = result?.itemEarned;
         if (earned != null) {
-          await _inventory.addItem(earned);
+          await _inventory?.addItem(earned);
           await _loadItems();
         }
     }
