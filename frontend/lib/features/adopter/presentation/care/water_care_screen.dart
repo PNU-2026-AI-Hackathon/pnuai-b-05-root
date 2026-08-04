@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/storage/care_storage.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/gauge_bar.dart';
@@ -9,6 +10,7 @@ import '../../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../../shared/widgets/step_indicator.dart';
 
 /// 1g — 케어: 물주기. 물방울을 꾹 누르는 동안 수분 게이지가 차오른다.
+/// 오늘 이미 완료했으면(로컬 저장, [CareStorage]) 재진입 시 잠긴 완료 상태로 보여준다.
 class WaterCareScreen extends StatefulWidget {
   const WaterCareScreen({super.key});
 
@@ -18,7 +20,10 @@ class WaterCareScreen extends StatefulWidget {
 
 class _WaterCareScreenState extends State<WaterCareScreen>
     with SingleTickerProviderStateMixin {
+  final _careStorage = CareStorage();
+
   double _moisture = 0.6;
+  bool _completed = false;
   Timer? _holdTimer;
   late final AnimationController _pulseController;
 
@@ -29,7 +34,20 @@ class _WaterCareScreenState extends State<WaterCareScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1600),
     )..repeat();
+    _loadCareStatus();
   }
+
+  Future<void> _loadCareStatus() async {
+    final last = await _careStorage.getLastCompleted(CareType.water);
+    if (!mounted || last == null || !_isSameDay(last, DateTime.now())) return;
+    setState(() {
+      _completed = true;
+      _moisture = 1;
+    });
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 
   @override
   void dispose() {
@@ -39,14 +57,24 @@ class _WaterCareScreenState extends State<WaterCareScreen>
   }
 
   void _startFilling() {
+    if (_completed) return;
     _holdTimer?.cancel();
     _holdTimer = Timer.periodic(const Duration(milliseconds: 180), (_) {
       setState(() => _moisture = (_moisture + 0.05).clamp(0, 1));
-      if (_moisture >= 1) _holdTimer?.cancel();
+      if (_moisture >= 1) {
+        _holdTimer?.cancel();
+        _markCompleted();
+      }
     });
   }
 
   void _stopFilling() => _holdTimer?.cancel();
+
+  Future<void> _markCompleted() async {
+    if (_completed) return;
+    setState(() => _completed = true);
+    await _careStorage.markCompleted(CareType.water);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,19 +89,22 @@ class _WaterCareScreenState extends State<WaterCareScreen>
               const StepIndicator(current: 1, total: 1),
               const SizedBox(height: 22),
               Text(
-                '물을 주세요!',
+                _completed ? '오늘 물주기 완료! 💧' : '물을 주세요!',
                 style: AppTextStyles.display(
                   fontSize: 32,
                   color: const Color(0xFFF7A0AE),
                 ),
               ),
               const SizedBox(height: 10),
-              Text('물방울을 꾹 눌러 화분에 부어보세요', style: AppTextStyles.guide()),
+              Text(
+                _completed ? '내일 다시 만나요' : '물방울을 꾹 눌러 화분에 부어보세요',
+                style: AppTextStyles.guide(),
+              ),
               Expanded(
                 child: Center(
                   child: GestureDetector(
-                    onLongPressStart: (_) => _startFilling(),
-                    onLongPressEnd: (_) => _stopFilling(),
+                    onLongPressStart: _completed ? null : (_) => _startFilling(),
+                    onLongPressEnd: _completed ? null : (_) => _stopFilling(),
                     child: AnimatedBuilder(
                       animation: _pulseController,
                       builder: (context, child) {
@@ -134,7 +165,7 @@ class _WaterCareScreenState extends State<WaterCareScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                '누르는 동안 재배자에게 물주기 요청이 기록돼요 💧',
+                _completed ? '오늘의 물주기가 기록됐어요 💧' : '오늘의 물주기가 이 기기에 기록돼요 💧',
                 style: AppTextStyles.body(
                   fontSize: 13,
                   color: AppColors.textMuted,
