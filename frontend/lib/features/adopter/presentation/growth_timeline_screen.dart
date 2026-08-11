@@ -160,12 +160,15 @@ class _TimelineCard extends StatelessWidget {
     final imageUrl = entry.illustrationUrl ?? entry.photoUrl;
 
     return GestureDetector(
-      onTap: () => showDiaryDetailDialog(
-        context,
-        content: entry.content,
-        createdAt: entry.createdAt,
-        photoUrl: entry.photoUrl,
-        illustrationUrl: entry.illustrationUrl,
+      onTap: () => Navigator.of(context).pushNamed(
+        '/adopter/diary-detail',
+        arguments: DiaryDetailArgs(
+          diaryId: entry.id,
+          content: entry.content,
+          createdAt: entry.createdAt,
+          photoUrl: entry.photoUrl,
+          illustrationUrl: entry.illustrationUrl,
+        ),
       ),
       child: Container(
         padding: const EdgeInsets.all(14),

@@ -655,22 +655,43 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   없으면(mock 모드거나 변환 실패) 원본 `photo`를 `Image.network()`로 보여주며, 둘 다 없으면 기존
   "✨ 일러스트 변환" placeholder를 보여줍니다(`imageUrl = entry.illustrationUrl ?? entry.photoUrl`).
   응답 순서가 보장되지 않아 클라이언트에서 `created_at` 내림차순으로 정렬합니다. 각 카드는
-  `GestureDetector`로 감싸 탭하면 `diary_detail_screen.dart`의 `showDiaryDetailDialog()`가 여는
-  중앙 카드 모달로 사진/일러스트와 `content` 전문을 볼 수 있습니다 — 원래는 `PigFigAppBar(closeLabel:
-  '닫기')`를 가진 풀스크린 push 화면(`DiaryDetailArgs` route-argument로 `/adopter/diary-detail`에
-  전달)이었으나, "탭 목록 위에 살짝 띄우는 느낌"이 더 맞다고 판단해 모달로 바꿨습니다. `showDialog`의
-  기본 `barrierDismissible`(바깥 탭 시 닫힘)과 `barrierColor`(배경 dim)를 그대로 활용하고, 카드
-  자체는 `Center` + `Container`(너비는 화면의 82%, 최대 높이 화면의 80%, `borderRadius: 20`,
-  `AppColors` 기반 그림자, `clipBehavior: Clip.antiAlias`)로 기존 카드 스타일 컨벤션을 따릅니다.
-  사진은 카드의 맨 위(첫 번째 자식)에 바로 붙여 넣기만 하면 바깥 `Container`의 clip이 카드 경계와
-  맞닿은 위쪽 모서리만 자연스럽게 둥글게 잘라주므로, 이미지에 별도 `ClipRRect`를 씌울 필요가
-  없었습니다. 우측 상단에 반투명 원형 X 버튼(`Positioned` + `GestureDetector` →
-  `Navigator.of(dialogContext).pop()`)도 함께 둬 바깥 탭과 명시적 닫기 버튼 두 가지 방법을 모두
-  지원합니다. 이 화면은 이제 `Navigator.pushNamed`로 도달하는 별도 라우트가 아니라
-  `growth_timeline_screen.dart`의 카드 `onTap`이 직접 호출하는 함수이므로, 값을 라우트 arguments로
-  포장해 전달할 필요가 없어져 `DiaryDetailArgs` 클래스와 `main.dart`의 `/adopter/diary-detail` 라우트
-  등록은 삭제했습니다(다른 곳에서 참조가 없는 것을 grep으로 확인 후 제거). `yolo_status_tag` 배지는
-  여전히 카드 목록에만 남아 있고 모달에는 넣지 않았습니다.
+  `GestureDetector`로 감싸 탭하면 `Navigator.pushNamed('/adopter/diary-detail', arguments:
+  DiaryDetailArgs(...))`로 `diary_detail_screen.dart`의 `DiaryDetailScreen` 풀스크린 화면으로
+  이동합니다 — 한때 "탭 목록 위에 살짝 띄우는 느낌"이 낫다고 판단해 중앙 카드 모달
+  (`showDiaryDetailDialog()`, 너비 82%/최대 높이 80% 고정)로 바꾼 적이 있었는데, 재배자가 실제로
+  찍은 세로로 긴 사진이 그 고정 비율 박스 안에서 `BoxFit.cover`로 위아래가 잘려 보이는 문제와
+  다운로드 버튼을 넣을 자리가 마땅치 않은 문제가 겹쳐 다시 풀스크린 라우트(`DiaryDetailArgs`
+  route-argument, `GrowerCompleteArgs`/`DonationCertificateArgs`와 동일하게 화면 자체는
+  `ModalRoute.of(context)!.settings.arguments as DiaryDetailArgs`로 인자를 읽는 패턴)로 되돌렸습니다.
+  이미지 영역은 화면 높이의 48%인 `SizedBox` 안에 `InteractiveViewer` + `Image.network(fit:
+  BoxFit.contain)`을 넣어, 세로로 길든 가로로 길든 정사각형이든 잘리지 않고 레터박스로 전체가
+  보이며 핀치 줌으로 확대해 볼 수 있습니다. 앱바는 다른 풀스크린 push 화면과 동일하게
+  `PigFigAppBar(closeLabel: '닫기')`를 그대로 재사용합니다(임의의 액션 아이콘 슬롯이 없어 다운로드
+  버튼은 앱바가 아니라 이미지/본문 아래에 배치, 아래 참고). `yolo_status_tag` 배지는 여전히 카드
+  목록에만 남아 있고 상세 화면에는 넣지 않았습니다.
+
+  화면에 표시된 이미지(일러스트 우선, 없으면 원본 사진 — 카드와 동일한 `illustration ?? photo`
+  우선순위)가 있으면 그 아래에 `PigFigButton.outline(label: '사진 저장하기 📥')` 다운로드 버튼이
+  뜹니다(사진 자체가 없어 placeholder만 보이는 일지는 버튼을 아예 숨김). 원본 사진과 일러스트가
+  둘 다 있는 경우에도 버튼은 하나만 두고 "지금 화면에 보이는 것"을 저장합니다 — 비개발자 사용자가
+  헷갈리지 않도록 선택지를 늘리지 않기로 결정했습니다. `http.get()`으로 이미지 바이트를 받은 뒤
+  `core/download/image_downloader.dart`의 `saveImageBytes(bytes, filename)`(파일명은
+  `diary_detail_screen.dart`의 `buildDiaryImageFilename(diaryId, createdAt)`이 만드는
+  `pigfig_diary_{id}_{yyyyMMdd}.jpg`)를 호출합니다. 이 함수는 웹과 모바일에서 저장 방식이 완전히
+  달라 `dart.library.io`/`dart.library.html` 조건부 export(`src/image_downloader_io.dart`/
+  `src/image_downloader_web.dart`, 두 조건 중 어느 것도 안 맞을 때를 위한
+  `src/image_downloader_stub.dart`는 사실상 선택될 일이 없는 더미)로 분기합니다 — 모바일은
+  `gal` 패키지(`pubspec.yaml`에 신규 추가)로 `Gal.hasAccess()`/`requestAccess()` 확인 후
+  `Gal.putImageBytes()`로 갤러리(앨범명 "Pig.Fig.")에 저장하고, 웹은 `package:web`(`dart:html`은
+  deprecated라 쓰지 않음) + `dart:js_interop`으로 Blob URL을 가진 `<a download>` 앵커를 만들어
+  클릭시켜 브라우저 다운로드를 트리거합니다. Android는 `gal`이 API 29+에서는 권한이 필요 없지만
+  `minSdkVersion 24`를 지원하기 위해 `AndroidManifest.xml`에
+  `WRITE_EXTERNAL_STORAGE`(`maxSdkVersion="28"`)를 추가했습니다. 저장 중에는 버튼이
+  `PigFigButton`의 내장 `loading` 상태로 스피너를 보여주고, 성공/실패 모두 스낵바로 안내합니다
+  (실패해도 일지 열람 자체는 그대로 유지 — vision/sensor의 폴백과 같은 "핵심 기능과 부가 기능을
+  분리"하는 톤). Windows 데스크톱(`flutter run -d windows`)에서도 `gal`이 이론적으로는 지원한다고
+  문서화돼 있지만 이 프로젝트는 실기기로 검증하지 않았습니다 — 실패하면 예외가 잡혀 스낵바로만
+  안내되고 크래시하지 않습니다.
 - `grower_diary_screen.dart`는 이제 탭 진입 시 `GrowerRepository.fetchSeedlings()`로 담당 묘목
   목록을 불러와 상단에 선택 칩으로 보여줍니다(재배중인 묘목이 있으면 자동 선택) — 이전에는 이 화면이
   어떤 묘목에 대한 일지인지 알 방법이 전혀 없었기 때문에 실제 연동을 위해 꼭 필요했던 추가입니다.
