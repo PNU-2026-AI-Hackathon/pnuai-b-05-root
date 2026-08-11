@@ -1,112 +1,145 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
+import '../../../core/download/image_downloader.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/fig_tree_illustration.dart';
+import '../../../shared/widgets/pigfig_app_bar.dart';
+import '../../../shared/widgets/pigfig_button.dart';
 
-/// 성장 타임라인 카드 상세를 중앙 카드 모달로 띄운다 — 사진(또는 일러스트)을 카드
-/// 상단에 크게 보고 날짜/내용 전문을 읽을 수 있다. 배경은 dim 처리되고, 바깥을
-/// 탭하거나 우측 상단 닫기(X) 버튼으로 닫힌다(`showDialog`의 기본
-/// `barrierDismissible`이 바깥 탭 닫기를 그대로 제공한다).
-Future<void> showDiaryDetailDialog(
-  BuildContext context, {
-  required String content,
-  required DateTime createdAt,
-  String? photoUrl,
-  String? illustrationUrl,
-}) {
-  // Gemini로 변환된 일러스트가 있으면 그것을, 없으면 원본 사진을 보여준다
-  // (카드 목록과 동일한 우선순위).
-  final imageUrl = illustrationUrl ?? photoUrl;
+/// `/adopter/diary-detail` route argument.
+class DiaryDetailArgs {
+  const DiaryDetailArgs({
+    required this.diaryId,
+    required this.content,
+    required this.createdAt,
+    this.photoUrl,
+    this.illustrationUrl,
+  });
 
-  return showDialog<void>(
-    context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.5),
-    builder: (dialogContext) => Center(
-      child: Container(
-        width: MediaQuery.of(dialogContext).size.width * 0.82,
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(dialogContext).size.height * 0.8,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
+  final int diaryId;
+  final String content;
+  final DateTime createdAt;
+  final String? photoUrl;
+  final String? illustrationUrl;
+}
+
+/// 일지 상세를 다운로드 가능한 사진 저장용 파일명으로 변환한다(순수 함수라 단독 테스트 가능).
+String buildDiaryImageFilename(int diaryId, DateTime createdAt) {
+  final y = createdAt.year.toString().padLeft(4, '0');
+  final m = createdAt.month.toString().padLeft(2, '0');
+  final d = createdAt.day.toString().padLeft(2, '0');
+  return 'pigfig_diary_${diaryId}_$y$m$d.jpg';
+}
+
+/// 성장 타임라인 카드 상세를 풀스크린으로 보여준다 — 사진(또는 일러스트)이 세로로 길거나
+/// 가로로 길어도 `BoxFit.contain`이라 잘리지 않고, `InteractiveViewer`로 확대해서 볼 수
+/// 있다. 화면에 표시된 이미지(일러스트 우선, 없으면 원본 사진)를 그대로 기기에 저장하는
+/// 다운로드 버튼도 제공한다. 예전에는 이 화면이 실제로 이 라우트로 존재했다가 "탭 목록
+/// 위에 살짝 띄우는 느낌"을 위해 모달로 바뀐 적이 있는데, 이번에 사진 크롭 문제와 다운로드
+/// 요구사항 때문에 다시 풀스크린 라우트로 되돌렸다.
+class DiaryDetailScreen extends StatefulWidget {
+  const DiaryDetailScreen({super.key});
+
+  @override
+  State<DiaryDetailScreen> createState() => _DiaryDetailScreenState();
+}
+
+class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
+  bool _downloading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final args = ModalRoute.of(context)!.settings.arguments as DiaryDetailArgs;
+    // Gemini로 변환된 일러스트가 있으면 그것을, 없으면 원본 사진을 보여준다(카드 목록과
+    // 동일한 우선순위) — 다운로드도 이 화면에 실제로 표시된 이미지를 대상으로 한다.
+    final imageUrl = args.illustrationUrl ?? args.photoUrl;
+
+    return Scaffold(
+      appBar: const PigFigAppBar(closeLabel: '닫기'),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SingleChildScrollView(
+            SizedBox(
+              width: double.infinity,
+              height: MediaQuery.of(context).size.height * 0.48,
+              child: imageUrl != null
+                  ? InteractiveViewer(
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const _ImagePlaceholder(),
+                      ),
+                    )
+                  : const _ImagePlaceholder(),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: double.infinity,
-                    height: 220,
-                    child: imageUrl != null
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const _ImagePlaceholder(),
-                          )
-                        : const _ImagePlaceholder(),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _formatDate(createdAt),
-                          style: AppTextStyles.body(
-                            fontSize: 13,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          content,
-                          style: AppTextStyles.body(
-                            fontSize: 15,
-                            color: AppColors.textPrimary,
-                          ).copyWith(height: 1.6),
-                        ),
-                      ],
+                  Text(
+                    _formatDate(args.createdAt),
+                    style: AppTextStyles.body(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
                     ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    args.content,
+                    style: AppTextStyles.body(
+                      fontSize: 15,
+                      color: AppColors.textPrimary,
+                    ).copyWith(height: 1.6),
                   ),
                 ],
               ),
             ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: GestureDetector(
-                onTap: () => Navigator.of(dialogContext).pop(),
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.close, color: Colors.white, size: 16),
+            if (imageUrl != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: PigFigButton.outline(
+                  label: '사진 저장하기 📥',
+                  loading: _downloading,
+                  onPressed: () => _download(imageUrl, args),
                 ),
               ),
-            ),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  Future<void> _download(String imageUrl, DiaryDetailArgs args) async {
+    setState(() => _downloading = true);
+    try {
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode != 200) {
+        throw Exception('이미지를 불러오지 못했어요.');
+      }
+      await saveImageBytes(
+        response.bodyBytes,
+        buildDiaryImageFilename(args.diaryId, args.createdAt),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('사진을 저장했어요 📥')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('사진 저장에 실패했어요. 다시 시도해주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
 }
 
 String _formatDate(DateTime date) =>

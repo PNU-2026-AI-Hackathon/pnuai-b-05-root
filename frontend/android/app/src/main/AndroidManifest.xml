@@ -5,6 +5,9 @@
     <!-- Android 13+(API 33)부터는 알림 표시에 런타임 권한이 필요하다(FCM 수신 자체는 필요 없지만,
          이 권한이 없으면 알림이 시스템 트레이에 나타나지 않는다). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- 일지 사진 다운로드(갤러리 저장, gal 패키지)용. Android 10(API 29)부터는 MediaStore로
+         이 권한 없이도 저장되지만, minSdkVersion 24 기기(API 29 미만)를 지원하려면 필요하다. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
     <application
         android:label="Pig.Fig."
         android:name="${applicationName}"
