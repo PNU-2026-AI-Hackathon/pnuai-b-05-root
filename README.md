@@ -288,7 +288,6 @@ python manage.py runserver
 
 | 강서영 | 박소영 | 강효원 |
 |:------:|:------:|:------:|
-| ksydr@pusan.ac.kr | | |
 | 팀장 · 백엔드 · AI <br/> Django, YOLOv8, Prophet, MQTT, Gemini API | 프론트엔드 <br/> Flutter, FCM, 소셜 로그인 | 기획 · 디자인 <br/> Figma AI, UI/UX, RAG 챗봇 프롬프트, 발표 |
 
 <br/>
