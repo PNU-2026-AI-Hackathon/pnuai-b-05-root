@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/photo_source_dialog.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../data/diary_repository.dart';
@@ -78,17 +79,27 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
     }
   }
 
-  Future<void> _pickPhoto() async {
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (picked == null) return;
-    final bytes = await picked.readAsBytes();
-    setState(() {
-      _photoBytes = bytes;
-      _photoFileName = picked.name;
-    });
+  Future<void> _choosePhotoSource() async {
+    final source = await showPhotoSourceDialog(context);
+    if (source == null) return;
+    await _pickPhoto(source);
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      final picked = await _picker.pickImage(source: source, imageQuality: 85);
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      setState(() {
+        _photoBytes = bytes;
+        _photoFileName = picked.name;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('사진을 가져오지 못했어요. 다시 시도해주세요.')),
+      );
+    }
   }
 
   Future<void> _submit() async {
@@ -257,7 +268,7 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
         ),
         const SizedBox(height: 14),
         GestureDetector(
-          onTap: _pickPhoto,
+          onTap: _choosePhotoSource,
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.all(8),
