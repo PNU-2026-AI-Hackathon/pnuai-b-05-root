@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/storage/care_storage.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/care_pot_illustration.dart';
 import '../../../../shared/widgets/gauge_bar.dart';
 import '../../../../shared/widgets/pigfig_app_bar.dart';
-import '../../../../shared/widgets/step_indicator.dart';
 
 /// 1h — 케어: 영양제. 영양제를 드래그해서 화분(흙)에 꽂으면 영양 게이지가 오른다.
 /// "7일에 한 번이면 충분해요" 문구에 맞춰, 최근 7일 이내 완료 기록(로컬 저장, [CareStorage])이
@@ -74,13 +74,11 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
           padding: const EdgeInsets.fromLTRB(24, 34, 24, 26),
           child: Column(
             children: [
-              const StepIndicator(current: 1, total: 1),
-              const SizedBox(height: 22),
               Text(
                 _completed ? '이번 주 영양제 완료! 🍃' : '영양제를 주세요!',
                 style: AppTextStyles.display(
                   fontSize: 32,
-                  color: const Color(0xFFF7A0AE),
+                  color: AppColors.pink500,
                 ),
               ),
               const SizedBox(height: 10),
@@ -114,7 +112,8 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
                         },
                         onLeave: (_) => setState(() => _hoveringTarget = false),
                         onAcceptWithDetails: (_) => _dropNutrient(),
-                        builder: (context, candidate, rejected) => _potTarget(),
+                        builder: (context, candidate, rejected) =>
+                            CarePotIllustration(overlay: _dropRing()),
                       ),
                     ),
                   ],
@@ -160,25 +159,51 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 44,
-            height: 76,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: const Color(0xFFCBE5C4), width: 2),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: dragging
-                  ? [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
-            ),
-            alignment: Alignment.center,
-            child: const Text('🍃', style: TextStyle(fontSize: 20)),
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
+            children: [
+              Positioned(
+                top: -6,
+                child: Container(
+                  width: 16,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: AppColors.green500,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(3),
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                width: 44,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(
+                    color: const Color(0xFFCBE5C4),
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: dragging
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.eco,
+                  size: 22,
+                  color: AppColors.green800,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 6),
           Text(
@@ -188,36 +213,35 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
               color: const Color(0xFFB7B2A4),
             ),
           ),
+          const SizedBox(height: 4),
+          Transform.rotate(
+            angle: -1.0,
+            child: const Icon(
+              Icons.reply,
+              size: 18,
+              color: AppColors.textCaption,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _potTarget() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 96,
-          height: 64,
-          decoration: BoxDecoration(
-            color: _hoveringTarget
-                ? const Color(0xFFA9713F)
-                : const Color(0xFFC08552),
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(22),
-            ),
-          ),
+  /// 드래그 중인 영양제를 받는 드롭 타겟 링. 화분(흙) 위에 겹쳐 그려지며,
+  /// 호버 여부에 따라 두께·불투명도·glow 크기가 커진다.
+  Widget _dropRing() {
+    final active = _hoveringTarget;
+    return Container(
+      width: active ? 76 : 66,
+      height: active ? 76 : 66,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.pink100.withValues(alpha: active ? 0.35 : 0.18),
+        border: Border.all(
+          color: AppColors.pink500.withValues(alpha: active ? 1 : 0.55),
+          width: active ? 3 : 2,
         ),
-        const SizedBox(height: 6),
-        Text(
-          '여기에 꽂기',
-          style: AppTextStyles.body(
-            fontSize: 12,
-            color: const Color(0xFFB7B2A4),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
