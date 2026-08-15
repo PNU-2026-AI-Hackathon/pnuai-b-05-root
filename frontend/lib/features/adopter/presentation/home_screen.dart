@@ -45,6 +45,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   DateTime? _lastCareCompletedAt;
   int? _waterCount;
   int? _nutrientCount;
+  bool _isPigFedRecently = false;
 
   @override
   void initState() {
@@ -53,16 +54,23 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   }
 
   /// 로그인한 사용자의 케어 완료 기록([CareStorage])과 보유 개수([CareInventoryStorage])를
-  /// 함께 조회한다. userId를 아직 못 읽었으면 전부 null — 이 경우 [computeTreeStatus]가
-  /// healthy로 취급하고, 배지는 표시하지 않는다.
-  Future<(DateTime?, int?, int?)> _fetchCareState() async {
+  /// 함께 조회한다. userId를 아직 못 읽었으면 전부 비어있는 값([_CareState] 기본값) —
+  /// 이 경우 [computeTreeStatus]가 healthy로 취급하고, 배지는 표시하지 않는다.
+  Future<_CareState> _fetchCareState() async {
     final userId = await TokenStorage().readUserId();
-    if (userId == null) return (null, null, null);
-    final lastCare = await CareStorage(userId: userId).mostRecentCompletion();
+    if (userId == null) return const _CareState();
+    final careStorage = CareStorage(userId: userId);
+    final lastCare = await careStorage.mostRecentCompletion();
+    final isPigFedRecently = await careStorage.isPigFedRecently();
     final inventory = CareInventoryStorage(userId: userId);
     final water = await inventory.getCount(CareItemType.water);
     final nutrient = await inventory.getCount(CareItemType.nutrient);
-    return (lastCare, water, nutrient);
+    return _CareState(
+      lastCare: lastCare,
+      water: water,
+      nutrient: nutrient,
+      isPigFedRecently: isPigFedRecently,
+    );
   }
 
   Future<void> _load() async {
@@ -72,12 +80,13 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     });
     try {
       final seedlings = await _repository.fetchSeedlings();
-      final (lastCare, water, nutrient) = await _fetchCareState();
+      final careState = await _fetchCareState();
       setState(() {
         _seedling = pickPrimarySeedling(seedlings);
-        _lastCareCompletedAt = lastCare;
-        _waterCount = water;
-        _nutrientCount = nutrient;
+        _lastCareCompletedAt = careState.lastCare;
+        _waterCount = careState.water;
+        _nutrientCount = careState.nutrient;
+        _isPigFedRecently = careState.isPigFedRecently;
       });
     } on ApiException catch (e) {
       setState(() => _errorMessage = e.message);
@@ -94,13 +103,14 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     if (!_hasLoadedOnce) return _load();
     try {
       final seedlings = await _repository.fetchSeedlings();
-      final (lastCare, water, nutrient) = await _fetchCareState();
+      final careState = await _fetchCareState();
       if (mounted) {
         setState(() {
           _seedling = pickPrimarySeedling(seedlings);
-          _lastCareCompletedAt = lastCare;
-          _waterCount = water;
-          _nutrientCount = nutrient;
+          _lastCareCompletedAt = careState.lastCare;
+          _waterCount = careState.water;
+          _nutrientCount = careState.nutrient;
+          _isPigFedRecently = careState.isPigFedRecently;
         });
       }
     } on ApiException {
@@ -134,14 +144,36 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     if (_seedling == null) {
       return _EmptyState(onAdopt: _goToAdopt);
     }
+    final treeStatus = computeTreeStatus(_lastCareCompletedAt);
+    // 나무 톤(treeStatus)과 돼지 노출 여부는 별개다 — 6일 이상 방치돼 pigInfested
+    // 톤이어도, 최근 12시간 안에 이미 먹이를 줬다면(_isPigFedRecently) 돼지는
+    // 화면에서 빠진다(나무는 여전히 시든 톤 유지).
+    final showPig = treeStatus == TreeStatus.pigInfested && !_isPigFedRecently;
     return _SeedlingHome(
       seedling: _seedling!,
-      treeStatus: computeTreeStatus(_lastCareCompletedAt),
+      treeStatus: treeStatus,
+      showPig: showPig,
       lastCareCompletedAt: _lastCareCompletedAt,
       waterCount: _waterCount,
       nutrientCount: _nutrientCount,
     );
   }
+}
+
+/// [_HomeScreenState._fetchCareState]의 조회 결과를 묶는다. 필드 4개짜리 튜플이
+/// 가독성을 해쳐 클래스로 뺐다.
+class _CareState {
+  const _CareState({
+    this.lastCare,
+    this.water,
+    this.nutrient,
+    this.isPigFedRecently = false,
+  });
+
+  final DateTime? lastCare;
+  final int? water;
+  final int? nutrient;
+  final bool isPigFedRecently;
 }
 
 /// 마지막 케어 시각을 홈 화면 문구로 변환한다. 기록이 없으면(신규 계정 등) 별도 안내를,
@@ -158,6 +190,7 @@ class _SeedlingHome extends StatelessWidget {
   const _SeedlingHome({
     required this.seedling,
     required this.treeStatus,
+    required this.showPig,
     required this.lastCareCompletedAt,
     required this.waterCount,
     required this.nutrientCount,
@@ -165,6 +198,10 @@ class _SeedlingHome extends StatelessWidget {
 
   final Seedling seedling;
   final TreeStatus treeStatus;
+
+  /// pigInfested 톤이어도 최근 12시간 안에 먹이를 줬으면 false — 나무 톤과
+  /// 별개로 결정된다([_HomeScreenState._buildBody] 참고).
+  final bool showPig;
   final DateTime? lastCareCompletedAt;
   final int? waterCount;
   final int? nutrientCount;
@@ -191,7 +228,9 @@ class _SeedlingHome extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  treeStatus == TreeStatus.pigInfested
+                  // 돼지가 실제로 안 보이는 상황(showPig == false)이면 pigInfested
+                  // 톤이어도 wilted와 같은 문구를 쓴다 — 안 보이는 돼지를 언급하면 어색하다.
+                  showPig
                       ? '6일이나 지났어요... 돼지가 찾아왔어요 🐷'
                       : '3일 동안 자리를 비웠더니...',
                   style: AppTextStyles.body(
@@ -205,18 +244,19 @@ class _SeedlingHome extends StatelessWidget {
               const SizedBox(height: 28),
             FigTreeIllustration(width: 190, status: treeStatus),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SpeechBubble(text: '꿀꿀~ 내가 왔다!'),
-                    const PigCharacter(width: 60),
-                  ],
-                ),
-              ],
-            ),
+            if (showPig)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SpeechBubble(text: '꿀꿀~ 내가 왔다!'),
+                      const PigCharacter(width: 60),
+                    ],
+                  ),
+                ],
+              ),
             const Spacer(),
           ],
         ),
