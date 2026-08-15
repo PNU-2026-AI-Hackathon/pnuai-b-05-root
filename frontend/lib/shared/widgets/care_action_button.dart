@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 
-/// 홈 화면 우측에 세로로 나열되는 원형 케어 액션 버튼 (물주기/영양제/햇빛/가지치기).
+/// 홈 화면 우측에 세로로 나열되는 원형 케어 액션 버튼 (물주기/영양제/햇빛).
 class CareActionButton extends StatelessWidget {
   const CareActionButton({
     super.key,

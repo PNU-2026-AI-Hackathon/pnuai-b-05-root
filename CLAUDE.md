@@ -24,7 +24,7 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
 ## 기술 스택
 
 - **프론트엔드**: Flutter — 최초 실행 온보딩(3장), 입양자(adopter) 플로우(회원가입/로그인/홈·타임라인·
-  게임·마이페이지 4탭/무화과 입양(결제)/케어 4종/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower)
+  게임·마이페이지 4탭/무화과 입양(결제)/케어 3종/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower)
   플로우(홈·일지·환경점검·마이 4탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인/로그아웃/
   `DELETE /api/accounts/me/` 회원탈퇴, Android는 로그인 성공 시 FCM 토큰도 함께 등록), seedlings
   (`GET /api/seedlings/` 목록 조회 + `POST /api/seedlings/` 입양(결제 후 생성, 재배자 자동 배정) +
@@ -481,27 +481,24 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 - 라우팅은 `main.dart`의 `MaterialApp.routes`에 이름 있는 라우트로 전부 등록합니다(중첩 라우터 없음).
   로그인 성공 시 역할이 `adopter`면 `pushReplacementNamed('/adopter')`, `grower`면
   `pushReplacementNamed('/grower')`로 이동합니다(`login_screen.dart`).
-- 케어 화면(`features/adopter/presentation/care/*.dart`) 4종은 각각 다른 제스처로 게이지 값을 올립니다:
+- 케어 화면(`features/adopter/presentation/care/*.dart`) 3종은 각각 다른 제스처로 게이지 값을 올립니다:
   물주기=`onLongPressStart`/`onLongPressEnd`로 타이머 반복 증가, 영양제=`Draggable`/`DragTarget`,
-  햇빛=`Slider`, 가지치기=`onLongPressStart` 트리거 `AnimationController.forward()`가 완료되면 1회성으로
-  완료 처리. 계획서상 이 케어는 "실제 재배와 분리된 미션형 연출"이라 서버(Django) 저장 대상은 아니라고
+  햇빛=`Slider`. 계획서상 이 케어는 "실제 재배와 분리된 미션형 연출"이라 서버(Django) 저장 대상은 아니라고
   판단했지만, 화면을 벗어나면(라우트 pop) 방금 완료한 케어까지 즉시 사라지는 건 그 의도와도 안 맞는
   진짜 결함이라 로컬 영속화만 추가했습니다 — `core/storage/care_storage.dart`의 `CareStorage`가
   `InventoryStorage`/`OnboardingStorage`와 동일한 `SharedPreferences` 래퍼 패턴으로 **게이지 %가
   아니라 화면별 마지막 완료 시각만** 저장합니다(연속값을 영속화하는 건 의미가 없고, "오늘/이번 주
-  이미 했는지"만 기억하면 충분하기 때문). 물주기/영양제/가지치기 3개 화면만 대상이고 햇빛은
+  이미 했는지"만 기억하면 충분하기 때문). 물주기/영양제 2개 화면만 대상이고 햇빛은
   제외했습니다 — 햇빛은 `Slider`로 자유롭게 왔다갔다 조절하는 순수 다이얼이라 애초에 이산적인 "완료"
   개념이 없어서, 억지로 완료 상태를 만들면 기존의 자유로운 상호작용을 깨뜨리기 때문입니다.
   완료 판정 기준도 화면마다 다릅니다 — 물주기는 오늘(캘린더 날짜) 안에 완료 기록이 있으면 잠금,
   영양제는 화면 문구("7일에 한 번이면 충분해요")에 맞춰 최근 7일 이내(`DateTime.difference().inDays`
-  기준 rolling window)면 잠금 + "다음 영양제까지 N일 남았어요"로 안내, 가지치기는 원래 설계대로
-  한 번이라도 완료 기록이 있으면 영구히 잠금(재진입 시 애니메이션 없이 바로 완료 체크마크 UI로
-  시작). 세 화면 모두 완료 시 게이지가 100%를 처음 찍는 순간(`_completed` 가드로 1회만)
-  `CareStorage.markCompleted()`를 호출하고, 그 즉시 제스처를 잠급니다(가지치기가 이미 쓰던
-  `onLongPressStart: _completed ? null : ...` 패턴을 물주기·영양제도 그대로 따름). 물주기 화면에
+  기준 rolling window)면 잠금 + "다음 영양제까지 N일 남았어요"로 안내. 두 화면 모두 완료 시 게이지가
+  100%를 처음 찍는 순간(`_completed` 가드로 1회만) `CareStorage.markCompleted()`를 호출하고, 그
+  즉시 제스처를 잠급니다(`onLongPressStart: _completed ? null : ...` 패턴). 물주기 화면에
   있던 "누르는 동안 재배자에게 물주기 요청이 기록돼요"라는 안내 문구는 실제로는 아무 데도 기록되지
   않는 순수 장식이었던 걸 이번에 발견해, 실제 동작(이 기기에 로컬 저장)과 맞는 문구로 고쳤습니다.
-  네 화면 모두 여전히 **서버에는** 저장되지 않습니다 — 이 기기를 벗어나면(재설치, 기기 변경)
+  세 화면 모두 여전히 **서버에는** 저장되지 않습니다 — 이 기기를 벗어나면(재설치, 기기 변경)
   초기화됩니다.
 - `features/grower/presentation/grower_shell.dart`는 홈(`GrowerDashboardScreen`)/일지
   (`GrowerDiaryScreen`)/환경점검(`GrowerSensorScreen`)/마이(`GrowerMypageScreen`) 4탭
@@ -639,7 +636,7 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   것 우선, 전부 완료 상태면 가장 최근 완료된 것) — 처음에는 응답의 첫 번째 항목을 그냥 썼다가, 완료된
   #1이 재배중인 #3보다 먼저 와서 홈 화면이 "이미 다 자란" 묘목을 보여주는 문제를 발견해 이 헬퍼로
   고쳤습니다. `home_screen.dart`는 이제 `StatefulWidget`으로 `initState`에서 이 repository를 호출해
-  로딩/에러/(묘목 없음→ 입양 유도 CTA)/데이터 4가지 상태를 분기하며, 물주기 등 케어 게이지 4종은
+  로딩/에러/(묘목 없음→ 입양 유도 CTA)/데이터 4가지 상태를 분기하며, 물주기 등 케어 게이지 3종은
   실제 묘목 데이터와 무관하게 동작합니다(로컬 영속화만 하며 서버에는 연동하지 않음, 위 케어 화면
   문단 참고).
 - `growth_timeline_screen.dart`는 `AdopterShell`의 두 번째 탭("타임라인")입니다 — 원래 마이페이지의
@@ -763,7 +760,7 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   https://ai.studio/spend 에서 한도를 올린 뒤 세 기능 모두 재검증 필요
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 최초 실행 온보딩(3장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
-  (회원가입/로그인/홈·타임라인·게임·마이페이지 4탭/무화과 입양(결제)/케어 4종/수령·기부 선택/기부
+  (회원가입/로그인/홈·타임라인·게임·마이페이지 4탭/무화과 입양(결제)/케어 3종/수령·기부 선택/기부
   인증서/AI 챗봇), 재배자 플로우(홈·일지·환경점검·마이 4탭 + 묘목 완성 신고) 모두 구현됨.
   `AdopterShell`/`GrowerShell` 둘 다 `IndexedStack`으로 탭 상태를 보존합니다. accounts(회원가입·
   로그인·로그아웃·회원탈퇴, Android는 FCM 토큰 등록도 함께), seedlings(`GET /api/seedlings/` 목록
@@ -783,8 +780,8 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   보존됨; 무화과 입양(결제) 플로우는 로그인 → 입양 → 결제 → 홈 반영 → grower 자동 배정까지
   실기기(크롬)로 확인됨). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지/환경 점검 작성·묘목
   입양·수령/기부 선택이 모두 실제 데이터를 쓰지만, 마이페이지 프로필은 여전히 로컬 mock 상태
-  (라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음. 케어 게이지 4종(물주기/영양제/
-  가지치기 3종은 `CareStorage`로 로컬 영속화, 햇빛은 완료 개념이 없어 제외)은 계획서상 "실제
+  (라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음. 케어 게이지 3종(물주기/영양제
+  2종은 `CareStorage`로 로컬 영속화, 햇빛은 완료 개념이 없어 제외)은 계획서상 "실제
   재배와 분리된 미션형 연출"이라는 의도적 설계라 서버에는 연동하지 않음(위 "케어 화면" 문단 참고)
 - 게임 탭의 실제 게임 4종(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍)은 모두 플레이
   가능하며, 획득 아이템은 `InventoryStorage`에 로컬로만 누적됨(서버 저장 없음, `pigfig.
