@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/storage/care_inventory_storage.dart';
 import '../../../core/storage/inventory_storage.dart';
 import '../../../core/storage/token_storage.dart';
 
@@ -33,12 +34,15 @@ class AuthRepository {
       '/api/accounts/login/',
       body: {'email': email, 'password': password},
     );
+    final userId = response['id'].toString();
     await _tokenStorage.save(
       access: response['access'] as String,
       refresh: response['refresh'] as String,
       email: email,
-      userId: response['id'].toString(),
+      userId: userId,
     );
+    // 최초 로그인 시에만 물주기/영양제를 각 2개씩 지급한다(멱등, 재로그인 시 재지급 안 됨).
+    await CareInventoryStorage(userId: userId).grantInitialIfNeeded();
     return LoginResult(
       role: UserRoleApi.fromApiValue(response['role'] as String),
     );
