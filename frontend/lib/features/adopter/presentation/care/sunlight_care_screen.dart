@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/care_pot_illustration.dart';
 import '../../../../shared/widgets/gauge_bar.dart';
 import '../../../../shared/widgets/pigfig_app_bar.dart';
-import '../../../../shared/widgets/step_indicator.dart';
 
 /// 1i — 케어: 햇빛. 슬라이더로 보광등 밝기를 조절한다.
+/// 완료 개념이 없는 자유 다이얼이라 [CareStorage]를 쓰지 않는다(물주기/영양제와 다른 점).
 class SunlightCareScreen extends StatefulWidget {
   const SunlightCareScreen({super.key});
 
@@ -27,38 +28,23 @@ class _SunlightCareScreenState extends State<SunlightCareScreen> {
           padding: const EdgeInsets.fromLTRB(24, 34, 24, 26),
           child: Column(
             children: [
-              const StepIndicator(current: 1, total: 1),
-              const SizedBox(height: 22),
               Text(
                 '햇빛을 쬐어주세요!',
                 style: AppTextStyles.display(
                   fontSize: 32,
-                  color: const Color(0xFFF7A0AE),
+                  color: AppColors.pink500,
                 ),
               ),
               const SizedBox(height: 10),
               Text('슬라이더를 밀어 보광등을 켜보세요', style: AppTextStyles.guide()),
               Expanded(
-                child: Center(
-                  child: Container(
-                    width: 150,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFDF3DC),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.orange400.withValues(
-                            alpha: 0.25 * _brightness + 0.05,
-                          ),
-                          blurRadius: 60 * _brightness + 10,
-                          spreadRadius: 20 * _brightness,
-                        ),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: const Text('☀️', style: TextStyle(fontSize: 64)),
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _sunWithGlow(),
+                    const SizedBox(height: 26),
+                    const CarePotIllustration(showPot: false),
+                  ],
                 ),
               ),
               Slider(
@@ -106,6 +92,54 @@ class _SunlightCareScreenState extends State<SunlightCareScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// 해 아이콘 + 밝기에 비례해 커지는 방사형 글로우(반투명 원 3겹).
+  Widget _sunWithGlow() {
+    return SizedBox(
+      width: 260,
+      height: 260,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          _glowLayer(220 + 140 * _brightness, alpha: 0.02 + 0.10 * _brightness),
+          _glowLayer(160 + 90 * _brightness, alpha: 0.03 + 0.16 * _brightness),
+          _glowLayer(110 + 50 * _brightness, alpha: 0.05 + 0.22 * _brightness),
+          Container(
+            width: 96,
+            height: 96,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFDF3DC),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFD873), AppColors.orange400],
+              ).createShader(bounds),
+              child: const Icon(
+                Icons.wb_sunny,
+                size: 60,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _glowLayer(double size, {required double alpha}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.orange400.withValues(alpha: alpha.clamp(0.0, 1.0)),
       ),
     );
   }
