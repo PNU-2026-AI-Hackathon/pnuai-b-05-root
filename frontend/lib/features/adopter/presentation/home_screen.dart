@@ -124,6 +124,12 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     if (mounted) _load();
   }
 
+  Future<void> _goToPigFeed() async {
+    await Navigator.of(context).pushNamed('/adopter/care/pig-feed');
+    // 먹이를 줬으면 showPig가 다시 계산돼 돼지가 사라진다.
+    if (mounted) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -156,6 +162,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
       lastCareCompletedAt: _lastCareCompletedAt,
       waterCount: _waterCount,
       nutrientCount: _nutrientCount,
+      onPigTap: _goToPigFeed,
     );
   }
 }
@@ -194,6 +201,7 @@ class _SeedlingHome extends StatelessWidget {
     required this.lastCareCompletedAt,
     required this.waterCount,
     required this.nutrientCount,
+    required this.onPigTap,
   });
 
   final Seedling seedling;
@@ -205,6 +213,7 @@ class _SeedlingHome extends StatelessWidget {
   final DateTime? lastCareCompletedAt;
   final int? waterCount;
   final int? nutrientCount;
+  final VoidCallback onPigTap;
 
   @override
   Widget build(BuildContext context) {
@@ -252,7 +261,10 @@ class _SeedlingHome extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const SpeechBubble(text: '꿀꿀~ 내가 왔다!'),
-                      const PigCharacter(width: 60),
+                      GestureDetector(
+                        onTap: onPigTap,
+                        child: const PigCharacter(width: 60),
+                      ),
                     ],
                   ),
                 ],
