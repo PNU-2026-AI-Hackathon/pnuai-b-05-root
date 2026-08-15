@@ -16,6 +16,7 @@ class CareStorage {
   final String userId;
 
   static const _keyPrefix = 'pigfig.care_last_completed.';
+  static const _pigFedKeyPrefix = 'pigfig.care_last_pig_fed.';
 
   /// 마지막 완료 시각을 반환한다. 저장된 적 없거나 값이 손상됐으면 null.
   Future<DateTime?> getLastCompleted(CareType type) async {
@@ -43,5 +44,26 @@ class CareStorage {
     if (water == null) return nutrient;
     if (nutrient == null) return water;
     return water.isAfter(nutrient) ? water : nutrient;
+  }
+
+  /// 돼지 먹이 주기 완료 시각을 기록한다. 나무 방치 판정([mostRecentCompletion])과는
+  /// 무관한 별도 트래킹이라 [CareType]에 얹지 않고 전용 메서드로 분리했다 — 돼지는
+  /// 나무를 "돌보는" 케어가 아니라 나타난 돼지를 쫓아내는 이벤트성 상호작용이다.
+  Future<void> markPigFed() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      '$_pigFedKeyPrefix$userId',
+      DateTime.now().toIso8601String(),
+    );
+  }
+
+  /// 가장 최근 돼지 먹이 주기가 12시간 이내면 true.
+  Future<bool> isPigFedRecently() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('$_pigFedKeyPrefix$userId');
+    if (raw == null) return false;
+    final last = DateTime.tryParse(raw);
+    if (last == null) return false;
+    return DateTime.now().difference(last) < const Duration(hours: 12);
   }
 }
