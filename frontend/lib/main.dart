@@ -9,7 +9,6 @@ import 'core/theme/app_theme.dart';
 import 'features/adopter/presentation/adopt/adopt_screen.dart';
 import 'features/adopter/presentation/adopter_shell.dart';
 import 'features/adopter/presentation/care/nutrient_care_screen.dart';
-import 'features/adopter/presentation/care/pruning_care_screen.dart';
 import 'features/adopter/presentation/care/sunlight_care_screen.dart';
 import 'features/adopter/presentation/care/water_care_screen.dart';
 import 'features/adopter/presentation/chatbot_screen.dart';
@@ -57,7 +56,6 @@ class PigFigApp extends StatelessWidget {
         '/adopter/care/water': (context) => const WaterCareScreen(),
         '/adopter/care/nutrient': (context) => const NutrientCareScreen(),
         '/adopter/care/sunlight': (context) => const SunlightCareScreen(),
-        '/adopter/care/pruning': (context) => const PruningCareScreen(),
         '/adopter/pickup-donate': (context) => const PickupDonateScreen(),
         '/adopter/donation-certificate': (context) =>
             const DonationCertificateScreen(),

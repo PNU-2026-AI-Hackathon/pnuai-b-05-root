@@ -14,7 +14,7 @@ import '../../../shared/widgets/status_badge.dart';
 import '../data/seedling_repository.dart';
 
 /// 1f — 홈: 나의 무화과. 묘목 상태는 `GET /api/seedlings/`와 실제 연동하고,
-/// 케어 게이지(물주기/영양제/햇빛/가지치기)는 여전히 로컬 mock이다.
+/// 케어 게이지(물주기/영양제/햇빛)는 여전히 로컬 mock이다.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -167,13 +167,6 @@ class _SeedlingHome extends StatelessWidget {
                 label: '햇빛',
                 onTap: () =>
                     Navigator.of(context).pushNamed('/adopter/care/sunlight'),
-              ),
-              const SizedBox(height: 16),
-              CareActionButton(
-                emoji: '✂️',
-                label: '가지치기',
-                onTap: () =>
-                    Navigator.of(context).pushNamed('/adopter/care/pruning'),
               ),
             ],
           ),
