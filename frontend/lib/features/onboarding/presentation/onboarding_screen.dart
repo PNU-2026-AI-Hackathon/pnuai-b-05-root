@@ -71,7 +71,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   _OnboardingPage(
                     illustration: _AppCareIllustration(),
                     title: '앱으로 케어하고\n성장을 지켜보세요',
-                    subtitle: '물주기·영양제·햇빛·가지치기,\n다 자라면 수령하거나 기부할 수 있어요.',
+                    subtitle: '물주기·영양제·햇빛,\n다 자라면 수령하거나 기부할 수 있어요.',
                   ),
                 ],
               ),
