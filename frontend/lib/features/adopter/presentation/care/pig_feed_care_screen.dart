@@ -24,7 +24,8 @@ const _troughFoodIcons = ['🍎', '🥕', '🌽'];
 /// 배부르게 해 쫓아낸다. 보유 개수([CareInventoryStorage])가 있으면 쓸 수 있고,
 /// 0이면 [CareOutOfStockState] 안내로 대체된다. 20탭을 채우면(=[_FeedStage.complete])
 /// [CareInventoryStorage.consume]으로 먹이 1개를 소비하고 [CareStorage.markPigFed]로
-/// 시각을 남긴 뒤, "확인"을 누르면 탭 카운트만 0으로 리셋해 다시 시작할 수 있다.
+/// 시각을 남긴 뒤, "확인"을 누르면 `Navigator.pop(context, true)`로 홈 화면에
+/// 성공 여부를 전달하며 화면을 나간다(홈 화면은 이 결과로 돼지 퇴장 애니메이션을 재생).
 class PigFeedCareScreen extends StatefulWidget {
   const PigFeedCareScreen({super.key});
 
@@ -130,8 +131,6 @@ class _PigFeedCareScreenState extends State<PigFeedCareScreen>
     });
   }
 
-  void _reset() => setState(() => _tapCount = 0);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -181,7 +180,10 @@ class _PigFeedCareScreenState extends State<PigFeedCareScreen>
           ),
           if (stage == _FeedStage.complete) ...[
             const SizedBox(height: 16),
-            PigFigButton.positive(label: '확인', onPressed: _reset),
+            PigFigButton.positive(
+              label: '확인',
+              onPressed: () => Navigator.pop(context, true),
+            ),
           ],
         ],
       ),
