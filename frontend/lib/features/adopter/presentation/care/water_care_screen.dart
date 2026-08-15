@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/storage/care_storage.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/care_pot_illustration.dart';
@@ -20,7 +21,7 @@ class WaterCareScreen extends StatefulWidget {
 
 class _WaterCareScreenState extends State<WaterCareScreen>
     with SingleTickerProviderStateMixin {
-  final _careStorage = CareStorage();
+  CareStorage? _careStorage;
 
   double _moisture = 0.6;
   bool _completed = false;
@@ -35,11 +36,18 @@ class _WaterCareScreenState extends State<WaterCareScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1600),
     )..repeat();
-    _loadCareStatus();
+    _initCareStorage();
+  }
+
+  Future<void> _initCareStorage() async {
+    final userId = await TokenStorage().readUserId();
+    if (!mounted || userId == null) return;
+    _careStorage = CareStorage(userId: userId);
+    await _loadCareStatus();
   }
 
   Future<void> _loadCareStatus() async {
-    final last = await _careStorage.getLastCompleted(CareType.water);
+    final last = await _careStorage?.getLastCompleted(CareType.water);
     if (!mounted || last == null || !_isSameDay(last, DateTime.now())) return;
     setState(() {
       _completed = true;
@@ -77,7 +85,7 @@ class _WaterCareScreenState extends State<WaterCareScreen>
       _completed = true;
       _pressing = false;
     });
-    await _careStorage.markCompleted(CareType.water);
+    await _careStorage?.markCompleted(CareType.water);
   }
 
   @override

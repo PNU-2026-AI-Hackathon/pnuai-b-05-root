@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/storage/care_storage.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/care_pot_illustration.dart';
@@ -20,7 +21,7 @@ class NutrientCareScreen extends StatefulWidget {
 class _NutrientCareScreenState extends State<NutrientCareScreen> {
   static const _cooldownDays = 7;
 
-  final _careStorage = CareStorage();
+  CareStorage? _careStorage;
 
   double _nutrition = 0.4;
   bool _hoveringTarget = false;
@@ -30,11 +31,18 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCareStatus();
+    _initCareStorage();
+  }
+
+  Future<void> _initCareStorage() async {
+    final userId = await TokenStorage().readUserId();
+    if (!mounted || userId == null) return;
+    _careStorage = CareStorage(userId: userId);
+    await _loadCareStatus();
   }
 
   Future<void> _loadCareStatus() async {
-    final last = await _careStorage.getLastCompleted(CareType.nutrient);
+    final last = await _careStorage?.getLastCompleted(CareType.nutrient);
     if (!mounted || last == null) return;
     final daysSince = DateTime.now().difference(last).inDays;
     if (daysSince < _cooldownDays) {
@@ -61,7 +69,7 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
       _completed = true;
       _daysUntilNext = _cooldownDays;
     });
-    await _careStorage.markCompleted(CareType.nutrient);
+    await _careStorage?.markCompleted(CareType.nutrient);
   }
 
   @override
