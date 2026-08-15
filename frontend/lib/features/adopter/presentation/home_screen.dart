@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/revalidatable_state.dart';
+import '../../../core/storage/care_inventory_storage.dart';
 import '../../../core/storage/care_storage.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
@@ -42,6 +43,8 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   String? _errorMessage;
   Seedling? _seedling;
   DateTime? _lastCareCompletedAt;
+  int? _waterCount;
+  int? _nutrientCount;
 
   @override
   void initState() {
@@ -49,12 +52,17 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     _load();
   }
 
-  /// 로그인한 사용자의 케어 완료 기록([CareStorage])을 조회한다. userId를 아직 못
-  /// 읽었거나 기록이 없으면 null — 이 경우 [computeTreeStatus]가 healthy로 취급한다.
-  Future<DateTime?> _fetchLastCareCompletedAt() async {
+  /// 로그인한 사용자의 케어 완료 기록([CareStorage])과 보유 개수([CareInventoryStorage])를
+  /// 함께 조회한다. userId를 아직 못 읽었으면 전부 null — 이 경우 [computeTreeStatus]가
+  /// healthy로 취급하고, 배지는 표시하지 않는다.
+  Future<(DateTime?, int?, int?)> _fetchCareState() async {
     final userId = await TokenStorage().readUserId();
-    if (userId == null) return null;
-    return CareStorage(userId: userId).mostRecentCompletion();
+    if (userId == null) return (null, null, null);
+    final lastCare = await CareStorage(userId: userId).mostRecentCompletion();
+    final inventory = CareInventoryStorage(userId: userId);
+    final water = await inventory.getCount(CareItemType.water);
+    final nutrient = await inventory.getCount(CareItemType.nutrient);
+    return (lastCare, water, nutrient);
   }
 
   Future<void> _load() async {
@@ -64,10 +72,12 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     });
     try {
       final seedlings = await _repository.fetchSeedlings();
-      final lastCare = await _fetchLastCareCompletedAt();
+      final (lastCare, water, nutrient) = await _fetchCareState();
       setState(() {
         _seedling = pickPrimarySeedling(seedlings);
         _lastCareCompletedAt = lastCare;
+        _waterCount = water;
+        _nutrientCount = nutrient;
       });
     } on ApiException catch (e) {
       setState(() => _errorMessage = e.message);
@@ -84,11 +94,13 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     if (!_hasLoadedOnce) return _load();
     try {
       final seedlings = await _repository.fetchSeedlings();
-      final lastCare = await _fetchLastCareCompletedAt();
+      final (lastCare, water, nutrient) = await _fetchCareState();
       if (mounted) {
         setState(() {
           _seedling = pickPrimarySeedling(seedlings);
           _lastCareCompletedAt = lastCare;
+          _waterCount = water;
+          _nutrientCount = nutrient;
         });
       }
     } on ApiException {
@@ -126,6 +138,8 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
       seedling: _seedling!,
       treeStatus: computeTreeStatus(_lastCareCompletedAt),
       lastCareCompletedAt: _lastCareCompletedAt,
+      waterCount: _waterCount,
+      nutrientCount: _nutrientCount,
     );
   }
 }
@@ -145,11 +159,15 @@ class _SeedlingHome extends StatelessWidget {
     required this.seedling,
     required this.treeStatus,
     required this.lastCareCompletedAt,
+    required this.waterCount,
+    required this.nutrientCount,
   });
 
   final Seedling seedling;
   final TreeStatus treeStatus;
   final DateTime? lastCareCompletedAt;
+  final int? waterCount;
+  final int? nutrientCount;
 
   @override
   Widget build(BuildContext context) {
@@ -210,6 +228,7 @@ class _SeedlingHome extends StatelessWidget {
               CareActionButton(
                 emoji: '💧',
                 label: '물주기',
+                count: waterCount,
                 onTap: () =>
                     Navigator.of(context).pushNamed('/adopter/care/water'),
               ),
@@ -217,6 +236,7 @@ class _SeedlingHome extends StatelessWidget {
               CareActionButton(
                 emoji: '🍃',
                 label: '영양제',
+                count: nutrientCount,
                 onTap: () =>
                     Navigator.of(context).pushNamed('/adopter/care/nutrient'),
               ),
