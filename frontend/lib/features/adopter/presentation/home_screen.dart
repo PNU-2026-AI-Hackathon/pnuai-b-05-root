@@ -47,6 +47,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   DateTime? _lastCareCompletedAt;
   int? _waterCount;
   int? _nutrientCount;
+  int? _pigFeedCount;
   bool _isPigFedRecently = false;
   bool _isPigExiting = false;
   bool _exitDirectionLeft = true;
@@ -69,10 +70,12 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     final inventory = CareInventoryStorage(userId: userId);
     final water = await inventory.getCount(CareItemType.water);
     final nutrient = await inventory.getCount(CareItemType.nutrient);
+    final pigFeed = await inventory.getCount(CareItemType.pigFeed);
     return _CareState(
       lastCare: lastCare,
       water: water,
       nutrient: nutrient,
+      pigFeed: pigFeed,
       isPigFedRecently: isPigFedRecently,
     );
   }
@@ -90,6 +93,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
         _lastCareCompletedAt = careState.lastCare;
         _waterCount = careState.water;
         _nutrientCount = careState.nutrient;
+        _pigFeedCount = careState.pigFeed;
         _isPigFedRecently = careState.isPigFedRecently;
       });
     } on ApiException catch (e) {
@@ -114,6 +118,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
           _lastCareCompletedAt = careState.lastCare;
           _waterCount = careState.water;
           _nutrientCount = careState.nutrient;
+          _pigFeedCount = careState.pigFeed;
           _isPigFedRecently = careState.isPigFedRecently;
         });
       }
@@ -181,6 +186,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
       lastCareCompletedAt: _lastCareCompletedAt,
       waterCount: _waterCount,
       nutrientCount: _nutrientCount,
+      pigFeedCount: _pigFeedCount,
       onPigTap: _goToPigFeed,
       isPigExiting: _isPigExiting,
       exitDirectionLeft: _exitDirectionLeft,
@@ -196,12 +202,14 @@ class _CareState {
     this.lastCare,
     this.water,
     this.nutrient,
+    this.pigFeed,
     this.isPigFedRecently = false,
   });
 
   final DateTime? lastCare;
   final int? water;
   final int? nutrient;
+  final int? pigFeed;
   final bool isPigFedRecently;
 }
 
@@ -223,6 +231,7 @@ class _SeedlingHome extends StatelessWidget {
     required this.lastCareCompletedAt,
     required this.waterCount,
     required this.nutrientCount,
+    required this.pigFeedCount,
     required this.onPigTap,
     required this.isPigExiting,
     required this.exitDirectionLeft,
@@ -238,6 +247,7 @@ class _SeedlingHome extends StatelessWidget {
   final DateTime? lastCareCompletedAt;
   final int? waterCount;
   final int? nutrientCount;
+  final int? pigFeedCount;
   final VoidCallback onPigTap;
 
   /// 먹이 주기 성공 직후 true로 켜져 퇴장 애니메이션이 재생되는 동안, 이미
@@ -339,6 +349,13 @@ class _SeedlingHome extends StatelessWidget {
                 label: '햇빛',
                 onTap: () =>
                     Navigator.of(context).pushNamed('/adopter/care/sunlight'),
+              ),
+              const SizedBox(height: 16),
+              CareActionButton(
+                emoji: '🍖',
+                label: '돼지먹이',
+                count: pigFeedCount,
+                onTap: onPigTap,
               ),
             ],
           ),
