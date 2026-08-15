@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
@@ -46,6 +48,8 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   int? _waterCount;
   int? _nutrientCount;
   bool _isPigFedRecently = false;
+  bool _isPigExiting = false;
+  bool _exitDirectionLeft = true;
 
   @override
   void initState() {
@@ -125,9 +129,24 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   }
 
   Future<void> _goToPigFeed() async {
-    await Navigator.of(context).pushNamed('/adopter/care/pig-feed');
-    // 먹이를 줬으면 showPig가 다시 계산돼 돼지가 사라진다.
+    final fed = await Navigator.of(
+      context,
+    ).pushNamed<bool>('/adopter/care/pig-feed');
+    if (fed == true) {
+      // _load()가 끝나기 전에 먼저 퇴장 애니메이션을 시작해야, 그 사이 showPig가
+      // false로 바뀌어도 isPigExiting 덕분에 돼지가 화면에서 갑자기 사라지지 않는다.
+      setState(() {
+        _isPigExiting = true;
+        _exitDirectionLeft = Random().nextBool();
+      });
+    }
     if (mounted) _load();
+  }
+
+  /// [AnimatedSlide.onEnd]는 최초 mount 시에도 한 번 호출되므로(변화 없는
+  /// 애니메이션), 실제로 퇴장 중일 때만 리셋한다.
+  void _onPigExitAnimationEnd() {
+    if (_isPigExiting) setState(() => _isPigExiting = false);
   }
 
   @override
@@ -163,6 +182,9 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
       waterCount: _waterCount,
       nutrientCount: _nutrientCount,
       onPigTap: _goToPigFeed,
+      isPigExiting: _isPigExiting,
+      exitDirectionLeft: _exitDirectionLeft,
+      onPigExitAnimationEnd: _onPigExitAnimationEnd,
     );
   }
 }
@@ -202,6 +224,9 @@ class _SeedlingHome extends StatelessWidget {
     required this.waterCount,
     required this.nutrientCount,
     required this.onPigTap,
+    required this.isPigExiting,
+    required this.exitDirectionLeft,
+    required this.onPigExitAnimationEnd,
   });
 
   final Seedling seedling;
@@ -214,6 +239,14 @@ class _SeedlingHome extends StatelessWidget {
   final int? waterCount;
   final int? nutrientCount;
   final VoidCallback onPigTap;
+
+  /// 먹이 주기 성공 직후 true로 켜져 퇴장 애니메이션이 재생되는 동안, 이미
+  /// showPig가 false로 바뀌었어도 돼지를 화면에 붙잡아둔다.
+  final bool isPigExiting;
+
+  /// 퇴장 방향(왼쪽/오른쪽)을 매 퇴장마다 무작위로 고른 값 — [_HomeScreenState._goToPigFeed] 참고.
+  final bool exitDirectionLeft;
+  final VoidCallback onPigExitAnimationEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -253,19 +286,27 @@ class _SeedlingHome extends StatelessWidget {
               const SizedBox(height: 28),
             FigTreeIllustration(width: 190, status: treeStatus),
             const SizedBox(height: 8),
-            if (showPig)
+            if (showPig || isPigExiting)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SpeechBubble(text: '꿀꿀~ 내가 왔다!'),
-                      GestureDetector(
-                        onTap: onPigTap,
-                        child: const PigCharacter(width: 60),
-                      ),
-                    ],
+                  AnimatedSlide(
+                    offset: isPigExiting
+                        ? Offset(exitDirectionLeft ? -1.5 : 1.5, 0)
+                        : Offset.zero,
+                    duration: const Duration(milliseconds: 700),
+                    curve: Curves.easeInOut,
+                    onEnd: onPigExitAnimationEnd,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SpeechBubble(text: '꿀꿀~ 내가 왔다!'),
+                        GestureDetector(
+                          onTap: onPigTap,
+                          child: const PigCharacter(width: 60),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
