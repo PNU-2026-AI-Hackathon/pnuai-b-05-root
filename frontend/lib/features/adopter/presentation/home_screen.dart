@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/revalidatable_state.dart';
+import '../../../core/storage/care_storage.dart';
+import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/care_action_button.dart';
@@ -12,6 +14,16 @@ import '../../../shared/widgets/pigfig_button.dart';
 import '../../../shared/widgets/speech_bubble.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../data/seedling_repository.dart';
+
+/// 가장 최근 케어 이후 경과일을 [TreeStatus]로 변환한다. 케어 기록이 아예 없으면
+/// (예: 막 입양한 신규 계정) 방치로 간주하지 않고 healthy로 취급한다.
+TreeStatus computeTreeStatus(DateTime? lastCompleted) {
+  if (lastCompleted == null) return TreeStatus.healthy;
+  final daysSince = DateTime.now().difference(lastCompleted).inDays;
+  if (daysSince >= 6) return TreeStatus.pigInfested;
+  if (daysSince >= 3) return TreeStatus.wilted;
+  return TreeStatus.healthy;
+}
 
 /// 1f — 홈: 나의 무화과. 묘목 상태는 `GET /api/seedlings/`와 실제 연동하고,
 /// 케어 게이지(물주기/영양제/햇빛)는 여전히 로컬 mock이다.
@@ -29,11 +41,20 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   bool _hasLoadedOnce = false;
   String? _errorMessage;
   Seedling? _seedling;
+  DateTime? _lastCareCompletedAt;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  /// 로그인한 사용자의 케어 완료 기록([CareStorage])을 조회한다. userId를 아직 못
+  /// 읽었거나 기록이 없으면 null — 이 경우 [computeTreeStatus]가 healthy로 취급한다.
+  Future<DateTime?> _fetchLastCareCompletedAt() async {
+    final userId = await TokenStorage().readUserId();
+    if (userId == null) return null;
+    return CareStorage(userId: userId).mostRecentCompletion();
   }
 
   Future<void> _load() async {
@@ -43,7 +64,11 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     });
     try {
       final seedlings = await _repository.fetchSeedlings();
-      setState(() => _seedling = pickPrimarySeedling(seedlings));
+      final lastCare = await _fetchLastCareCompletedAt();
+      setState(() {
+        _seedling = pickPrimarySeedling(seedlings);
+        _lastCareCompletedAt = lastCare;
+      });
     } on ApiException catch (e) {
       setState(() => _errorMessage = e.message);
     } finally {
@@ -59,7 +84,13 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     if (!_hasLoadedOnce) return _load();
     try {
       final seedlings = await _repository.fetchSeedlings();
-      if (mounted) setState(() => _seedling = pickPrimarySeedling(seedlings));
+      final lastCare = await _fetchLastCareCompletedAt();
+      if (mounted) {
+        setState(() {
+          _seedling = pickPrimarySeedling(seedlings);
+          _lastCareCompletedAt = lastCare;
+        });
+      }
     } on ApiException {
       // 재조회 실패 시 기존 화면을 그대로 유지한다.
     }
@@ -91,14 +122,34 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     if (_seedling == null) {
       return _EmptyState(onAdopt: _goToAdopt);
     }
-    return _SeedlingHome(seedling: _seedling!);
+    return _SeedlingHome(
+      seedling: _seedling!,
+      treeStatus: computeTreeStatus(_lastCareCompletedAt),
+      lastCareCompletedAt: _lastCareCompletedAt,
+    );
   }
 }
 
+/// 마지막 케어 시각을 홈 화면 문구로 변환한다. 기록이 없으면(신규 계정 등) 별도 안내를,
+/// 있으면 오늘/어제/N일 전으로 표시한다.
+String formatLastCare(DateTime? lastCompleted) {
+  if (lastCompleted == null) return '아직 케어 기록이 없어요';
+  final days = DateTime.now().difference(lastCompleted).inDays;
+  if (days == 0) return '마지막 케어: 오늘';
+  if (days == 1) return '마지막 케어: 어제';
+  return '마지막 케어: $days일 전';
+}
+
 class _SeedlingHome extends StatelessWidget {
-  const _SeedlingHome({required this.seedling});
+  const _SeedlingHome({
+    required this.seedling,
+    required this.treeStatus,
+    required this.lastCareCompletedAt,
+  });
 
   final Seedling seedling;
+  final TreeStatus treeStatus;
+  final DateTime? lastCareCompletedAt;
 
   @override
   Widget build(BuildContext context) {
@@ -111,22 +162,30 @@ class _SeedlingHome extends StatelessWidget {
         Column(
           children: [
             const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.pink100,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '3일 동안 자리를 비웠더니...',
-                style: AppTextStyles.body(
-                  fontSize: 14,
-                  color: AppColors.badgePinkText,
+            if (treeStatus != TreeStatus.healthy) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.pink100,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  treeStatus == TreeStatus.pigInfested
+                      ? '6일이나 지났어요... 돼지가 찾아왔어요 🐷'
+                      : '3일 동안 자리를 비웠더니...',
+                  style: AppTextStyles.body(
+                    fontSize: 14,
+                    color: AppColors.badgePinkText,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 28),
-            const FigTreeIllustration(width: 190),
+              const SizedBox(height: 28),
+            ] else
+              const SizedBox(height: 28),
+            FigTreeIllustration(width: 190, status: treeStatus),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -221,7 +280,10 @@ class _SeedlingHome extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text('마지막 케어: 오늘', style: AppTextStyles.caption()),
+                Text(
+                  formatLastCare(lastCareCompletedAt),
+                  style: AppTextStyles.caption(),
+                ),
               ],
             ),
           ),

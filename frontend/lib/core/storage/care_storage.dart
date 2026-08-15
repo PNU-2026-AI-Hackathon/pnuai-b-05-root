@@ -7,13 +7,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// 연속 슬라이더라 대상에서 제외한다.
 enum CareType { water, nutrient }
 
+/// [InventoryStorage]와 동일하게 **계정(userId) 단위**로 분리해 저장한다 — 같은 기기에서
+/// 다른 계정으로 로그인해도 이전 계정의 케어 완료 기록이 보이면 안 된다.
+/// [TokenStorage.readUserId]로 얻은 값을 그대로 넘겨 생성한다.
 class CareStorage {
+  CareStorage({required this.userId});
+
+  final String userId;
+
   static const _keyPrefix = 'pigfig.care_last_completed.';
 
   /// 마지막 완료 시각을 반환한다. 저장된 적 없거나 값이 손상됐으면 null.
   Future<DateTime?> getLastCompleted(CareType type) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('$_keyPrefix${type.name}');
+    final raw = prefs.getString('$_keyPrefix${type.name}.$userId');
     if (raw == null) return null;
     return DateTime.tryParse(raw);
   }
@@ -22,8 +29,19 @@ class CareStorage {
   Future<void> markCompleted(CareType type) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-      '$_keyPrefix${type.name}',
+      '$_keyPrefix${type.name}.$userId',
       DateTime.now().toIso8601String(),
     );
+  }
+
+  /// 물주기/영양제 중 더 최근에 완료된 시각을 반환한다. 둘 다 기록이 없으면 null.
+  /// 나무 방치 상태([FigTreeIllustration]의 `TreeStatus`) 계산이 "어떤 케어가
+  /// 반영 대상인지"를 이 메서드 하나로 알 수 있게 캡슐화한다.
+  Future<DateTime?> mostRecentCompletion() async {
+    final water = await getLastCompleted(CareType.water);
+    final nutrient = await getLastCompleted(CareType.nutrient);
+    if (water == null) return nutrient;
+    if (nutrient == null) return water;
+    return water.isAfter(nutrient) ? water : nutrient;
   }
 }
