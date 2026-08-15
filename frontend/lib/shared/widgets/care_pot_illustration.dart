@@ -7,9 +7,13 @@ import '../../core/theme/app_colors.dart';
 /// 케어 화면(물주기/영양제)에서 공통으로 쓰며, [overlay]로 화분 몸통 위에
 /// 드롭 타겟 링 같은 요소를 겹쳐 그릴 수 있다.
 class CarePotIllustration extends StatelessWidget {
-  const CarePotIllustration({super.key, this.overlay});
+  const CarePotIllustration({super.key, this.overlay, this.showPot = true});
 
   final Widget? overlay;
+
+  /// false면 화분 몸통/테두리를 그리지 않고 새싹+줄기만 보여준다
+  /// (햇빛 케어 화면처럼 화분 없이 새싹만 필요한 경우용).
+  final bool showPot;
 
   @override
   Widget build(BuildContext context) {
@@ -47,36 +51,37 @@ class CarePotIllustration extends StatelessWidget {
           ),
         ),
         Container(width: 4, height: 22, color: AppColors.brown600),
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 90,
-                  height: 8,
-                  margin: const EdgeInsets.only(bottom: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7A4E30),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                Container(
-                  width: 100,
-                  height: 46,
-                  decoration: const BoxDecoration(
-                    color: AppColors.brown600,
-                    borderRadius: BorderRadius.vertical(
-                      bottom: Radius.circular(22),
+        if (showPot)
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 90,
+                    height: 8,
+                    margin: const EdgeInsets.only(bottom: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF7A4E30),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                ),
-              ],
-            ),
-            ?overlay,
-          ],
-        ),
+                  Container(
+                    width: 100,
+                    height: 46,
+                    decoration: const BoxDecoration(
+                      color: AppColors.brown600,
+                      borderRadius: BorderRadius.vertical(
+                        bottom: Radius.circular(22),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              ?overlay,
+            ],
+          ),
       ],
     );
   }
