@@ -11,12 +11,9 @@ import 'games/balloon_pop/balloon_pop_screen.dart';
 import 'games/fig_quiz/fig_quiz_screen.dart';
 import 'games/models/game_item.dart';
 import 'games/models/game_result.dart';
+import 'games/models/game_type.dart';
 import 'games/pest_catch/pest_catch_screen.dart';
 import 'games/watering_timing/watering_timing_screen.dart';
-
-/// 게임 종류. 게임별 실제 화면은 팀원이 별도 브랜치에서 개발할 예정이라
-/// 여기서는 카드 → 게임 화면으로 이어지는 라우팅 스켈레톤만 잡아둔다.
-enum GameType { balloonPop, quiz, pestCatch, wateringTiming }
 
 class _GameCardData {
   const _GameCardData({
@@ -125,53 +122,44 @@ class _GamesScreenState extends State<GamesScreen> {
 
   Future<void> _openGame(GameType type) async {
     // 게임 4종 모두 실제 게임 화면으로 연결된다. 각 게임은 종료 시 GameResult를 돌려주며,
-    // 아이템을 획득했으면 저장하고 보유 아이템 바를 갱신하는 동일한 패턴을 따른다.
+    // 획득한 아이템(등급에 따라 여러 개일 수 있음)을 모두 저장하고 보유 아이템 바를
+    // 갱신하는 동일한 패턴을 따른다.
     switch (type) {
       case GameType.quiz:
         final result = await Navigator.of(context).push<GameResult>(
           MaterialPageRoute(builder: (_) => const FigQuizScreen()),
         );
         if (!mounted) return;
-        // 아이템을 획득했으면 저장하고 보유 아이템 바를 갱신한다.
-        final earned = result?.itemEarned;
-        if (earned != null) {
-          await _inventory?.addItem(earned);
-          await _loadItems();
-        }
+        await _saveEarnedItems(result?.itemsEarned);
       case GameType.wateringTiming:
         final result = await Navigator.of(context).push<GameResult>(
           MaterialPageRoute(builder: (_) => const WateringTimingScreen()),
         );
         if (!mounted) return;
-        // 무화과 퀴즈와 동일한 패턴: 획득 아이템을 저장하고 보유 아이템 바를 갱신.
-        final earned = result?.itemEarned;
-        if (earned != null) {
-          await _inventory?.addItem(earned);
-          await _loadItems();
-        }
+        await _saveEarnedItems(result?.itemsEarned);
       case GameType.pestCatch:
         final result = await Navigator.of(context).push<GameResult>(
           MaterialPageRoute(builder: (_) => const PestCatchScreen()),
         );
         if (!mounted) return;
-        // 다른 게임들과 동일한 패턴: 획득 아이템을 저장하고 보유 아이템 바를 갱신.
-        final earned = result?.itemEarned;
-        if (earned != null) {
-          await _inventory?.addItem(earned);
-          await _loadItems();
-        }
+        await _saveEarnedItems(result?.itemsEarned);
       case GameType.balloonPop:
         final result = await Navigator.of(context).push<GameResult>(
           MaterialPageRoute(builder: (_) => const BalloonPopScreen()),
         );
         if (!mounted) return;
-        // 다른 게임들과 동일한 패턴: 획득 아이템을 저장하고 보유 아이템 바를 갱신.
-        final earned = result?.itemEarned;
-        if (earned != null) {
-          await _inventory?.addItem(earned);
-          await _loadItems();
-        }
+        await _saveEarnedItems(result?.itemsEarned);
     }
+  }
+
+  /// 획득한 아이템을 모두 보유 아이템 저장소에 추가하고 보유 아이템 바를 갱신한다.
+  /// [items]가 비어있으면(클리어 실패 등) 아무것도 하지 않는다.
+  Future<void> _saveEarnedItems(List<GameItem>? items) async {
+    if (items == null || items.isEmpty) return;
+    for (final item in items) {
+      await _inventory?.addItem(item);
+    }
+    await _loadItems();
   }
 
   @override

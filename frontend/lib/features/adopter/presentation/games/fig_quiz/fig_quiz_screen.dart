@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_theme.dart';
-import '../models/game_item.dart';
 import '../models/game_result.dart';
+import '../models/game_type.dart';
 import '../models/reward_grade.dart';
 import '../shared/game_items.dart';
 import '../shared/game_scaffold.dart';
@@ -66,14 +66,12 @@ class _FigQuizScreenState extends State<FigQuizScreen> {
   Future<void> _finish() async {
     final score = _correctCount * 10;
     final cleared = score >= _clearScore;
-    // 목표 달성 시에만 후보 중 하나를 랜덤으로 지급한다.
-    final GameItem? earned =
-        cleared ? rewardItems[Random().nextInt(rewardItems.length)] : null;
+    final grade = computeRewardGrade(score);
     final result = GameResult(
       score: score,
       cleared: cleared,
-      itemEarned: earned,
-      grade: computeRewardGrade(score),
+      itemsEarned: pickRewardItems(GameType.quiz, grade, Random()),
+      grade: grade,
     );
     if (!mounted) return;
     await GameScaffold.showResultDialog(context, result);

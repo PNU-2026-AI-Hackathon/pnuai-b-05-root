@@ -4,6 +4,7 @@ import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../shared/widgets/pigfig_button.dart';
 import '../models/game_result.dart';
+import '../models/reward_grade.dart';
 
 /// 게임 화면 공통 셸. 각 게임 화면(무화과 퀴즈, 해충 잡기 등)이 자신의 게임 본문을
 /// 이 위젯으로 감싸 상단 헤더(제목 + 점수 + 닫기)를 공유한다.
@@ -29,7 +30,8 @@ class GameScaffold extends StatelessWidget {
     BuildContext context,
     GameResult result,
   ) {
-    final item = result.itemEarned;
+    final items = result.itemsEarned;
+    final grade = result.grade;
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -47,6 +49,12 @@ class GameScaffold extends StatelessWidget {
                 result.cleared ? '🎉 성공!' : '아쉬워요',
                 style: AppTextStyles.display(fontSize: 26),
               ),
+              // 등급 배지를 점수보다 먼저 보여줘 "아이템을 왜 여러 개 받았는지"가
+              // 개수를 보기 전에 등급으로 먼저 설명되도록 한다.
+              if (grade != null) ...[
+                const SizedBox(height: 10),
+                _GradeBadge(grade: grade),
+              ],
               const SizedBox(height: 12),
               Text(
                 '${result.score}점',
@@ -56,11 +64,29 @@ class GameScaffold extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              if (item != null)
-                _EarnedItemBox(
-                  emoji: item.emoji,
-                  name: item.name,
-                  description: item.description,
+              if (items.isNotEmpty)
+                Column(
+                  children: [
+                    for (var i = 0; i < items.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 10),
+                      _EarnedItemBox(
+                        emoji: items[i].emoji,
+                        name: items[i].name,
+                        description: items[i].description,
+                      ),
+                    ],
+                  ],
+                )
+              else if (grade == RewardGrade.gold)
+                // TODO(game-reward-grade-choice): 골드는 다음 브랜치에서 직접 선택
+                // UI로 아이템을 채운다. 그 전까지는 안내 문구만 보여준다.
+                Text(
+                  '골드 등급이에요! 곧 아이템을 직접 골라보실 수 있어요 🎁',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.guide(
+                    fontSize: 14,
+                    color: AppColors.textMuted,
+                  ).copyWith(height: 1.5),
                 )
               else
                 Text(
@@ -145,6 +171,49 @@ class _GameHeader extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 결과 다이얼로그 상단에서 획득 등급을 보여주는 배지.
+class _GradeBadge extends StatelessWidget {
+  const _GradeBadge({required this.grade});
+
+  final RewardGrade grade;
+
+  static const _labels = {
+    RewardGrade.bronze: '브론즈 🥉',
+    RewardGrade.silver: '실버 🥈',
+    RewardGrade.gold: '골드 🥇',
+  };
+
+  static const _backgrounds = {
+    RewardGrade.bronze: Color(0xFFF1E1D3),
+    RewardGrade.silver: Color(0xFFE7E7EA),
+    RewardGrade.gold: Color(0xFFFCEBC7),
+  };
+
+  static const _textColors = {
+    RewardGrade.bronze: AppColors.brown600,
+    RewardGrade.silver: Color(0xFF6B6B73),
+    RewardGrade.gold: Color(0xFFB8791A),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: _backgrounds[grade],
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        _labels[grade]!,
+        style: AppTextStyles.body(
+          fontSize: 13,
+          color: _textColors[grade]!,
+        ).copyWith(fontWeight: FontWeight.w700),
       ),
     );
   }
