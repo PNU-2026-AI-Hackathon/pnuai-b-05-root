@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/constants/support_contact.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/revalidatable_state.dart';
 import '../../../core/storage/token_storage.dart';
@@ -85,6 +87,8 @@ class _GrowerMypageScreenState extends RevalidatableState<GrowerMypageScreen> {
                     seedlingCount: _seedlingCount,
                   ),
             const SizedBox(height: 28),
+            _HelpSection(onTap: () => _showHelpSheet(context)),
+            const SizedBox(height: 28),
             Center(
               child: TextButton(
                 onPressed: () => confirmLogout(context),
@@ -113,6 +117,154 @@ class _GrowerMypageScreenState extends RevalidatableState<GrowerMypageScreen> {
         ),
       ),
     );
+  }
+}
+
+/// 시니어 재배자가 헷갈릴 때 바로 누를 수 있는 큼직한 도움 요청 버튼 섹션.
+/// 작은 아이콘 버튼(`CareActionButton` 등)과 달리 가로 전체 폭 + 큰 글씨로
+/// 탭 실수를 줄인다.
+class _HelpSection extends StatelessWidget {
+  const _HelpSection({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '도움이 필요하신가요?',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.title(fontSize: 15),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 56,
+          child: ElevatedButton(
+            onPressed: onTap,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.pink500,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: const StadiumBorder(),
+            ),
+            child: Text(
+              '🆘 도움 요청하기',
+              style: AppTextStyles.title(fontSize: 18, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// "도움 요청하기"를 누르면 뜨는 바텀시트 — 전화/문자 중 하나를 고르면 실제
+/// 전화·문자 앱을 실행한다. 시니어가 잘못 누르지 않도록 옵션마다 탭 영역을
+/// 크게(높이 60) 잡는다.
+Future<void> _showHelpSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '어떻게 도와드릴까요?',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.title(fontSize: 18),
+            ),
+            const SizedBox(height: 20),
+            _HelpOptionButton(
+              emoji: '📞',
+              label: '전화 걸기',
+              background: AppColors.pink500,
+              onTap: () => _launchContact(sheetContext, scheme: 'tel'),
+            ),
+            const SizedBox(height: 14),
+            _HelpOptionButton(
+              emoji: '💬',
+              label: '문자 보내기',
+              background: AppColors.green500,
+              onTap: () => _launchContact(sheetContext, scheme: 'sms'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// 바텀시트 안의 전화/문자 옵션 버튼. [_HelpSection]의 진입 버튼과 마찬가지로
+/// 아이콘 + 큰 텍스트 조합으로 탭 영역과 가독성을 키운다.
+class _HelpOptionButton extends StatelessWidget {
+  const _HelpOptionButton({
+    required this.emoji,
+    required this.label,
+    required this.background,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final String label;
+  final Color background;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 60,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: background,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: const StadiumBorder(),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 24)),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: AppTextStyles.title(fontSize: 18, color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// [scheme]('tel'/'sms')으로 [SupportContact.phoneNumber]를 열어 실제 전화/문자
+/// 앱을 실행한다. 바텀시트를 먼저 닫은 뒤 시도하며, 실행 앱이 없는 환경(웹 등)
+/// 이거나 launchUrl 자체가 예외를 던져도 앱이 죽지 않도록 try-catch로 감싸고
+/// 실패 시 스낵바로만 안내한다. `await` 전에 `ScaffoldMessenger`를 미리 잡아둬
+/// 바텀시트가 닫혀 [sheetContext]가 무효해진 뒤에도 안내를 띄울 수 있게 한다.
+Future<void> _launchContact(
+  BuildContext sheetContext, {
+  required String scheme,
+}) async {
+  final messenger = ScaffoldMessenger.of(sheetContext);
+  Navigator.of(sheetContext).pop();
+  final uri = Uri(scheme: scheme, path: SupportContact.phoneNumber);
+  try {
+    final launched = await launchUrl(uri);
+    if (!launched) {
+      messenger.showSnackBar(const SnackBar(content: Text('연결할 수 없어요')));
+    }
+  } catch (_) {
+    messenger.showSnackBar(const SnackBar(content: Text('연결할 수 없어요')));
   }
 }
 

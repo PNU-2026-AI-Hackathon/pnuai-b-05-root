@@ -51,5 +51,16 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Android 11(API 30)부터는 패키지 가시성이 기본 제한돼, 아래 선언이 없으면
+             url_launcher가 tel:/sms: scheme으로 실제 전화/문자 앱을 찾지 못하고
+             launchUrl()이 조용히 false를 반환한다(마이 탭 "도움 요청하기" 기능용). -->
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO"/>
+            <data android:scheme="sms"/>
+        </intent>
     </queries>
 </manifest>
