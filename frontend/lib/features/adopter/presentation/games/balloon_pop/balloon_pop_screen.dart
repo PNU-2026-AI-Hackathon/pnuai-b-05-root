@@ -29,7 +29,7 @@ class _Balloon {
 
 /// 돼지 풍선 터뜨리기 게임. 하단에서 솟아오르는 돼지 풍선을 상단에 닿기 전에 탭해
 /// 터뜨리면 +10점, 놓치면 실패 카운트가 오른다. 실패 5회 또는 30초 경과 시 종료되며
-/// 총점 70점 이상이면 아이템 1개를 랜덤 획득한다.
+/// 총점 50점 이상이면 아이템 1개를 랜덤 획득한다. 점수는 100점을 넘지 않도록 클램프된다.
 ///
 /// 다중 풍선 애니메이션은 단일 [AnimationController]를 프레임 드라이버로 삼아
 /// 매 프레임 "경과 시각 기준 각 풍선의 위치"를 계산하는 방식(방식 1)으로 구현했다.
@@ -45,7 +45,7 @@ class _BalloonPopScreenState extends State<BalloonPopScreen>
     with SingleTickerProviderStateMixin {
   static const _gameSeconds = 30;
   static const _maxMissed = 5;
-  static const _clearScore = 70;
+  static const _clearScore = 50;
   static const _pointsPerBalloon = 10;
   static const _maxConcurrent = 5; // 동시에 떠 있는(안 터진) 풍선 최대 수
   static const _balloonSlot = 72.0; // 풍선 배치 슬롯 크기(위치 계산용)
@@ -148,7 +148,8 @@ class _BalloonPopScreenState extends State<BalloonPopScreen>
   void _onBalloonTap(_Balloon balloon) {
     if (balloon.isPopped) return; // 이미 터진 풍선은 무시
     setState(() {
-      _score += _pointsPerBalloon;
+      // 동시 최대 5개 풍선을 계속 터뜨리면 무제한 누적되므로 100점으로 클램프한다.
+      _score = (_score + _pointsPerBalloon).clamp(0, 100);
       balloon.poppedAtMs = _elapsed.inMilliseconds;
     });
   }

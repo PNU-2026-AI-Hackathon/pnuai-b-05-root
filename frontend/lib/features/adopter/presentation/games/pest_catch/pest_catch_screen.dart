@@ -12,7 +12,7 @@ import '../shared/game_scaffold.dart';
 
 /// 해충 잡기 게임(두더지잡기 형태). 3x3 격자에서 랜덤 칸에 해충이 잠깐 나타났다가
 /// 사라지며, 사라지기 전에 탭하면 +10점. 총 30초, 시간이 지날수록 노출 시간이 짧아진다.
-/// 70점 이상이면 아이템 1개를 랜덤 획득한다.
+/// 50점 이상이면 아이템 1개를 랜덤 획득한다. 점수는 100점을 넘지 않도록 클램프된다.
 class PestCatchScreen extends StatefulWidget {
   const PestCatchScreen({super.key});
 
@@ -23,7 +23,7 @@ class PestCatchScreen extends StatefulWidget {
 class _PestCatchScreenState extends State<PestCatchScreen> {
   static const _cellCount = 9; // 3x3
   static const _gameSeconds = 30;
-  static const _clearScore = 70;
+  static const _clearScore = 50;
   static const _pointsPerHit = 10;
   static const _spawnIntervalMs = 900; // 스폰 간격
   static const _initialExposureMs = 700; // 초기 노출 시간
@@ -115,7 +115,8 @@ class _PestCatchScreenState extends State<PestCatchScreen> {
     // 성공: 해당 칸의 퇴장 타이머를 취소하고 점수를 올린다.
     _hideTimers.remove(index)?.cancel();
     setState(() {
-      _score += _pointsPerHit;
+      // 30초 동안 계속 잡으면 무제한 누적되므로 100점으로 클램프한다.
+      _score = (_score + _pointsPerHit).clamp(0, 100);
       _activeCells.remove(index);
     });
   }
@@ -180,7 +181,7 @@ class _PestCatchScreenState extends State<PestCatchScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              '30초 안에 70점 이상이면 아이템을 획득해요 🎁',
+              '30초 안에 50점 이상이면 아이템을 획득해요 🎁',
               textAlign: TextAlign.center,
               style: AppTextStyles.body(
                 fontSize: 13,
