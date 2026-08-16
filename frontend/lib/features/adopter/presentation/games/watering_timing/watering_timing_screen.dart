@@ -12,7 +12,7 @@ import '../shared/game_scaffold.dart';
 
 /// 물주기 타이밍 게임. 바(bar)를 왕복하는 물방울 인디케이터를 타겟 존 정중앙에서
 /// 탭할수록 높은 점수를 얻는다. 총 5라운드, 라운드가 오를수록 속도가 빨라지며,
-/// 5라운드 평균 70점 이상이면 아이템 1개를 랜덤 획득한다.
+/// 5라운드 평균 50점 이상이면 아이템 1개를 랜덤 획득한다.
 class WateringTimingScreen extends StatefulWidget {
   const WateringTimingScreen({super.key});
 
@@ -23,7 +23,7 @@ class WateringTimingScreen extends StatefulWidget {
 class _WateringTimingScreenState extends State<WateringTimingScreen>
     with SingleTickerProviderStateMixin {
   static const _totalRounds = 5;
-  static const _clearScore = 70; // 평균 이 점수 이상이면 cleared
+  static const _clearScore = 50; // 평균 이 점수 이상이면 cleared
   static const _baseDurationMs = 1100; // 1라운드 왕복 주기
   static const _speedStepMs = 130; // 라운드마다 이만큼씩 주기 단축(속도 상승)
   static const _targetHalfWidth = 0.1; // 타겟 존 반폭(존 = center ± 0.1)
@@ -174,7 +174,7 @@ class _WateringTimingScreenState extends State<WateringTimingScreen>
               ),
               const Spacer(),
               Text(
-                '5라운드 평균 70점 이상이면 아이템을 획득해요 🎁',
+                '5라운드 평균 50점 이상이면 아이템을 획득해요 🎁',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.body(
                   fontSize: 13,

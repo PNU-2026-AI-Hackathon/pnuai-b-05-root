@@ -64,7 +64,7 @@ class GameScaffold extends StatelessWidget {
                 )
               else
                 Text(
-                  '다음엔 70점 이상 도전해서\n아이템을 획득해 보세요!',
+                  '다음엔 50점 이상 도전해서\n아이템을 획득해 보세요!',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.guide(
                     fontSize: 14,

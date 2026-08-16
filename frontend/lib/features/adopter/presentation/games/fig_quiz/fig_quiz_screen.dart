@@ -12,7 +12,7 @@ import '../shared/game_scaffold.dart';
 import 'fig_quiz_questions.dart';
 
 /// 무화과 퀴즈 게임. 10문항(4지선다 + O/X 혼합)을 풀고 정답 개수로 점수를 낸다.
-/// 문항당 10점, 70점 이상이면 아이템 1개를 랜덤 획득한다.
+/// 문항당 10점, 50점 이상이면 아이템 1개를 랜덤 획득한다.
 class FigQuizScreen extends StatefulWidget {
   const FigQuizScreen({super.key});
 
@@ -22,7 +22,7 @@ class FigQuizScreen extends StatefulWidget {
 
 class _FigQuizScreenState extends State<FigQuizScreen> {
   /// 목표 점수(이 이상이면 cleared + 아이템 획득).
-  static const _clearScore = 70;
+  static const _clearScore = 50;
 
   int _index = 0;
   int _correctCount = 0;
