@@ -77,6 +77,12 @@ class _GrowerDashboardScreenState
     if (mounted) _load();
   }
 
+  void _showAlreadyCompletedMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('이미 완성된 묘목이에요 🎉')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -153,7 +159,7 @@ class _GrowerDashboardScreenState
                   seedling: seedling,
                   onTap: seedling.status == SeedlingStatus.growing
                       ? () => _openComplete(seedling)
-                      : null,
+                      : _showAlreadyCompletedMessage,
                 );
               },
             ),
@@ -228,70 +234,79 @@ class _SeedlingCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.badgeGreenBg,
-                borderRadius: BorderRadius.circular(14),
+      child: Opacity(
+        opacity: isGrowing ? 1.0 : 0.65,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
-              child: const FigTreeIllustration(width: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '무화과 #${seedling.id}',
-                    style: AppTextStyles.title(
-                      fontSize: 15,
-                    ).copyWith(fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '입양자 #${seedling.adopterId}',
-                    style: AppTextStyles.body(
-                      fontSize: 12,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isGrowing
-                        ? '시작일 ${_formatDate(seedling.startedAt)}'
-                        : '완료일 ${_formatDate(seedling.completedAt!)}',
-                    style: AppTextStyles.body(
-                      fontSize: 11,
-                      color: const Color(0xFFB7B2A4),
-                    ),
-                  ),
-                ],
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isGrowing
+                      ? AppColors.badgeGreenBg
+                      : AppColors.dotInactive,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const FigTreeIllustration(width: 22),
               ),
-            ),
-            StatusBadge(
-              label: isGrowing ? '재배중' : '완료',
-              background: isGrowing ? AppColors.green500 : AppColors.pink100,
-              textColor: isGrowing ? Colors.white : AppColors.badgePinkText,
-              pill: false,
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '무화과 #${seedling.id}',
+                      style: AppTextStyles.title(
+                        fontSize: 15,
+                      ).copyWith(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '입양자 #${seedling.adopterId}',
+                      style: AppTextStyles.body(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isGrowing
+                          ? '시작일 ${_formatDate(seedling.startedAt)}'
+                          : '완료일 ${_formatDate(seedling.completedAt!)}',
+                      style: AppTextStyles.body(
+                        fontSize: 11,
+                        color: const Color(0xFFB7B2A4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              StatusBadge(
+                label: isGrowing ? '재배중' : '완료',
+                background: isGrowing
+                    ? AppColors.green500
+                    : AppColors.pink100,
+                textColor: isGrowing
+                    ? Colors.white
+                    : AppColors.badgePinkText,
+                pill: false,
+              ),
+            ],
+          ),
         ),
       ),
     );
