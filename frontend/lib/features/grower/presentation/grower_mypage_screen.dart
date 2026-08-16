@@ -8,6 +8,7 @@ import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
+import '../../../shared/widgets/pigfig_button.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../auth/presentation/account_actions.dart';
 import '../data/grower_repository.dart';
@@ -87,6 +88,13 @@ class _GrowerMypageScreenState extends RevalidatableState<GrowerMypageScreen> {
                     seedlingCount: _seedlingCount,
                   ),
             const SizedBox(height: 28),
+            PigFigButton.outline(
+              label: '📅 나의 재배 활동 보기',
+              onPressed: () => Navigator.of(
+                context,
+              ).pushNamed('/grower/activity-calendar'),
+            ),
+            const SizedBox(height: 14),
             _HelpSection(onTap: () => _showHelpSheet(context)),
             const SizedBox(height: 28),
             Center(
