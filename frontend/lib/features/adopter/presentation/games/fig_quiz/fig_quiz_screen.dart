@@ -7,6 +7,7 @@ import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../models/game_item.dart';
 import '../models/game_result.dart';
+import '../models/reward_grade.dart';
 import '../shared/game_items.dart';
 import '../shared/game_scaffold.dart';
 import 'fig_quiz_questions.dart';
@@ -68,7 +69,12 @@ class _FigQuizScreenState extends State<FigQuizScreen> {
     // 목표 달성 시에만 후보 중 하나를 랜덤으로 지급한다.
     final GameItem? earned =
         cleared ? rewardItems[Random().nextInt(rewardItems.length)] : null;
-    final result = GameResult(score: score, cleared: cleared, itemEarned: earned);
+    final result = GameResult(
+      score: score,
+      cleared: cleared,
+      itemEarned: earned,
+      grade: computeRewardGrade(score),
+    );
     if (!mounted) return;
     await GameScaffold.showResultDialog(context, result);
   }
