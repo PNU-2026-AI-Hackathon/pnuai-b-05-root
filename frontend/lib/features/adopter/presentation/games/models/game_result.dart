@@ -1,4 +1,5 @@
 import 'game_item.dart';
+import 'reward_grade.dart';
 
 /// 게임 종료 결과. 각 게임 화면이 종료 시 이 객체를 만들어
 /// `Navigator.pop(context, result)`로 게임 탭에 돌려준다.
@@ -7,6 +8,7 @@ class GameResult {
     required this.score,
     required this.cleared,
     this.itemEarned,
+    this.grade,
   });
 
   /// 획득 점수 (예: 무화과 퀴즈는 문항당 10점, 만점 100점).
@@ -17,4 +19,7 @@ class GameResult {
 
   /// 이번 게임에서 획득한 아이템. 목표 미달성 시 null.
   final GameItem? itemEarned;
+
+  /// 획득 등급. cleared == false면 항상 null.
+  final RewardGrade? grade;
 }

@@ -6,6 +6,7 @@ import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../models/game_item.dart';
 import '../models/game_result.dart';
+import '../models/reward_grade.dart';
 import '../shared/game_items.dart';
 import '../shared/game_scaffold.dart';
 
@@ -161,8 +162,12 @@ class _BalloonPopScreenState extends State<BalloonPopScreen>
     final cleared = _score >= _clearScore;
     final GameItem? earned =
         cleared ? rewardItems[_random.nextInt(rewardItems.length)] : null;
-    final result =
-        GameResult(score: _score, cleared: cleared, itemEarned: earned);
+    final result = GameResult(
+      score: _score,
+      cleared: cleared,
+      itemEarned: earned,
+      grade: computeRewardGrade(_score),
+    );
     if (!mounted) return;
     await GameScaffold.showResultDialog(context, result);
   }
