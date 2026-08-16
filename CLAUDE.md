@@ -500,6 +500,38 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   않는 순수 장식이었던 걸 이번에 발견해, 실제 동작(이 기기에 로컬 저장)과 맞는 문구로 고쳤습니다.
   세 화면 모두 여전히 **서버에는** 저장되지 않습니다 — 이 기기를 벗어나면(재설치, 기기 변경)
   초기화됩니다.
+- 케어 아이템은 원래 무제한으로 쓸 수 있었지만, 횟수제로 전환하면서 `core/storage/
+  care_inventory_storage.dart`의 `CareInventoryStorage`(계정별 `SharedPreferences`, `CareStorage`/
+  `InventoryStorage`와 동일한 컨벤션)가 `CareItemType`(`water`/`nutrient`/`pigFeed`) 보유 개수를
+  관리합니다. `AuthRepository.login()` 성공 직후 `grantInitialIfNeeded()`를 호출해 계정당 물주기/
+  영양제 각 2개를 최초 1회만 지급합니다(멱등 — `pigfig.care_inventory.granted.$userId` 플래그로
+  로그인마다 재지급되지 않게 가드). 물주기/영양제 화면은 게이지를 100% 채우는 시점에
+  `consume()`으로 1개를 차감하고, 0개면 게이지 UI 대신 `shared/widgets/care_out_of_stock_state.dart`의
+  `CareOutOfStockState`("게임 탭에서 아이템을 모아보세요")를 보여줍니다. `grant()`(충전)는 게임 보상
+  연동을 염두에 두고 미리 만들어뒀지만, 게임 4종의 보상은 여전히 `InventoryStorage`(장식용 게임
+  아이템, 위 문단)에만 쌓이고 `CareInventoryStorage`(케어 소비용 아이템)로 이어지는 경로가 아직
+  없습니다 — 특히 `pigFeed`는 지급 수단이 전혀 없어 돼지 먹이 화면이 실제로는 항상 재고 0(품절
+  안내)으로만 보입니다. 게임 보상 → `CareInventoryStorage.grant()` 연동이 다음 단계 과제로 남아
+  있습니다.
+- 나무 방치 상태(`TreeStatus`: `healthy`/`wilted`/`pigInfested`, `shared/widgets/
+  fig_tree_illustration.dart`)는 `home_screen.dart`의 `computeTreeStatus(lastCompleted)`가
+  `CareStorage.mostRecentCompletion()`(물주기/영양제 중 더 최근 완료 시각, 기록이 아예 없으면 신규
+  계정으로 보고 healthy) 이후 경과일로 계산합니다 — 3일 이상이면 `wilted`(잎·줄기 색이 어두운 갈색
+  쪽으로 `Color.lerp` 보간), 6일 이상이면 `pigInfested`(같은 톤 + 나무 옆 돼지 이모지 오버레이)입니다.
+  다만 화면에 실제 돼지 캐릭터(`PigCharacter`, 탭 가능)가 나타나는지는 이 톤과 별개로 결정됩니다 —
+  `pigInfested`여도 최근 12시간 안에 이미 먹이를 줬으면(`CareStorage.isPigFedRecently()`) `showPig`는
+  false가 되어, 나무 톤은 시든 채 유지하되 돼지·"6일이나 지났어요... 돼지가 찾아왔어요" 문구 대신
+  "3일 동안 자리를 비웠더니..."로 낮춰 보여줍니다(화면에 없는 돼지를 언급하지 않도록). 돼지를 탭하면
+  `/adopter/care/pig-feed`(`pig_feed_care_screen.dart`)로 이동합니다 — `PigFeedCareScreen`은 먹이
+  (🍖)를 20번 탭해 포만 게이지를 채우는 화면이며, 완료 시 `CareInventoryStorage.consume(pigFeed)`로
+  먹이 1개를 차감하고 `CareStorage.markPigFed()`로 시각을 기록한 뒤 "확인"을 누르면 `Navigator.
+  pop(context, true)`로 홈 화면에 성공을 알립니다. 홈 화면은 이 결과를 받으면 즉시 `_isPigExiting`을
+  켜서(그사이 `_load()`가 끝나기 전에 `showPig`가 이미 false로 바뀌어도 돼지가 화면에서 뚝 끊기지
+  않도록) `AnimatedSlide`로 돼지를 좌우 무작위 방향(`Random().nextBool()`)으로 700ms 동안
+  퇴장시킵니다 — `AnimatedSlide.onEnd`는 최초 mount 시에도 한 번 불리므로, 실제로 퇴장 중일 때만
+  (`_isPigExiting == true`) 상태를 리셋하는 가드가 있습니다. 홈 화면 우측 케어 버튼 3개
+  (`CareActionButton`)에는 물주기/영양제 보유 개수 배지가 붙어 `_fetchCareState()`가 조회한
+  `CareInventoryStorage` 값을 표시합니다(햇빛은 소비 개념이 없어 배지 없음).
 - `features/grower/presentation/grower_shell.dart`는 홈(`GrowerDashboardScreen`)/일지
   (`GrowerDiaryScreen`)/환경점검(`GrowerSensorScreen`)/마이(`GrowerMypageScreen`) 4탭
   `StatefulWidget`입니다. `body: IndexedStack(index: _index, children: _screens)`로 네 화면을 전부
@@ -782,7 +814,11 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   입양·수령/기부 선택이 모두 실제 데이터를 쓰지만, 마이페이지 프로필은 여전히 로컬 mock 상태
   (라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음. 케어 게이지 3종(물주기/영양제
   2종은 `CareStorage`로 로컬 영속화, 햇빛은 완료 개념이 없어 제외)은 계획서상 "실제
-  재배와 분리된 미션형 연출"이라는 의도적 설계라 서버에는 연동하지 않음(위 "케어 화면" 문단 참고)
+  재배와 분리된 미션형 연출"이라는 의도적 설계라 서버에는 연동하지 않음(위 "케어 화면" 문단 참고).
+  물주기/영양제/돼지먹이 횟수제 전환(`CareInventoryStorage`), 나무 방치 상태(`TreeStatus`), 돼지
+  출현·먹이 주기 케어(`PigFeedCareScreen`)·홈 화면 퇴장 애니메이션·보유 개수 배지까지 모두 구현
+  완료됐지만, 게임 보상이 `CareInventoryStorage`로 이어지는 지급 경로가 아직 없어 `pigFeed`는 실제로
+  모을 방법이 없는 상태(위 "나무 방치 상태" 문단 참고) — 다음 단계 과제로 남음
 - 게임 탭의 실제 게임 4종(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍)은 모두 플레이
   가능하며, 획득 아이템은 `InventoryStorage`에 로컬로만 누적됨(서버 저장 없음, `pigfig.
   inventory_items.$userId`로 계정별 키 분리 완료 — 로그아웃 시 유지, 회원탈퇴 시 삭제). vision은 백엔드
