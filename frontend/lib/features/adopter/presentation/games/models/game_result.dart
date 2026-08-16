@@ -7,7 +7,7 @@ class GameResult {
   const GameResult({
     required this.score,
     required this.cleared,
-    this.itemEarned,
+    this.itemsEarned = const [],
     this.grade,
   });
 
@@ -17,8 +17,8 @@ class GameResult {
   /// 목표 달성 여부 (달성 시에만 아이템을 준다).
   final bool cleared;
 
-  /// 이번 게임에서 획득한 아이템. 목표 미달성 시 null.
-  final GameItem? itemEarned;
+  /// 이번 게임에서 획득한 아이템 목록. 목표 미달성 시 항상 빈 리스트.
+  final List<GameItem> itemsEarned;
 
   /// 획득 등급. cleared == false면 항상 null.
   final RewardGrade? grade;

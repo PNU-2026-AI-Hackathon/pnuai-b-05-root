@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_theme.dart';
-import '../models/game_item.dart';
 import '../models/game_result.dart';
+import '../models/game_type.dart';
 import '../models/reward_grade.dart';
 import '../shared/game_items.dart';
 import '../shared/game_scaffold.dart';
@@ -160,13 +160,12 @@ class _BalloonPopScreenState extends State<BalloonPopScreen>
     _finished = true;
     _controller.stop();
     final cleared = _score >= _clearScore;
-    final GameItem? earned =
-        cleared ? rewardItems[_random.nextInt(rewardItems.length)] : null;
+    final grade = computeRewardGrade(_score);
     final result = GameResult(
       score: _score,
       cleared: cleared,
-      itemEarned: earned,
-      grade: computeRewardGrade(_score),
+      itemsEarned: pickRewardItems(GameType.balloonPop, grade, _random),
+      grade: grade,
     );
     if (!mounted) return;
     await GameScaffold.showResultDialog(context, result);
