@@ -159,6 +159,16 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     if (mounted) _load();
   }
 
+  Future<void> _goToWaterCare() async {
+    await Navigator.of(context).pushNamed('/adopter/care/water');
+    if (mounted) _load();
+  }
+
+  Future<void> _goToNutrientCare() async {
+    await Navigator.of(context).pushNamed('/adopter/care/nutrient');
+    if (mounted) _load();
+  }
+
   Future<void> _goToPigFeed() async {
     final fed = await Navigator.of(
       context,
@@ -215,6 +225,8 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
       waterCount: _waterCount,
       nutrientCount: _nutrientCount,
       pigFeedCount: _pigFeedCount,
+      onWaterTap: _goToWaterCare,
+      onNutrientTap: _goToNutrientCare,
       onPigTap: _goToPigFeed,
       isPigExiting: _isPigExiting,
       exitDirectionLeft: _exitDirectionLeft,
@@ -262,6 +274,8 @@ class _SeedlingHome extends StatelessWidget {
     required this.waterCount,
     required this.nutrientCount,
     required this.pigFeedCount,
+    required this.onWaterTap,
+    required this.onNutrientTap,
     required this.onPigTap,
     required this.isPigExiting,
     required this.exitDirectionLeft,
@@ -286,6 +300,8 @@ class _SeedlingHome extends StatelessWidget {
   final int? waterCount;
   final int? nutrientCount;
   final int? pigFeedCount;
+  final VoidCallback onWaterTap;
+  final VoidCallback onNutrientTap;
   final VoidCallback onPigTap;
 
   /// 먹이 주기 성공 직후 true로 켜져 퇴장 애니메이션이 재생되는 동안, 이미
@@ -368,16 +384,14 @@ class _SeedlingHome extends StatelessWidget {
                 emoji: '💧',
                 label: '물주기',
                 count: waterCount,
-                onTap: () =>
-                    Navigator.of(context).pushNamed('/adopter/care/water'),
+                onTap: onWaterTap,
               ),
               const SizedBox(height: 16),
               CareActionButton(
                 emoji: '🍃',
                 label: '영양제',
                 count: nutrientCount,
-                onTap: () =>
-                    Navigator.of(context).pushNamed('/adopter/care/nutrient'),
+                onTap: onNutrientTap,
               ),
               const SizedBox(height: 16),
               CareActionButton(
