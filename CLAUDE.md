@@ -567,14 +567,20 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   "이상 감지"는 실제 `Seedling` 모델에 대응하는 필드가 없어(진행 단계·이상탐지는 diary/sensor
   API 영역이라 이번에도 미연동) "재배중"/"완료" 카운트로 대체했습니다. 카드의 "입양자 #{id}" 표기도
   같은 이유입니다 — `SeedlingSerializer`가 `adopter`를 FK id로만 내려주고 이름을 함께 주는
-  엔드포인트가 없어서, 실제 값(id)만 그대로 보여줍니다. 담당 묘목 카드를 탭하면(완료된 묘목은 탭
-  비활성화) `GrowerCompleteArgs`(seedlingId/seedlingName/adopterName — 이제 adopterName엔
+  엔드포인트가 없어서, 실제 값(id)만 그대로 보여줍니다. 재배중인 묘목 카드를 탭하면
+  `GrowerCompleteArgs`(seedlingId/seedlingName/adopterName — 이제 adopterName엔
   "입양자 #6"처럼 완성된 표시 문구 전체가 들어가므로 `grower_complete_screen.dart`는 앞에 "입양자"를
   더 붙이지 않습니다)를 route argument로 담아 `/grower/complete`로 이동하며, 이 화면의 "완성 신고하기"
   버튼이 `completeSeedling()`으로 실제 `PATCH /api/seedlings/{id}/complete/`를 호출합니다. 성공 후
   `Navigator.pop()`으로 대시보드에 돌아오면 `await`로 이어받아 곧바로 `fetchSeedlings()`를 다시
   호출해 목록·통계를 최신 상태로 갱신합니다(완성 처리 직후에도 화면이 낡은 mock처럼 안 바뀌는 문제
-  방지). 탭한 seedlingId는 이제 항상 실제 `Seedling.pk`입니다(목록 자체가 실제 응답이므로).
+  방지). 탭한 seedlingId는 이제 항상 실제 `Seedling.pk`입니다(목록 자체가 실제 응답이므로). 완료된
+  묘목 카드는 탭 자체를 막지 않고 여전히 `onTap`이 걸려 있지만, 콜백이 `_openComplete()` 대신
+  `_showAlreadyCompletedMessage()`(스낵바 "이미 완성된 묘목이에요 🎉")로 분기해 완성 화면으로
+  이동하지 않고 안내만 하고 끝냅니다 — 탭이 씹히는 것처럼 보이는 것(아무 반응 없음)보다 "왜 안
+  움직이는지"를 알려주는 쪽이 낫다고 판단했습니다. `_SeedlingCard`도 `isGrowing` 여부에 따라
+  `Opacity(0.65)` + 아이콘 배경색을 `AppColors.dotInactive`(회색)로 바꿔 재배중 카드와 시각적으로
+  구분합니다.
 - `main()`이 `Future<void>`로 바뀌어 `runApp()` 전에 `OnboardingStorage().hasSeenOnboarding()`을
   `await`하고, 그 결과로 `PigFigApp(initialRoute: ...)`을 결정합니다(`/onboarding` 또는 `/`) — 위젯
   트리 안에서 라우팅을 늦게 리다이렉트하는 대신 첫 프레임부터 올바른 화면으로 시작합니다. `PigFigApp`의
@@ -609,15 +615,34 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 
   게임 4종(`games/balloon_pop/`, `games/fig_quiz/`, `games/pest_catch/`, `games/watering_timing/`)은
   모두 실제로 플레이 가능한 화면입니다. 각 게임은 `games/shared/game_scaffold.dart`의
-  `GameScaffold`(제목+점수+닫기 헤더 공통 셸)로 본문을 감싸고, 종료 시 `GameResult`(점수/목표 달성
-  여부/획득 아이템)를 만들어 `Navigator.pop(context, result)`로 `games_screen.dart`에 돌려주는
-  동일한 패턴을 따릅니다. `GameScaffold.showResultDialog()`가 결과 다이얼로그(성공/실패 문구 +
-  점수 + 획득 아이템 박스)를 공통으로 띄우는 것도 네 게임이 공유합니다. `games_screen.dart`의
-  `_openGame()`은 `GameType` 기준 `switch`로 각 게임 화면을 push하고, 돌아온 `GameResult`에
-  `itemEarned`(목표 달성 시에만 채워짐)가 있으면 `core/storage/inventory_storage.dart`의
-  `InventoryStorage.addItem()`으로 저장한 뒤 보유 아이템 바를 다시 그립니다. `InventoryStorage`는
-  `TokenStorage`/`OnboardingStorage`와 동일한 `SharedPreferences` 래퍼 컨벤션이며, 아이템 목록을
-  JSON 문자열 하나로 인코딩해 저장합니다(게임 종류·서버 저장 없이 로컬에만 누적).
+  `GameScaffold`(제목+점수+닫기 헤더 공통 셸)로 본문을 감싸고, 종료 시 `GameResult`(점수/클리어
+  여부/획득 아이템 목록/등급)를 만들어 `Navigator.pop(context, result)`로 `games_screen.dart`에
+  돌려주는 동일한 패턴을 따릅니다. `GameScaffold.showResultDialog()`가 결과 다이얼로그(성공/실패
+  문구 + 등급 배지 + 점수 + 획득 아이템 박스)를 공통으로 띄우는 것도 네 게임이 공유합니다.
+  `games_screen.dart`의 `_openGame()`은 `GameType` 기준 `switch`로 각 게임 화면을 push하고, 돌아온
+  `GameResult.itemsEarned`(클리어 시에만 채워짐)를 `_saveEarnedItems()`가 순회하며 `core/storage/
+  inventory_storage.dart`의 `InventoryStorage.addItem()`으로 하나씩 저장한 뒤 보유 아이템 바를 다시
+  그립니다. `InventoryStorage`는 `TokenStorage`/`OnboardingStorage`와 동일한 `SharedPreferences`
+  래퍼 컨벤션이며, 아이템 목록을 JSON 문자열 하나로 인코딩해 저장합니다(게임 종류·서버 저장 없이
+  로컬에만 누적).
+
+  각 게임의 점수는 `.clamp(0, 100)`으로 100점을 넘지 않게 잘리고(예: 돼지 풍선 터뜨리기는 동시
+  최대 5개 풍선을 계속 터뜨리면 무제한 누적되는 것을 막기 위함), 클리어 기준은 4종 공통으로 50점
+  이상입니다. `games/models/reward_grade.dart`의 `computeRewardGrade(score)`가 점수를 등급으로
+  변환합니다 — 50점 미만은 클리어 실패로 `null`(등급 없음, 아이템도 없음), 50~69는 브론즈, 70~89는
+  실버, 90~100은 골드(`RewardGrade` enum). `games/shared/game_items.dart`의 `rewardItems`는 4개
+  게임이 공유하는 공용 아이템 풀(무화과잎 부채/시니어의 물뿌리개/햇살 한 줌 3종)이며,
+  `rewardCountFor(type, grade)`가 등급·게임별 지급 개수를 결정합니다 — 브론즈는 모든 게임이
+  1개로 동일하고, 실버는 돼지 풍선 터뜨리기만 1개고 나머지 세 게임은 2개입니다("브론즈는 공통,
+  실버만 게임마다 다르다"는 표 형태라 게임별 로컬 상수 4곳에 중복 정의하는 대신 이 함수 하나로
+  모았습니다). 골드는 다음 브랜치에서 다룰 직접 선택 UI를 위해 아직 개수를 정하지 않아 `0`을
+  반환합니다(`TODO(game-reward-grade-choice)` 주석). `pickRewardItems(type, grade, random)`이 그
+  개수만큼 `rewardItems`에서 무작위로 뽑아 돌려주며(중복 허용), 골드처럼 개수가 0이거나 등급이
+  `null`이면 빈 리스트를 돌려줍니다. `showResultDialog()`는 획득 아이템이 있으면 아이템 박스를,
+  없는데 등급이 골드면 "골드 등급이에요! 곧 아이템을 직접 골라보실 수 있어요 🎁" 안내 문구를,
+  그마저 아니면(클리어 실패) "다음엔 50점 이상 도전해서..." 문구를 보여주는 3단 분기입니다. 골드
+  등급의 아이템 직접 선택 UI는 아직 구현되지 않은 상태로, 이 저장소의 `feat/game-reward-select-ui`
+  브랜치가 다루는 다음 작업입니다.
 
   처음에는 `TokenStorage`/`OnboardingStorage`처럼 고정 키(`pigfig.inventory_items`) 하나로
   저장했는데, 이러면 같은 기기에서 A 계정으로 게임해 아이템을 모은 뒤 로그아웃하고 B 계정으로
@@ -659,7 +684,21 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   카드(이메일 + "담당 묘목 N그루", `GrowerRepository.fetchSeedlings().length`로 계산)와 로그아웃/
   회원탈퇴만 있는 단순한 화면입니다 — 이메일은 백엔드에 프로필 조회 API가 없어서, 로그인 시점에
   이미 알고 있는 값을 `TokenStorage`에 함께 저장해뒀다가(`AuthRepository.login()`이 토큰과 같이
-  `email`도 저장, `logout()`/`deleteAccount()`가 토큰과 함께 지움) 읽어오는 방식입니다.
+  `email`도 저장, `logout()`/`deleteAccount()`가 토큰과 함께 지움) 읽어오는 방식입니다. 프로필
+  카드 아래 "📅 나의 재배 활동 보기" 버튼은 `grower_activity_calendar_screen.dart`의
+  `GrowerActivityCalendarScreen`으로 push합니다 — 묘목별 일지 화면(`grower_diary_screen.dart`)은
+  새로 작성할 때만 쓰여서 과거 작성 이력을 전체적으로 돌아볼 방법이 없었던 것을 보완한 월별 달력
+  화면입니다. 탭 화면이 아니라 `Navigator.pushNamed`로 진입하는 독립 push 화면이라
+  `RevalidatableState` 대신 일반 `State`를 씁니다. `initState`에서 `GrowerRepository.
+  fetchSeedlings()`로 담당 묘목 전체를 조회한 뒤, 각 묘목마다 `DiaryRepository.fetchDiaries()`를
+  `Future.wait()`로 병렬 호출해 모든 일지를 모으고, `entry.createdAt.toLocal()`을 시분초 없이 자른
+  날짜를 키로 `Map<DateTime, List<_DiaryOccurrence>>`에 묶습니다(`created_at`이 UTC라 그대로 자르면
+  자정 근처 일지가 실제와 다른 날짜에 찍힐 수 있어 로컬 시각 변환을 먼저 함). 이 맵의 key 집합
+  자체가 "일지가 있는 날짜들의 집합" 역할을 겸해서, 달력 각 칸의 점 표시 여부(`containsKey`)와
+  선택한 날짜의 요약 카드 목록 조회를 같은 구조 하나로 처리합니다. 날짜를 탭하면 그 날 작성된 일지들을
+  묘목 id와 함께 요약 카드로 보여주고(여러 묘목의 일지가 같은 날 섞여 있을 수 있음), 일지가 없으면
+  "이 날은 작성한 일지가 없어요"를 보여줍니다. 담당 묘목이 하나도 없으면 달력 대신 안내 문구만
+  띄웁니다(다른 화면들과 동일한 로딩/에러/빈 목록/데이터 4상태 분기).
 - `features/adopter/data/seedling_repository.dart`는 `grower/data/grower_repository.dart`와 동일한
   패턴(같은 `GET /api/seedlings/`, 같은 `Seedling`/`SeedlingStatus` 모양)을 입양자 쪽에도 그대로
   적용한 별도 파일입니다 — 기능이 겹치더라도 feature 간 참조 없이 각 feature가 자기 데이터 계층을
@@ -820,7 +859,11 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   완료됐지만, 게임 보상이 `CareInventoryStorage`로 이어지는 지급 경로가 아직 없어 `pigFeed`는 실제로
   모을 방법이 없는 상태(위 "나무 방치 상태" 문단 참고) — 다음 단계 과제로 남음
 - 게임 탭의 실제 게임 4종(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍)은 모두 플레이
-  가능하며, 획득 아이템은 `InventoryStorage`에 로컬로만 누적됨(서버 저장 없음, `pigfig.
+  가능하며, 점수는 100점 클램프·클리어 기준 50점으로 통일되고 50/70/90점 구간에 따라
+  브론즈/실버/골드 등급(`computeRewardGrade`)이 매겨져 등급 배지와 함께 결과 다이얼로그에
+  표시됨(위 "게임" 문단 참고). 브론즈·실버는 등급별 개수만큼 공용 아이템 풀에서 무작위 지급까지
+  구현 완료됐지만, 골드 등급의 아이템 직접 선택 UI는 아직 없음(`feat/game-reward-select-ui`
+  브랜치의 다음 작업). 획득 아이템은 `InventoryStorage`에 로컬로만 누적됨(서버 저장 없음, `pigfig.
   inventory_items.$userId`로 계정별 키 분리 완료 — 로그아웃 시 유지, 회원탈퇴 시 삭제). vision은 백엔드
   실제 추론 + 재배자 일지 작성 시 프론트엔드 자동 호출까지 연동 완료. FCM은 Android 클라이언트가
   로그인 시 실제 토큰을 등록하도록 연동 완료(다른 플랫폼은 미지원)
