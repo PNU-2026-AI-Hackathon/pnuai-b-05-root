@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/storage/care_inventory_storage.dart';
 import '../../../core/storage/inventory_storage.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
@@ -13,6 +14,7 @@ import 'games/models/game_item.dart';
 import 'games/models/game_result.dart';
 import 'games/models/game_type.dart';
 import 'games/pest_catch/pest_catch_screen.dart';
+import 'games/shared/game_items.dart';
 import 'games/watering_timing/watering_timing_screen.dart';
 
 class _GameCardData {
@@ -58,6 +60,7 @@ class _GamesScreenState extends State<GamesScreen> {
 
   final _tokenStorage = TokenStorage();
   InventoryStorage? _inventory;
+  CareInventoryStorage? _careInventory;
   List<GameItem> _ownedItems = [];
 
   @override
@@ -67,11 +70,14 @@ class _GamesScreenState extends State<GamesScreen> {
   }
 
   // 보유 아이템은 계정별로 분리 저장되므로([InventoryStorage] 참고), 로그인한
-  // 사용자의 id를 먼저 조회한 뒤에야 인스턴스를 만들 수 있다.
+  // 사용자의 id를 먼저 조회한 뒤에야 인스턴스를 만들 수 있다. 실제 소비 가능한
+  // 케어 아이템 개수를 관리하는 [CareInventoryStorage]도 같은 userId로 함께 만든다
+  // (홈 화면 `_fetchCareState()`가 쓰는 것과 동일한 인스턴스 생성 패턴).
   Future<void> _initInventory() async {
     final userId = await _tokenStorage.readUserId();
     if (!mounted || userId == null) return;
     _inventory = InventoryStorage(userId: userId);
+    _careInventory = CareInventoryStorage(userId: userId);
     await _loadItems();
   }
 
@@ -152,12 +158,16 @@ class _GamesScreenState extends State<GamesScreen> {
     }
   }
 
-  /// 획득한 아이템을 모두 보유 아이템 저장소에 추가하고 보유 아이템 바를 갱신한다.
-  /// [items]가 비어있으면(클리어 실패 등) 아무것도 하지 않는다.
+  /// 획득한 아이템을 저장한다. [items]가 비어있으면(클리어 실패 등) 아무것도
+  /// 하지 않는다. 아이템마다 두 곳에 이중으로 반영한다 — [InventoryStorage]에는
+  /// 그대로 추가해 게임 탭 하단 "보유 아이템" 바에 계속 표시되게 하고(장식 목적),
+  /// [CareInventoryStorage]에는 [careItemTypeFor]로 변환한 실제 케어 아이템
+  /// 종류로 지급해 물주기/영양제/돼지 먹이 화면에서 실제로 소비할 수 있게 한다.
   Future<void> _saveEarnedItems(List<GameItem>? items) async {
     if (items == null || items.isEmpty) return;
     for (final item in items) {
       await _inventory?.addItem(item);
+      await _careInventory?.grant(careItemTypeFor(item));
     }
     await _loadItems();
   }

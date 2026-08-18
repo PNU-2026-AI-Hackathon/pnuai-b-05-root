@@ -33,7 +33,9 @@ class CareInventoryStorage {
     return true;
   }
 
-  /// 개수를 [amount]만큼 늘린다(게임 보상 등에서 사용, 이번 범위에서는 미연동).
+  /// 개수를 [amount]만큼 늘린다. 게임 보상 지급 시 `games_screen.dart`의
+  /// `_saveEarnedItems()`가 `careItemTypeFor(item)`으로 변환한 타입에 대해 호출한다
+  /// (`games/shared/game_items.dart` 참고).
   Future<void> grant(CareItemType type, {int amount = 1}) async {
     final current = await getCount(type);
     await _setCount(type, current + amount);

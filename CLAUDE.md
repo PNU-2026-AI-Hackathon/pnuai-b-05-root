@@ -507,12 +507,18 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   영양제 각 2개를 최초 1회만 지급합니다(멱등 — `pigfig.care_inventory.granted.$userId` 플래그로
   로그인마다 재지급되지 않게 가드). 물주기/영양제 화면은 게이지를 100% 채우는 시점에
   `consume()`으로 1개를 차감하고, 0개면 게이지 UI 대신 `shared/widgets/care_out_of_stock_state.dart`의
-  `CareOutOfStockState`("게임 탭에서 아이템을 모아보세요")를 보여줍니다. `grant()`(충전)는 게임 보상
-  연동을 염두에 두고 미리 만들어뒀지만, 게임 4종의 보상은 여전히 `InventoryStorage`(장식용 게임
-  아이템, 위 문단)에만 쌓이고 `CareInventoryStorage`(케어 소비용 아이템)로 이어지는 경로가 아직
-  없습니다 — 특히 `pigFeed`는 지급 수단이 전혀 없어 돼지 먹이 화면이 실제로는 항상 재고 0(품절
-  안내)으로만 보입니다. 게임 보상 → `CareInventoryStorage.grant()` 연동이 다음 단계 과제로 남아
-  있습니다.
+  `CareOutOfStockState`("게임 탭에서 아이템을 모아보세요")를 보여줍니다. `grant()`(충전)는 이제 게임
+  보상 지급 경로와 실제로 연결되어 있습니다 — `games/shared/game_items.dart`의 `rewardItems` 3종을
+  각 `CareItemType`과 1:1로 대응하도록 이름·이모지를 바꿨습니다(`water_item`=물주기 아이템 💧,
+  `nutrient_item`=영양제 아이템 🍃, `pig_feed_item`=돼지 먹이 🍖 — 이전에는 "무화과잎 부채"처럼
+  장식용 이름이라 실제로 뭘로 쓰이는지 알기 어려웠습니다). 같은 파일의 `careItemTypeFor(item)`이
+  `GameItem.id`를 보고 대응하는 `CareItemType`을 돌려주며(목록에 없는 id면 `ArgumentError`),
+  `games_screen.dart`의 `_saveEarnedItems()`가 획득 아이템마다 `InventoryStorage.addItem()`(장식용,
+  게임 탭 하단 "보유 아이템" 바 표시 목적)과 `CareInventoryStorage.grant(careItemTypeFor(item))`
+  (실제 소비 가능한 개수)를 함께 호출하는 이중 구조입니다. `CareInventoryStorage` 인스턴스는
+  `_initInventory()`에서 `InventoryStorage`와 같은 시점에 같은 userId로 함께 만듭니다(홈 화면
+  `_fetchCareState()`가 쓰는 것과 동일한 생성 패턴). 이제 `pigFeed`도 게임에서 실제로 모을 수
+  있어(위 "나무 방치 상태" 문단의 돼지 먹이 화면 참고) 항상 재고 0이던 상태를 벗어났습니다.
 - 나무 방치 상태(`TreeStatus`: `healthy`/`wilted`/`pigInfested`, `shared/widgets/
   fig_tree_illustration.dart`)는 `home_screen.dart`의 `computeTreeStatus(lastCompleted)`가
   `CareStorage.mostRecentCompletion()`(물주기/영양제 중 더 최근 완료 시각, 기록이 아예 없으면 신규
@@ -866,8 +872,8 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   재배와 분리된 미션형 연출"이라는 의도적 설계라 서버에는 연동하지 않음(위 "케어 화면" 문단 참고).
   물주기/영양제/돼지먹이 횟수제 전환(`CareInventoryStorage`), 나무 방치 상태(`TreeStatus`), 돼지
   출현·먹이 주기 케어(`PigFeedCareScreen`)·홈 화면 퇴장 애니메이션·보유 개수 배지까지 모두 구현
-  완료됐지만, 게임 보상이 `CareInventoryStorage`로 이어지는 지급 경로가 아직 없어 `pigFeed`는 실제로
-  모을 방법이 없는 상태(위 "나무 방치 상태" 문단 참고) — 다음 단계 과제로 남음
+  완료. 게임 보상 → `CareInventoryStorage`로 이어지는 지급 경로(`careItemTypeFor`)도 연동
+  완료되어 `pigFeed`를 포함한 3종 모두 게임으로 실제로 모을 수 있음(위 "케어 아이템" 문단 참고)
 - 게임 탭의 실제 게임 4종(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍)은 모두 플레이
   가능하며, 점수는 100점 클램프·클리어 기준 50점으로 통일되고 50/70/90점 구간에 따라
   브론즈/실버/골드 등급(`computeRewardGrade`)이 매겨져 등급 배지와 함께 결과 다이얼로그에
