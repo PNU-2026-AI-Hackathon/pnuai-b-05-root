@@ -34,13 +34,18 @@ class DiaryRepository {
   final ApiClient _apiClient;
   final TokenStorage _tokenStorage;
 
-  /// [photoBytes]가 주어지면 `multipart/form-data`로, 아니면 사진 없이 텍스트만 전송한다.
-  /// 생성된 일지의 id를 반환한다 — vision 분석 요청 시 `diary_id`로 연결하기 위함이다.
+  /// [photoBytes]가 주어지면 `multipart/form-data`로, 아니면 사진 없이 텍스트만 전송한다
+  /// (요청 자체는 사진 유무와 무관하게 항상 `postMultipart`를 거치므로 `growthStage`도
+  /// 두 경우 모두 동일하게 `fields`에 실린다). [growthStage]는 백엔드
+  /// `Diary.GrowthStage` 코드값(rooting/leafing/branching/mature)이며, null이면
+  /// `growth_stage` 필드 자체를 보내지 않아 서버에서 null로 저장된다. 생성된 일지의
+  /// id를 반환한다 — vision 분석 요청 시 `diary_id`로 연결하기 위함이다.
   Future<int> createDiary({
     required int seedlingId,
     required String content,
     Uint8List? photoBytes,
     String? photoFileName,
+    String? growthStage,
   }) async {
     final accessToken = await _tokenStorage.readAccessToken();
     if (accessToken == null) {
@@ -48,7 +53,11 @@ class DiaryRepository {
     }
     final response = await _apiClient.postMultipart(
       '/api/diary/',
-      fields: {'seedling': '$seedlingId', 'content': content},
+      fields: {
+        'seedling': '$seedlingId',
+        'content': content,
+        'growth_stage': ?growthStage,
+      },
       fileBytes: photoBytes,
       fileFieldName: photoBytes == null ? null : 'photo',
       fileName: photoFileName,
