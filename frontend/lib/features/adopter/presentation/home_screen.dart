@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/revalidatable_state.dart';
@@ -52,6 +53,29 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   bool _isPigExiting = false;
   bool _exitDirectionLeft = true;
 
+  /// 직전에 계산된 [TreeStatus] — POC 시범 적용이라 별도 저장소 없이 이 State
+  /// 필드에만 기억한다(앱을 완전히 재시작하면 초기화되지만, 탭 전환/재조회에서는
+  /// [RevalidatableState] 덕분에 이 State 자체가 유지되므로 충분하다).
+  TreeStatus? _previousTreeStatus;
+
+  /// wilted/pigInfested → healthy로 "좋아지는 전환"이 감지된 직후 한 번만 true가
+  /// 되어 [_GrowAnimatedTree]가 tree_growing.json을 재생하게 한다. 매 홈 화면
+  /// 진입마다 재생되면 안 되므로(요구사항), 이미 healthy였던 상태에서 다시
+  /// healthy로 재조회되는 경우는 트리거하지 않는다.
+  bool _playGrowAnimation = false;
+
+  /// [_load]/[revalidate]가 새로 계산한 [TreeStatus]를 이전 값과 비교해 "좋아지는
+  /// 전환"일 때만 [_playGrowAnimation]을 켠다. 최초 진입(_previousTreeStatus가
+  /// null)에는 이전 값이 없어 전환으로 취급하지 않는다.
+  void _updateGrowAnimationFlag(TreeStatus newStatus) {
+    if (_previousTreeStatus != null &&
+        _previousTreeStatus != TreeStatus.healthy &&
+        newStatus == TreeStatus.healthy) {
+      _playGrowAnimation = true;
+    }
+    _previousTreeStatus = newStatus;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -95,6 +119,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
         _nutrientCount = careState.nutrient;
         _pigFeedCount = careState.pigFeed;
         _isPigFedRecently = careState.isPigFedRecently;
+        _updateGrowAnimationFlag(computeTreeStatus(careState.lastCare));
       });
     } on ApiException catch (e) {
       setState(() => _errorMessage = e.message);
@@ -120,6 +145,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
           _nutrientCount = careState.nutrient;
           _pigFeedCount = careState.pigFeed;
           _isPigFedRecently = careState.isPigFedRecently;
+          _updateGrowAnimationFlag(computeTreeStatus(careState.lastCare));
         });
       }
     } on ApiException {
@@ -182,6 +208,9 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     return _SeedlingHome(
       seedling: _seedling!,
       treeStatus: treeStatus,
+      playGrowAnimation: _playGrowAnimation,
+      onGrowAnimationConsumed: () =>
+          setState(() => _playGrowAnimation = false),
       showPig: showPig,
       lastCareCompletedAt: _lastCareCompletedAt,
       waterCount: _waterCount,
@@ -227,6 +256,8 @@ class _SeedlingHome extends StatelessWidget {
   const _SeedlingHome({
     required this.seedling,
     required this.treeStatus,
+    required this.playGrowAnimation,
+    required this.onGrowAnimationConsumed,
     required this.showPig,
     required this.lastCareCompletedAt,
     required this.waterCount,
@@ -240,6 +271,14 @@ class _SeedlingHome extends StatelessWidget {
 
   final Seedling seedling;
   final TreeStatus treeStatus;
+
+  /// wilted/pigInfested → healthy 전환 직후 한 번만 true — [_GrowAnimatedTree]가
+  /// tree_growing.json을 재생할지 결정한다.
+  final bool playGrowAnimation;
+
+  /// 애니메이션 재생이 끝나 정적 [FigTreeIllustration]으로 돌아간 뒤 호출되어,
+  /// 부모의 [playGrowAnimation] 플래그를 리셋한다.
+  final VoidCallback onGrowAnimationConsumed;
 
   /// pigInfested 톤이어도 최근 12시간 안에 먹이를 줬으면 false — 나무 톤과
   /// 별개로 결정된다([_HomeScreenState._buildBody] 참고).
@@ -294,7 +333,12 @@ class _SeedlingHome extends StatelessWidget {
               const SizedBox(height: 28),
             ] else
               const SizedBox(height: 28),
-            FigTreeIllustration(width: 190, status: treeStatus),
+            _GrowAnimatedTree(
+              width: 190,
+              status: treeStatus,
+              playAnimation: playGrowAnimation,
+              onAnimationConsumed: onGrowAnimationConsumed,
+            ),
             const SizedBox(height: 8),
             if (showPig || isPigExiting)
               Row(
@@ -419,6 +463,75 @@ class _SeedlingHome extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// [FigTreeIllustration] 자리에 들어가 "좋아지는 전환" 순간에만
+/// `tree_growing.json`을 한 번 재생한 뒤 정적 일러스트로 되돌아가는 POC 위젯
+/// (Lottie 도입 시범 적용, 12번 브랜치). [playAnimation]은 이 위젯이 처음
+/// build될 때만 확인한다 — 이후 재생 중에 [FigTreeIllustration.status]가
+/// 바뀌어도(예: 케어 게이지 조작) 재생을 중단하지 않는다.
+class _GrowAnimatedTree extends StatefulWidget {
+  const _GrowAnimatedTree({
+    required this.width,
+    required this.status,
+    required this.playAnimation,
+    required this.onAnimationConsumed,
+  });
+
+  final double width;
+  final TreeStatus status;
+  final bool playAnimation;
+  final VoidCallback onAnimationConsumed;
+
+  @override
+  State<_GrowAnimatedTree> createState() => _GrowAnimatedTreeState();
+}
+
+class _GrowAnimatedTreeState extends State<_GrowAnimatedTree> {
+  bool _showingAnimation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _showingAnimation = widget.playAnimation;
+  }
+
+  /// 재생 완료(정상 종료 또는 로드 실패) 시 한 번만 정적 일러스트로 전환하고,
+  /// 부모의 [TreeStatus] 관찰 플래그를 리셋해 다음 전환까지 재생되지 않게 한다.
+  void _finishAnimation() {
+    if (!mounted || !_showingAnimation) return;
+    setState(() => _showingAnimation = false);
+    widget.onAnimationConsumed();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_showingAnimation) {
+      return FigTreeIllustration(width: widget.width, status: widget.status);
+    }
+    // FigTreeIllustration과 동일한 박스 크기를 유지해 애니메이션↔정적 일러스트
+    // 전환 시 레이아웃이 흔들리지 않게 한다.
+    return SizedBox(
+      width: widget.width,
+      height: widget.width * 1.27,
+      child: Lottie.asset(
+        'assets/lottie/tree_growing.json',
+        repeat: false,
+        fit: BoxFit.contain,
+        onLoaded: (composition) {
+          Future.delayed(composition.duration, _finishAnimation);
+        },
+        errorBuilder: (context, error, stackTrace) {
+          // 에셋 로드 실패 시 크래시 대신 즉시 정적 일러스트로 폴백한다.
+          // build 중 setState를 피하기 위해 다음 프레임으로 미룬다.
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _finishAnimation(),
+          );
+          return FigTreeIllustration(width: widget.width, status: widget.status);
+        },
+      ),
     );
   }
 }
