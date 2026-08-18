@@ -114,6 +114,32 @@ class DiaryCreateViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         mock_convert.assert_not_called()
 
+    def test_grower_can_create_diary_with_growth_stage(self):
+        self.client.force_authenticate(user=self.grower)
+        data = {
+            'seedling': self.seedling.pk,
+            'content': '뿌리가 자리를 잡았어요',
+            'growth_stage': Diary.GrowthStage.ROOTING,
+        }
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['growth_stage'], Diary.GrowthStage.ROOTING)
+        diary = Diary.objects.get()
+        self.assertEqual(diary.growth_stage, Diary.GrowthStage.ROOTING)
+
+    def test_growth_stage_defaults_to_null_when_not_provided(self):
+        self.client.force_authenticate(user=self.grower)
+        data = {'seedling': self.seedling.pk, 'content': '아직 성장 단계를 고르지 않은 일지'}
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data['growth_stage'])
+        diary = Diary.objects.get()
+        self.assertIsNone(diary.growth_stage)
+
 
 class ConvertToIllustrationTests(TestCase):
     """`gemini_illustration.convert_to_illustration()` 자체를 뷰 없이 검증한다."""
@@ -186,3 +212,18 @@ class DiaryListViewTests(APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_growth_stage_and_label_included_in_list_response(self):
+        Diary.objects.create(
+            seedling=self.seedling,
+            grower=self.grower,
+            content='잎이 많이 자랐어요',
+            growth_stage=Diary.GrowthStage.LEAFING,
+        )
+        self.client.force_authenticate(user=self.adopter)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        entry = next(d for d in response.data if d['growth_stage'] == Diary.GrowthStage.LEAFING)
+        self.assertEqual(entry['growth_stage_label'], '잎 성장 중')
