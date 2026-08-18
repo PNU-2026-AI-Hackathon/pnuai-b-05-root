@@ -174,8 +174,8 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     if (mounted) _load();
   }
 
-  /// [AnimatedSlide.onEnd]는 최초 mount 시에도 한 번 호출되므로(변화 없는
-  /// 애니메이션), 실제로 퇴장 중일 때만 리셋한다.
+  /// [_LottiePig]가 퇴장 애니메이션을 끝마쳤을 때 호출한다(자체적으로 1회만
+  /// 호출되도록 가드하지만, 방어적으로 여기서도 이미 false면 무시한다).
   void _onPigExitAnimationEnd() {
     if (_isPigExiting) setState(() => _isPigExiting = false);
   }
@@ -209,8 +209,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
       seedling: _seedling!,
       treeStatus: treeStatus,
       playGrowAnimation: _playGrowAnimation,
-      onGrowAnimationConsumed: () =>
-          setState(() => _playGrowAnimation = false),
+      onGrowAnimationConsumed: () => setState(() => _playGrowAnimation = false),
       showPig: showPig,
       lastCareCompletedAt: _lastCareCompletedAt,
       waterCount: _waterCount,
@@ -321,9 +320,7 @@ class _SeedlingHome extends StatelessWidget {
                 child: Text(
                   // 돼지가 실제로 안 보이는 상황(showPig == false)이면 pigInfested
                   // 톤이어도 wilted와 같은 문구를 쓴다 — 안 보이는 돼지를 언급하면 어색하다.
-                  showPig
-                      ? '6일이나 지났어요... 돼지가 찾아왔어요 🐷'
-                      : '3일 동안 자리를 비웠더니...',
+                  showPig ? '6일이나 지났어요... 돼지가 찾아왔어요 🐷' : '3일 동안 자리를 비웠더니...',
                   style: AppTextStyles.body(
                     fontSize: 14,
                     color: AppColors.badgePinkText,
@@ -344,23 +341,18 @@ class _SeedlingHome extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  AnimatedSlide(
-                    offset: isPigExiting
-                        ? Offset(exitDirectionLeft ? -1.5 : 1.5, 0)
-                        : Offset.zero,
-                    duration: const Duration(milliseconds: 700),
-                    curve: Curves.easeInOut,
-                    onEnd: onPigExitAnimationEnd,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const SpeechBubble(text: '꿀꿀~ 내가 왔다!'),
-                        GestureDetector(
-                          onTap: onPigTap,
-                          child: const PigCharacter(width: 60),
-                        ),
-                      ],
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SpeechBubble(text: '꿀꿀~ 내가 왔다!'),
+                      _LottiePig(
+                        showPig: showPig,
+                        isPigExiting: isPigExiting,
+                        exitDirectionLeft: exitDirectionLeft,
+                        onPigTap: onPigTap,
+                        onPigExitAnimationEnd: onPigExitAnimationEnd,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -529,8 +521,227 @@ class _GrowAnimatedTreeState extends State<_GrowAnimatedTree> {
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _finishAnimation(),
           );
-          return FigTreeIllustration(width: widget.width, status: widget.status);
+          return FigTreeIllustration(
+            width: widget.width,
+            status: widget.status,
+          );
         },
+      ),
+    );
+  }
+}
+
+/// 돼지 등장/배회/탭 리액션/퇴장을 관리하는 위젯 — `pig.json`(제자리 씰룩 반복)을
+/// `Transform.translate`/`Transform.scale`로 감싸 위치·크기 변화를 얹는다
+/// (Lottie는 "제자리 애니메이션"만 담당, 위치/크기는 Flutter `AnimationController`가 담당).
+enum _PigPhase { entering, idle, exiting }
+
+class _LottiePig extends StatefulWidget {
+  const _LottiePig({
+    required this.showPig,
+    required this.isPigExiting,
+    required this.exitDirectionLeft,
+    required this.onPigTap,
+    required this.onPigExitAnimationEnd,
+  });
+
+  // 호출부(_SeedlingHome)의 기존 파라미터 구성을 그대로 유지하기 위해 받지만,
+  // 등장 시점은 항상 이 위젯이 새로 mount되는 순간과 일치해(부모가 showPig ||
+  // isPigExiting일 때만 트리에 넣음) 내부 로직에서는 쓰이지 않는다.
+  final bool showPig;
+  final bool isPigExiting;
+  final bool exitDirectionLeft;
+  final VoidCallback onPigTap;
+  final VoidCallback onPigExitAnimationEnd;
+
+  @override
+  State<_LottiePig> createState() => _LottiePigState();
+}
+
+class _LottiePigState extends State<_LottiePig> with TickerProviderStateMixin {
+  late final AnimationController _hopController;
+  late final AnimationController _wanderController;
+  late final AnimationController _tapController;
+  late final Animation<double> _tapScale;
+
+  final _random = Random();
+  _PigPhase _phase = _PigPhase.entering;
+  bool _entryFromLeft = true;
+  bool _isReacting = false;
+  bool _exitEndCalled = false;
+  Offset _wanderFrom = Offset.zero;
+  Offset _wanderTarget = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _entryFromLeft = _random.nextBool();
+    _hopController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _wanderController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+    _tapController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+    _tapScale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 1.0,
+          end: 0.85,
+        ).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 45,
+      ),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 0.85,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 55,
+      ),
+    ]).animate(_tapController);
+
+    if (widget.isPigExiting) {
+      // 방어적 예외: 첫 build부터 이미 퇴장 중이면 등장을 건너뛰고 곧장 퇴장한다.
+      _phase = _PigPhase.idle;
+      _startExit();
+    } else {
+      _phase = _PigPhase.entering;
+      _runEntrance();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _LottiePig oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.isPigExiting &&
+        widget.isPigExiting &&
+        _phase != _PigPhase.exiting) {
+      _startExit();
+    }
+  }
+
+  /// 등장/퇴장 공용 "통통 튐" 오프셋. 수평은 [curve]로 단조 이동하고, 수직은
+  /// 감쇠하는 사인파(`sin(3πt)`, 3구간)로 2~3번 바운스하는 느낌을 낸다.
+  Offset _hopOffset({
+    required double fromX,
+    required double toX,
+    required Curve curve,
+  }) {
+    final t = _hopController.value;
+    final dx = fromX + (toX - fromX) * curve.transform(t);
+    const bounceHeight = 18.0;
+    final envelope = 1 - t;
+    final dy = -bounceHeight * envelope * sin(3 * pi * t).abs();
+    return Offset(dx, dy);
+  }
+
+  Future<void> _runEntrance() async {
+    await _hopController.forward(from: 0);
+    if (!mounted || _phase != _PigPhase.entering) return;
+    setState(() => _phase = _PigPhase.idle);
+    _scheduleWander();
+  }
+
+  Future<void> _startExit() async {
+    if (_phase == _PigPhase.exiting) return;
+    _wanderController.stop();
+    _hopController.stop();
+    setState(() {
+      _phase = _PigPhase.exiting;
+      _wanderFrom = Offset.zero;
+      _wanderTarget = Offset.zero;
+    });
+    await _hopController.forward(from: 0);
+    if (!mounted || _exitEndCalled) return;
+    _exitEndCalled = true;
+    widget.onPigExitAnimationEnd();
+  }
+
+  /// 3~5초 간격으로 나무 근처 좁은 범위(좌우 ±20px)에서 랜덤하게 배회한다.
+  /// `mounted`/`_phase` 체크로 퇴장 시작 시 스스로 멈춘다.
+  Future<void> _scheduleWander() async {
+    while (mounted && _phase == _PigPhase.idle) {
+      final waitMs = 3000 + _random.nextInt(2000);
+      await Future.delayed(Duration(milliseconds: waitMs));
+      if (!mounted || _phase != _PigPhase.idle) return;
+      _wanderFrom = _wanderTarget;
+      _wanderTarget = Offset((_random.nextDouble() * 40) - 20, 0);
+      await _wanderController.forward(from: 0);
+      if (!mounted || _phase != _PigPhase.idle) return;
+    }
+  }
+
+  void _handleTap() {
+    if (_phase != _PigPhase.idle || _isReacting) return;
+    _isReacting = true;
+    _tapController.forward(from: 0).whenComplete(() {
+      if (!mounted) return;
+      _isReacting = false;
+      widget.onPigTap();
+    });
+  }
+
+  @override
+  void dispose() {
+    _hopController.stop();
+    _wanderController.stop();
+    _tapController.stop();
+    _hopController.dispose();
+    _wanderController.dispose();
+    _tapController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    return GestureDetector(
+      onTap: _handleTap,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([
+          _hopController,
+          _wanderController,
+          _tapController,
+        ]),
+        builder: (context, child) {
+          final positionOffset = switch (_phase) {
+            _PigPhase.entering => _hopOffset(
+              fromX: _entryFromLeft ? -screenWidth : screenWidth,
+              toX: 0,
+              curve: Curves.easeOut,
+            ),
+            _PigPhase.exiting => _hopOffset(
+              fromX: 0,
+              toX: widget.exitDirectionLeft ? -screenWidth : screenWidth,
+              curve: Curves.easeIn,
+            ),
+            _PigPhase.idle => Offset.lerp(
+              _wanderFrom,
+              _wanderTarget,
+              Curves.easeInOut.transform(_wanderController.value),
+            )!,
+          };
+          return Transform.translate(
+            offset: positionOffset,
+            child: Transform.scale(scale: _tapScale.value, child: child),
+          );
+        },
+        child: SizedBox(
+          width: 60,
+          height: 60,
+          child: Lottie.asset(
+            'assets/lottie/pig.json',
+            repeat: true,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) =>
+                const PigCharacter(width: 60),
+          ),
+        ),
       ),
     );
   }
