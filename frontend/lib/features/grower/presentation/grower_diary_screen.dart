@@ -15,7 +15,8 @@ import '../data/grower_repository.dart';
 import '../data/vision_repository.dart';
 
 /// 1s — 재배자 일지 작성: 사진 업로드(선택) + 기록 입력. `POST /api/diary/`와 실제 연동한다.
-/// "성장 단계" 칩은 실제 `Diary` 모델에 대응하는 필드가 없어 여전히 로컬 UI 장식으로만 남는다.
+/// "성장 단계" 칩은 백엔드 `Diary.GrowthStage` choices(rooting/leafing/branching/mature)와
+/// 실제로 연동되어 선택한 코드값이 `growth_stage`로 전송된다.
 class GrowerDiaryScreen extends StatefulWidget {
   const GrowerDiaryScreen({super.key});
 
@@ -24,7 +25,14 @@ class GrowerDiaryScreen extends StatefulWidget {
 }
 
 class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
-  static const _stages = ['뿌리', '잎 성장 중', '가지 발달', '묘목 완성'];
+  /// (한글 라벨, 백엔드 코드값) 쌍 — `backend/diary/models.py`의
+  /// `Diary.GrowthStage`와 순서·값을 그대로 맞춘다.
+  static const _stages = <(String label, String code)>[
+    ('발근 중', 'rooting'),
+    ('잎 성장 중', 'leafing'),
+    ('가지 발달', 'branching'),
+    ('묘목 완성', 'mature'),
+  ];
 
   final _seedlingRepository = GrowerRepository();
   final _diaryRepository = DiaryRepository();
@@ -123,6 +131,7 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
         content: content,
         photoBytes: photoBytes,
         photoFileName: photoFileName,
+        growthStage: _stages[_selectedStage].$2,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -360,7 +369,7 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
           children: [
             for (var i = 0; i < _stages.length; i++)
               _StageChip(
-                label: _stages[i],
+                label: _stages[i].$1,
                 selected: i == _selectedStage,
                 onTap: () => setState(() => _selectedStage = i),
               ),
