@@ -119,7 +119,11 @@ class _WateringTimingScreenState extends State<WateringTimingScreen>
     final result = GameResult(
       score: average,
       cleared: cleared,
-      itemsEarned: pickRewardItems(GameType.wateringTiming, grade, _random),
+      gameType: GameType.wateringTiming,
+      // 골드는 결과 다이얼로그의 직접 선택 UI에서 채워지므로 여기서는 비워둔다.
+      itemsEarned: grade == RewardGrade.gold
+          ? const []
+          : pickRewardItems(GameType.wateringTiming, grade, _random),
       grade: grade,
     );
     if (!mounted) return;

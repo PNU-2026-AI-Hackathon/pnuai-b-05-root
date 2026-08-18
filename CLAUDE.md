@@ -633,16 +633,26 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   실버, 90~100은 골드(`RewardGrade` enum). `games/shared/game_items.dart`의 `rewardItems`는 4개
   게임이 공유하는 공용 아이템 풀(무화과잎 부채/시니어의 물뿌리개/햇살 한 줌 3종)이며,
   `rewardCountFor(type, grade)`가 등급·게임별 지급 개수를 결정합니다 — 브론즈는 모든 게임이
-  1개로 동일하고, 실버는 돼지 풍선 터뜨리기만 1개고 나머지 세 게임은 2개입니다("브론즈는 공통,
-  실버만 게임마다 다르다"는 표 형태라 게임별 로컬 상수 4곳에 중복 정의하는 대신 이 함수 하나로
-  모았습니다). 골드는 다음 브랜치에서 다룰 직접 선택 UI를 위해 아직 개수를 정하지 않아 `0`을
-  반환합니다(`TODO(game-reward-grade-choice)` 주석). `pickRewardItems(type, grade, random)`이 그
-  개수만큼 `rewardItems`에서 무작위로 뽑아 돌려주며(중복 허용), 골드처럼 개수가 0이거나 등급이
-  `null`이면 빈 리스트를 돌려줍니다. `showResultDialog()`는 획득 아이템이 있으면 아이템 박스를,
-  없는데 등급이 골드면 "골드 등급이에요! 곧 아이템을 직접 골라보실 수 있어요 🎁" 안내 문구를,
-  그마저 아니면(클리어 실패) "다음엔 50점 이상 도전해서..." 문구를 보여주는 3단 분기입니다. 골드
-  등급의 아이템 직접 선택 UI는 아직 구현되지 않은 상태로, 이 저장소의 `feat/game-reward-select-ui`
-  브랜치가 다루는 다음 작업입니다.
+  1개로 동일하고, 실버는 돼지 풍선 터뜨리기만 1개고 나머지 세 게임은 2개, 골드는 물주기 타이밍만
+  3개고 나머지 세 게임은 2개입니다("브론즈는 공통, 실버·골드는 게임마다 다르다"는 표 형태라
+  게임별 로컬 상수 4곳에 중복 정의하는 대신 이 함수 하나로 모았습니다). `pickRewardItems(type,
+  grade, random)`은 브론즈·실버에 한해 그 개수만큼 `rewardItems`에서 무작위로 뽑아
+  `GameResult.itemsEarned`를 즉시 채웁니다(중복 허용, grade가 `null`이면 빈 리스트). 골드는
+  게임 화면이 `pickRewardItems`를 호출하지 않고 `itemsEarned`를 빈 리스트로 남겨 `GameResult`를
+  만듭니다 — 대신 `GameResult.gameType`(각 게임이 자신의 `GameType`을 함께 담음)을 보고
+  `GameScaffold.showResultDialog()`가 `cleared && grade == RewardGrade.gold`일 때 일반 결과
+  다이얼로그 대신 `_GoldRewardDialog`(private `StatefulWidget`)로 분기합니다. 이 다이얼로그는
+  `rewardItems` 3종을 탭 가능한 카드로 나열하고, 카드를 탭할 때마다(같은 카드 중복 탭 허용) 그
+  아이템의 선택 횟수가 우상단 "×N" 배지로 올라가며 상단에 "N/목표개수 선택됨" 진행 문구를
+  보여줍니다. `rewardCountFor(gameType, RewardGrade.gold)`로 정한 목표 개수를 다 채워야 "확인"
+  버튼이 활성화되고(그 전엔 `onPressed: null`이라 탭해도 반응 없음), 눌러야 선택한 아이템들로
+  `itemsEarned`를 채운 새 `GameResult`를 만들어 다이얼로그를 닫고 게임 화면을 그 결과와 함께
+  종료합니다. 아이템 카드가 3장 + 안내문까지 겹치면 작은 화면에서 다이얼로그 기본 높이를 넘길 수
+  있어(다른 세 게임 대비 무화과 퀴즈 만점처럼 콘텐츠가 많은 경우, 위젯 테스트로 실제
+  `RenderFlex` 오버플로를 확인했음), `AlertDialog(scrollable: true)`로 넘치는 대신 스크롤되게
+  했습니다. `games_screen.dart`의 `_saveEarnedItems()`는 이 gameType 분기와 무관하게 항상
+  `GameResult.itemsEarned`를 그대로 순회하므로, 골드 직접 선택 결과도 브론즈/실버와 동일한
+  경로로 `InventoryStorage`에 저장됩니다(별도 분기 불필요).
 
   처음에는 `TokenStorage`/`OnboardingStorage`처럼 고정 키(`pigfig.inventory_items`) 하나로
   저장했는데, 이러면 같은 기기에서 A 계정으로 게임해 아이템을 모은 뒤 로그아웃하고 B 계정으로
@@ -861,10 +871,11 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 - 게임 탭의 실제 게임 4종(돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기/물주기 타이밍)은 모두 플레이
   가능하며, 점수는 100점 클램프·클리어 기준 50점으로 통일되고 50/70/90점 구간에 따라
   브론즈/실버/골드 등급(`computeRewardGrade`)이 매겨져 등급 배지와 함께 결과 다이얼로그에
-  표시됨(위 "게임" 문단 참고). 브론즈·실버는 등급별 개수만큼 공용 아이템 풀에서 무작위 지급까지
-  구현 완료됐지만, 골드 등급의 아이템 직접 선택 UI는 아직 없음(`feat/game-reward-select-ui`
-  브랜치의 다음 작업). 획득 아이템은 `InventoryStorage`에 로컬로만 누적됨(서버 저장 없음, `pigfig.
-  inventory_items.$userId`로 계정별 키 분리 완료 — 로그아웃 시 유지, 회원탈퇴 시 삭제). vision은 백엔드
+  표시됨(위 "게임" 문단 참고). 브론즈·실버는 등급별 개수만큼 공용 아이템 풀에서 무작위 지급되고,
+  골드는 결과 다이얼로그 안에서 사용자가 목표 개수만큼 직접 아이템을 골라 지급받는 UI까지 구현
+  완료됨(`GameScaffold._GoldRewardDialog`). 획득 아이템은 `InventoryStorage`에 로컬로만 누적됨
+  (서버 저장 없음, `pigfig.inventory_items.$userId`로 계정별 키 분리 완료 — 로그아웃 시 유지,
+  회원탈퇴 시 삭제). vision은 백엔드
   실제 추론 + 재배자 일지 작성 시 프론트엔드 자동 호출까지 연동 완료. FCM은 Android 클라이언트가
   로그인 시 실제 토큰을 등록하도록 연동 완료(다른 플랫폼은 미지원)
 - `PATCH /api/seedlings/{id}/pickup-donate/`(완성 묘목 수령/기부 선택)는 백엔드(models/

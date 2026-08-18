@@ -130,7 +130,11 @@ class _PestCatchScreenState extends State<PestCatchScreen> {
     final result = GameResult(
       score: _score,
       cleared: cleared,
-      itemsEarned: pickRewardItems(GameType.pestCatch, grade, _random),
+      gameType: GameType.pestCatch,
+      // 골드는 결과 다이얼로그의 직접 선택 UI에서 채워지므로 여기서는 비워둔다.
+      itemsEarned: grade == RewardGrade.gold
+          ? const []
+          : pickRewardItems(GameType.pestCatch, grade, _random),
       grade: grade,
     );
     if (!mounted) return;

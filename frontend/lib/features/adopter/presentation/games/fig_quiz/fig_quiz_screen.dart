@@ -70,7 +70,11 @@ class _FigQuizScreenState extends State<FigQuizScreen> {
     final result = GameResult(
       score: score,
       cleared: cleared,
-      itemsEarned: pickRewardItems(GameType.quiz, grade, Random()),
+      gameType: GameType.quiz,
+      // 골드는 결과 다이얼로그의 직접 선택 UI에서 채워지므로 여기서는 비워둔다.
+      itemsEarned: grade == RewardGrade.gold
+          ? const []
+          : pickRewardItems(GameType.quiz, grade, Random()),
       grade: grade,
     );
     if (!mounted) return;

@@ -28,13 +28,15 @@ const rewardItems = <GameItem>[
   ),
 ];
 
-/// 게임·등급별 랜덤 지급 개수.
+/// 게임·등급별 지급 개수.
 /// 브론즈는 모든 게임이 1개로 동일하고, 실버는 돼지 풍선 터뜨리기만 1개이고
 /// 나머지(무화과 퀴즈/해충 잡기/물주기 타이밍)는 2개다 — "브론즈는 공통, 실버만
 /// 게임마다 다르다"는 표 형태라 게임별 로컬 상수 4곳에 중복 정의하는 대신 이
-/// 공용 함수 하나로 모았다. 골드는 다음 브랜치의 직접 선택 UI에서 다룰
-/// 예정이라 아직 개수를 정하지 않아 0을 돌려준다(아래 [pickRewardItems]가 이
-/// 0을 그대로 빈 리스트로 반영한다).
+/// 공용 함수 하나로 모았다. 골드는 돼지 풍선 터뜨리기/무화과 퀴즈/해충 잡기가 2개,
+/// 물주기 타이밍만 3개다. 브론즈/실버는 [pickRewardItems]가 이 개수만큼 무작위로
+/// 뽑지만, 골드는 이 개수를 결과 다이얼로그의 직접 선택 UI가 "사용자가 골라야 하는
+/// 목표 개수"로 그대로 가져다 쓴다(각 게임 화면은 골드일 때 [pickRewardItems]를
+/// 호출하지 않고 `itemsEarned`를 빈 리스트로 남겨둔다).
 int rewardCountFor(GameType type, RewardGrade grade) {
   switch (grade) {
     case RewardGrade.bronze:
@@ -42,14 +44,14 @@ int rewardCountFor(GameType type, RewardGrade grade) {
     case RewardGrade.silver:
       return type == GameType.balloonPop ? 1 : 2;
     case RewardGrade.gold:
-      // TODO(game-reward-grade-choice): 골드는 직접 선택 UI로 지급할 예정.
-      return 0;
+      return type == GameType.wateringTiming ? 3 : 2;
   }
 }
 
 /// [grade]에 맞는 개수만큼 [rewardItems]에서 무작위로 뽑아 돌려준다.
-/// grade가 null(클리어 실패)이거나 gold(개수가 아직 0인 상태, 위 [rewardCountFor] 참고)면
-/// 빈 리스트를 돌려준다. 같은 아이템이 중복으로 뽑힐 수 있다(랜덤 지급이므로 허용).
+/// grade가 null(클리어 실패)이면 빈 리스트를 돌려준다. 같은 아이템이 중복으로
+/// 뽑힐 수 있다(랜덤 지급이므로 허용). 골드 등급은 사용자가 직접 고르므로(위
+/// [rewardCountFor] 참고) 각 게임 화면이 골드에 대해서는 이 함수를 호출하지 않는다.
 List<GameItem> pickRewardItems(GameType type, RewardGrade? grade, Random random) {
   if (grade == null) return const [];
   final count = rewardCountFor(type, grade);
