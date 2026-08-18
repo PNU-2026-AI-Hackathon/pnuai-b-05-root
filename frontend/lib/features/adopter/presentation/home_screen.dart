@@ -7,6 +7,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/revalidatable_state.dart';
 import '../../../core/storage/care_inventory_storage.dart';
 import '../../../core/storage/care_storage.dart';
+import '../../../core/storage/growth_stage_storage.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -17,6 +18,7 @@ import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../../../shared/widgets/speech_bubble.dart';
 import '../../../shared/widgets/status_badge.dart';
+import '../data/diary_repository.dart';
 import '../data/seedling_repository.dart';
 
 /// 가장 최근 케어 이후 경과일을 [TreeStatus]로 변환한다. 케어 기록이 아예 없으면
@@ -29,6 +31,13 @@ TreeStatus computeTreeStatus(DateTime? lastCompleted) {
   return TreeStatus.healthy;
 }
 
+/// 백엔드 `Diary.GrowthStage` choices와 동일한 순서 — 인덱스 비교로 "진행"을 판단한다.
+const _growthStageOrder = ['rooting', 'leafing', 'branching', 'mature'];
+
+/// [stage]가 [_growthStageOrder]에 없으면(알 수 없는/미래 버전 코드) -1을 반환해
+/// "진행 아님"으로 방어적으로 처리한다.
+int _growthStageIndex(String stage) => _growthStageOrder.indexOf(stage);
+
 /// 1f — 홈: 나의 무화과. 묘목 상태는 `GET /api/seedlings/`와 실제 연동하고,
 /// 케어 게이지(물주기/영양제/햇빛)는 여전히 로컬 mock이다.
 class HomeScreen extends StatefulWidget {
@@ -40,6 +49,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends RevalidatableState<HomeScreen> {
   final _repository = SeedlingRepository();
+  final _diaryRepository = DiaryRepository();
 
   bool _loading = true;
   bool _hasLoadedOnce = false;
@@ -52,6 +62,14 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   bool _isPigFedRecently = false;
   bool _isPigExiting = false;
   bool _exitDirectionLeft = true;
+
+  /// 현재 성장 단계(코드). 일지에 growth_stage가 하나도 없으면(신규 묘목, 또는 기존
+  /// 일지들) 'rooting' 기본값.
+  String _growthStage = 'rooting';
+
+  /// non-null이면 [_growthStage] 직전 단계(진행 애니메이션의 "출발" 구간) — 진행이
+  /// 감지되지 않았거나(변화 없음/히스토리 없음) 이미 소비된 경우 null.
+  String? _growthStageAdvanceFrom;
 
   /// 직전에 계산된 [TreeStatus] — POC 시범 적용이라 별도 저장소 없이 이 State
   /// 필드에만 기억한다(앱을 완전히 재시작하면 초기화되지만, 탭 전환/재조회에서는
@@ -104,22 +122,75 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
     );
   }
 
+  /// 대표 묘목의 최신 일지에서 성장 단계를 읽고, 계정별 저장소([GrowthStageStorage])와
+  /// 비교해 "진행됨"을 감지한다. 부가 기능이라 실패해도 화면 전체 에러로 번지면 안 되므로
+  /// [ApiException]을 이 메서드 안에서 직접 삼키고 기본값으로 폴백한다(센서/비전/챗봇
+  /// Gemini 연동에서 쓰는 것과 동일한 "게이트 확인 → try/except → 정적 폴백" 관례).
+  Future<_GrowthStageState> _fetchGrowthStageState(int seedlingId) async {
+    String current = 'rooting';
+    try {
+      final diaries = await _diaryRepository.fetchDiaries(seedlingId);
+      for (final diary in diaries) {
+        if (diary.growthStage != null) {
+          current = diary.growthStage!;
+          break;
+        }
+      }
+    } on ApiException {
+      return const _GrowthStageState.initial();
+    }
+
+    final userId = await TokenStorage().readUserId();
+    if (userId == null) return _GrowthStageState(stage: current);
+
+    final storage = GrowthStageStorage(userId: userId);
+    final stored = await storage.getLastSeenStage();
+    // 감지 즉시 무조건 최신값으로 덮어쓴다 — 이 State가 이후 unmount되거나 setState가
+    // 반영되지 않아도, "이 계정이 current 단계를 확인했다"는 사실 자체는 위젯 수명과
+    // 무관하게 남아야 한다(CareStorage.markCompleted와 동일한 관례).
+    await storage.setLastSeenStage(current);
+
+    final storedIndex = stored == null ? -1 : _growthStageIndex(stored);
+    final currentIndex = _growthStageIndex(current);
+    final advanced = stored != null && storedIndex >= 0 && currentIndex > storedIndex;
+    return _GrowthStageState(stage: current, advanceFrom: advanced ? stored : null);
+  }
+
+  /// [_load]/[revalidate]가 공유하는 다단계 조회. 대표 묘목을 먼저 고른 뒤, 케어 상태와
+  /// 성장 단계 상태를 병렬로 조회한다(서로 독립적인 조회라 순차로 기다릴 이유가 없다).
+  Future<_HomeFetchResult> _fetchData() async {
+    final seedlings = await _repository.fetchSeedlings();
+    final seedling = pickPrimarySeedling(seedlings);
+    final careFuture = _fetchCareState();
+    final stageFuture = seedling != null
+        ? _fetchGrowthStageState(seedling.id)
+        : Future.value(const _GrowthStageState.initial());
+    final careState = await careFuture;
+    final growthStageState = await stageFuture;
+    return _HomeFetchResult(
+      seedling: seedling,
+      careState: careState,
+      growthStageState: growthStageState,
+    );
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _errorMessage = null;
     });
     try {
-      final seedlings = await _repository.fetchSeedlings();
-      final careState = await _fetchCareState();
+      final result = await _fetchData();
       setState(() {
-        _seedling = pickPrimarySeedling(seedlings);
-        _lastCareCompletedAt = careState.lastCare;
-        _waterCount = careState.water;
-        _nutrientCount = careState.nutrient;
-        _pigFeedCount = careState.pigFeed;
-        _isPigFedRecently = careState.isPigFedRecently;
-        _updateGrowAnimationFlag(computeTreeStatus(careState.lastCare));
+        _seedling = result.seedling;
+        _lastCareCompletedAt = result.careState.lastCare;
+        _waterCount = result.careState.water;
+        _nutrientCount = result.careState.nutrient;
+        _pigFeedCount = result.careState.pigFeed;
+        _isPigFedRecently = result.careState.isPigFedRecently;
+        _growthStage = result.growthStageState.stage;
+        _growthStageAdvanceFrom = result.growthStageState.advanceFrom;
+        _updateGrowAnimationFlag(computeTreeStatus(result.careState.lastCare));
       });
     } on ApiException catch (e) {
       setState(() => _errorMessage = e.message);
@@ -135,17 +206,18 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   Future<void> revalidate() async {
     if (!_hasLoadedOnce) return _load();
     try {
-      final seedlings = await _repository.fetchSeedlings();
-      final careState = await _fetchCareState();
+      final result = await _fetchData();
       if (mounted) {
         setState(() {
-          _seedling = pickPrimarySeedling(seedlings);
-          _lastCareCompletedAt = careState.lastCare;
-          _waterCount = careState.water;
-          _nutrientCount = careState.nutrient;
-          _pigFeedCount = careState.pigFeed;
-          _isPigFedRecently = careState.isPigFedRecently;
-          _updateGrowAnimationFlag(computeTreeStatus(careState.lastCare));
+          _seedling = result.seedling;
+          _lastCareCompletedAt = result.careState.lastCare;
+          _waterCount = result.careState.water;
+          _nutrientCount = result.careState.nutrient;
+          _pigFeedCount = result.careState.pigFeed;
+          _isPigFedRecently = result.careState.isPigFedRecently;
+          _growthStage = result.growthStageState.stage;
+          _growthStageAdvanceFrom = result.growthStageState.advanceFrom;
+          _updateGrowAnimationFlag(computeTreeStatus(result.careState.lastCare));
         });
       }
     } on ApiException {
@@ -220,6 +292,8 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
       treeStatus: treeStatus,
       playGrowAnimation: _playGrowAnimation,
       onGrowAnimationConsumed: () => setState(() => _playGrowAnimation = false),
+      growthStage: _growthStage,
+      growthStageAdvanceFrom: _growthStageAdvanceFrom,
       showPig: showPig,
       lastCareCompletedAt: _lastCareCompletedAt,
       waterCount: _waterCount,
@@ -253,6 +327,31 @@ class _CareState {
   final bool isPigFedRecently;
 }
 
+/// [_HomeScreenState._fetchGrowthStageState] 조회 결과.
+class _GrowthStageState {
+  const _GrowthStageState({required this.stage, this.advanceFrom});
+  const _GrowthStageState.initial() : stage = 'rooting', advanceFrom = null;
+
+  final String stage;
+
+  /// non-null이면 [stage] 직전 단계 — 진행 애니메이션의 "출발" 구간.
+  final String? advanceFrom;
+}
+
+/// [_HomeScreenState._fetchData]가 묶어 반환하는 다단계 조회 결과 — [_HomeScreenState._load]/
+/// [_HomeScreenState.revalidate]가 중복 없이 공유한다.
+class _HomeFetchResult {
+  const _HomeFetchResult({
+    required this.seedling,
+    required this.careState,
+    required this.growthStageState,
+  });
+
+  final Seedling? seedling;
+  final _CareState careState;
+  final _GrowthStageState growthStageState;
+}
+
 /// 마지막 케어 시각을 홈 화면 문구로 변환한다. 기록이 없으면(신규 계정 등) 별도 안내를,
 /// 있으면 오늘/어제/N일 전으로 표시한다.
 String formatLastCare(DateTime? lastCompleted) {
@@ -269,6 +368,8 @@ class _SeedlingHome extends StatelessWidget {
     required this.treeStatus,
     required this.playGrowAnimation,
     required this.onGrowAnimationConsumed,
+    required this.growthStage,
+    required this.growthStageAdvanceFrom,
     required this.showPig,
     required this.lastCareCompletedAt,
     required this.waterCount,
@@ -292,6 +393,14 @@ class _SeedlingHome extends StatelessWidget {
   /// 애니메이션 재생이 끝나 정적 [FigTreeIllustration]으로 돌아간 뒤 호출되어,
   /// 부모의 [playGrowAnimation] 플래그를 리셋한다.
   final VoidCallback onGrowAnimationConsumed;
+
+  /// 현재 성장 단계 코드(rooting/leafing/branching/mature) — healthy 상태일 때
+  /// [_GrowthStageTree]가 idle-loop할 프레임 구간을 결정한다.
+  final String growthStage;
+
+  /// non-null이면 [growthStage] 직전 단계 — [_GrowthStageTree]가 그 구간 시작
+  /// 지점부터 [growthStage] 구간 시작 지점까지 한 번 전진 재생한다.
+  final String? growthStageAdvanceFrom;
 
   /// pigInfested 톤이어도 최근 12시간 안에 먹이를 줬으면 false — 나무 톤과
   /// 별개로 결정된다([_HomeScreenState._buildBody] 참고).
@@ -351,6 +460,8 @@ class _SeedlingHome extends StatelessWidget {
               status: treeStatus,
               playAnimation: playGrowAnimation,
               onAnimationConsumed: onGrowAnimationConsumed,
+              growthStage: growthStage,
+              growthStageAdvanceFrom: growthStageAdvanceFrom,
             ),
             const SizedBox(height: 8),
             if (showPig || isPigExiting)
@@ -484,12 +595,19 @@ class _GrowAnimatedTree extends StatefulWidget {
     required this.status,
     required this.playAnimation,
     required this.onAnimationConsumed,
+    required this.growthStage,
+    required this.growthStageAdvanceFrom,
   });
 
   final double width;
   final TreeStatus status;
   final bool playAnimation;
   final VoidCallback onAnimationConsumed;
+
+  /// 회복 flourish("좋아지는 전환")와 별개인 성장 단계 신호 — healthy 상태에서만
+  /// [_GrowthStageTree]로 전달된다. flourish 재생 중에는 쓰이지 않는다.
+  final String growthStage;
+  final String? growthStageAdvanceFrom;
 
   @override
   State<_GrowAnimatedTree> createState() => _GrowAnimatedTreeState();
@@ -515,6 +633,13 @@ class _GrowAnimatedTreeState extends State<_GrowAnimatedTree> {
   @override
   Widget build(BuildContext context) {
     if (!_showingAnimation) {
+      if (widget.status == TreeStatus.healthy) {
+        return _GrowthStageTree(
+          width: widget.width,
+          stage: widget.growthStage,
+          advanceFrom: widget.growthStageAdvanceFrom,
+        );
+      }
       return FigTreeIllustration(width: widget.width, status: widget.status);
     }
     // FigTreeIllustration과 동일한 박스 크기를 유지해 애니메이션↔정적 일러스트
@@ -538,6 +663,138 @@ class _GrowAnimatedTreeState extends State<_GrowAnimatedTree> {
           return FigTreeIllustration(
             width: widget.width,
             status: widget.status,
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// 무화과 성장 단계(rooting/leafing/branching/mature)에 맞는 프레임 구간을
+/// tree_growing.json에서 idle-loop 재생하고, 단계가 진행되면([advanceFrom] non-null)
+/// 이전 구간 시작 지점부터 새 구간 시작 지점까지 순방향으로 한 번 재생한 뒤 다시
+/// idle로 돌아간다. healthy 상태에서만 쓰인다([_GrowAnimatedTree] 참고) —
+/// wilted/pigInfested는 여전히 정적 [FigTreeIllustration]을 그대로 쓴다.
+///
+/// `AdopterShell`이 `IndexedStack`으로 홈 탭을 계속 마운트 상태로 유지하는 탓에,
+/// 다른 탭에 있다가 홈 탭으로 돌아올 때([RevalidatableState.revalidate]가 호출하는
+/// 조회 경로)는 이 위젯이 새로 마운트되지 않고 [didUpdateWidget]만 호출된다 — 재배자가
+/// 새 일지를 남기는 시점은 대부분 입양자가 홈 탭을 보고 있지 않을 때이므로, 실제
+/// 사용에서 "단계 진행"은 거의 항상 이 경로로 감지된다. 따라서 [didUpdateWidget]
+/// 오버라이드가 장식이 아니라 이 기능이 동작하기 위한 필수 조건이다.
+class _GrowthStageTree extends StatefulWidget {
+  const _GrowthStageTree({
+    required this.width,
+    required this.stage,
+    required this.advanceFrom,
+  });
+
+  final double width;
+  final String stage;
+  final String? advanceFrom;
+
+  @override
+  State<_GrowthStageTree> createState() => _GrowthStageTreeState();
+}
+
+class _GrowthStageTreeState extends State<_GrowthStageTree>
+    with SingleTickerProviderStateMixin {
+  /// tree_growing.json 확인된 사양: fr(frameRate)=60 — 전진 재생 시간(초)을 프레임
+  /// 수로부터 역산할 때만 쓴다. progress(0.0~1.0) 계산은 [_composition]의 실제
+  /// startFrame/endFrame을 쓰므로 총 프레임 수(1200)를 따로 하드코딩하지 않는다
+  /// (에셋이 나중에 다른 길이로 재수출돼도 안전).
+  static const _frameRate = 60.0;
+
+  static const _frameRanges = <String, (int, int)>{
+    'rooting': (400, 600),
+    'leafing': (600, 800),
+    'branching': (800, 1000),
+    'mature': (1000, 1200),
+  };
+
+  late final AnimationController _controller;
+  LottieComposition? _composition;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this);
+  }
+
+  @override
+  void didUpdateWidget(covariant _GrowthStageTree oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_composition == null) return; // 아직 로드 전 — onLoaded가 최신 값을 읽는다.
+    if (widget.advanceFrom != oldWidget.advanceFrom) {
+      _applyStage(stage: widget.stage, advanceFrom: widget.advanceFrom);
+    }
+  }
+
+  /// 알 수 없는 단계 코드(백엔드에 나중에 choice가 추가되는 등)가 들어오면 'rooting'
+  /// 구간으로 방어적 폴백한다.
+  (int, int) _rangeFor(String stage) =>
+      _frameRanges[stage] ?? _frameRanges['rooting']!;
+
+  double _progress(int frame) {
+    final c = _composition!;
+    return (frame - c.startFrame) / (c.endFrame - c.startFrame);
+  }
+
+  Duration _durationForFrames(int frames) =>
+      Duration(milliseconds: (frames / _frameRate * 1000).round());
+
+  void _idleAt(String stage) {
+    final (start, end) = _rangeFor(stage);
+    // 정방향 단순 반복은 구간 경계마다 시작 지점으로 순간 이동하는 "튐"이 생길 수
+    // 있다 — tree_growing.json은 seamless 루프로 제작된 에셋이 아니라서, 항상 현재
+    // 위치에서 이어 재생되는 핑퐁(reverse: true)이 더 안전하다.
+    _controller.repeat(
+      min: _progress(start),
+      max: _progress(end),
+      reverse: true,
+      period: _durationForFrames(end - start),
+    );
+  }
+
+  Future<void> _applyStage({required String stage, String? advanceFrom}) async {
+    if (advanceFrom == null || !_frameRanges.containsKey(advanceFrom)) {
+      _idleAt(stage);
+      return;
+    }
+    final (fromStart, _) = _rangeFor(advanceFrom);
+    final (toStart, _) = _rangeFor(stage);
+    _controller.value = _progress(fromStart);
+    await _controller.animateTo(
+      _progress(toStart),
+      duration: _durationForFrames(toStart - fromStart),
+    );
+    if (!mounted) return;
+    _idleAt(stage);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.width,
+      height: widget.width * 1.27,
+      child: Lottie.asset(
+        'assets/lottie/tree_growing.json',
+        controller: _controller,
+        fit: BoxFit.contain,
+        onLoaded: (composition) {
+          _composition = composition;
+          _applyStage(stage: widget.stage, advanceFrom: widget.advanceFrom);
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return FigTreeIllustration(
+            width: widget.width,
+            status: TreeStatus.healthy,
           );
         },
       ),

@@ -10,6 +10,8 @@ class DiaryEntry {
     this.photoUrl,
     this.illustrationUrl,
     this.yoloStatusTag,
+    this.growthStage,
+    this.growthStageLabel,
   });
 
   final int id;
@@ -22,6 +24,13 @@ class DiaryEntry {
   final String? illustrationUrl;
   final String? yoloStatusTag;
 
+  /// 재배자가 일지 작성 시 선택한 성장 단계 코드(rooting/leafing/branching/mature).
+  /// 이 필드 도입 이전 일지에는 값이 없어 null일 수 있다(백엔드 `Diary.growth_stage` 참고).
+  final String? growthStage;
+
+  /// [growthStage]의 한글 라벨(백엔드 `growth_stage_label`).
+  final String? growthStageLabel;
+
   factory DiaryEntry.fromJson(Map<String, dynamic> json) => DiaryEntry(
     id: json['id'] as int,
     content: json['content'] as String,
@@ -29,6 +38,8 @@ class DiaryEntry {
     photoUrl: json['photo'] as String?,
     illustrationUrl: json['illustration'] as String?,
     yoloStatusTag: json['yolo_status_tag'] as String?,
+    growthStage: json['growth_stage'] as String?,
+    growthStageLabel: json['growth_stage_label'] as String?,
   );
 }
 
