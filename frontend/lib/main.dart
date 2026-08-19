@@ -18,7 +18,9 @@ import 'features/adopter/presentation/pickup_donate_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/register_screen.dart';
 import 'features/grower/presentation/grower_activity_calendar_screen.dart';
+import 'features/grower/presentation/grower_anomaly_summary_screen.dart';
 import 'features/grower/presentation/grower_complete_screen.dart';
+import 'features/grower/presentation/grower_faq_screen.dart';
 import 'features/grower/presentation/grower_shell.dart';
 import 'features/onboarding/presentation/onboarding_screen.dart';
 
@@ -55,6 +57,9 @@ class PigFigApp extends StatelessWidget {
         '/grower/complete': (context) => const GrowerCompleteScreen(),
         '/grower/activity-calendar': (context) =>
             const GrowerActivityCalendarScreen(),
+        '/grower/anomaly-summary': (context) =>
+            const GrowerAnomalySummaryScreen(),
+        '/grower/faq': (context) => const GrowerFaqScreen(),
         '/adopter/care/water': (context) => const WaterCareScreen(),
         '/adopter/care/nutrient': (context) => const NutrientCareScreen(),
         '/adopter/care/sunlight': (context) => const SunlightCareScreen(),

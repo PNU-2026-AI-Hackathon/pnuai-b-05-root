@@ -8,12 +8,13 @@ import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
-import '../../../shared/widgets/pigfig_button.dart';
+import '../../../shared/widgets/service_card.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../auth/presentation/account_actions.dart';
 import '../data/grower_repository.dart';
 
-/// 재배자용 마이 탭: 프로필 카드(이메일 + 담당 묘목 수) + 로그아웃/회원탈퇴.
+/// 재배자용 마이 탭: 프로필 카드(이메일 + 담당 묘목 수) + 2x2 서비스 카드 그리드
+/// (재배 활동 캘린더/도움 요청하기/환경 이상 감지 요약/FAQ) + 로그아웃/회원탈퇴.
 /// `GrowerDashboardScreen` 앱바에 있던 사람 아이콘 진입점을 이 탭으로 대체했다.
 class GrowerMypageScreen extends StatefulWidget {
   const GrowerMypageScreen({super.key});
@@ -87,15 +88,67 @@ class _GrowerMypageScreenState extends RevalidatableState<GrowerMypageScreen> {
                     email: _email ?? '알 수 없음',
                     seedlingCount: _seedlingCount,
                   ),
-            const SizedBox(height: 28),
-            PigFigButton.outline(
-              label: '📅 나의 재배 활동 보기',
-              onPressed: () => Navigator.of(
-                context,
-              ).pushNamed('/grower/activity-calendar'),
+            const SizedBox(height: 22),
+            Text('주요 서비스', style: AppTextStyles.title(fontSize: 16)),
+            const SizedBox(height: 12),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: ServiceCard(
+                      emoji: '📅',
+                      iconBg: AppColors.green500,
+                      title: '재배 활동 캘린더',
+                      description: '작성한 일지 이력을 달력으로 확인해요',
+                      onTap: () => Navigator.of(
+                        context,
+                      ).pushNamed('/grower/activity-calendar'),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: ServiceCard(
+                      emoji: '🆘',
+                      iconBg: AppColors.pink100,
+                      title: '도움 요청하기',
+                      description: '전화 또는 문자로 문의해요',
+                      onTap: () => _showHelpSheet(context),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
-            _HelpSection(onTap: () => _showHelpSheet(context)),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: ServiceCard(
+                      emoji: '📊',
+                      iconBg: AppColors.green500,
+                      title: '환경 이상 감지 요약',
+                      description: '담당 묘목별 이상 감지 이력을 비교해요',
+                      onTap: () => Navigator.of(
+                        context,
+                      ).pushNamed('/grower/anomaly-summary'),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: ServiceCard(
+                      emoji: '❓',
+                      iconBg: AppColors.pink100,
+                      title: 'FAQ',
+                      description: '자주 묻는 질문을 확인해요',
+                      onTap: () =>
+                          Navigator.of(context).pushNamed('/grower/faq'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 28),
             Center(
               child: TextButton(
@@ -124,46 +177,6 @@ class _GrowerMypageScreenState extends RevalidatableState<GrowerMypageScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// 시니어 재배자가 헷갈릴 때 바로 누를 수 있는 큼직한 도움 요청 버튼 섹션.
-/// 작은 아이콘 버튼(`CareActionButton` 등)과 달리 가로 전체 폭 + 큰 글씨로
-/// 탭 실수를 줄인다.
-class _HelpSection extends StatelessWidget {
-  const _HelpSection({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '도움이 필요하신가요?',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.title(fontSize: 15),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 56,
-          child: ElevatedButton(
-            onPressed: onTap,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.pink500,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: const StadiumBorder(),
-            ),
-            child: Text(
-              '🆘 도움 요청하기',
-              style: AppTextStyles.title(fontSize: 18, color: Colors.white),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
