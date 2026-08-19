@@ -64,7 +64,8 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       if (!mounted) return;
       if (result.role == UserRole.adopter) {
-        Navigator.of(context).pushReplacementNamed('/adopter');
+        // 이전에 본 적 있는지 따지지 않고 입양자 로그인에 성공할 때마다 매번 보여준다.
+        Navigator.of(context).pushReplacementNamed('/onboarding');
       } else {
         Navigator.of(context).pushReplacementNamed('/grower');
       }
