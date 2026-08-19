@@ -8,19 +8,21 @@ import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../data/grower_repository.dart';
-import 'grower_complete_screen.dart';
+import 'grower_diary_list_screen.dart';
 import 'grower_seedling_overview.dart';
 
-/// 1r — 재배자 대시보드: 담당 묘목 현황 요약 + 목록. `GET /api/seedlings/`와 실제 연동한다.
-class GrowerDashboardScreen extends StatefulWidget {
-  const GrowerDashboardScreen({super.key});
+/// "일지" 탭: `GrowerDashboardScreen`(홈 탭)과 동일한 디자인(통계 3칸 + 담당 묘목 목록
+/// 카드)을 공유하되, 카드를 탭하면 완성 신고가 아니라 그 묘목의 일지 리스트 화면
+/// (`GrowerDiaryListScreen`)으로 이동한다.
+class GrowerDiaryTabScreen extends StatefulWidget {
+  const GrowerDiaryTabScreen({super.key});
 
   @override
-  State<GrowerDashboardScreen> createState() => _GrowerDashboardScreenState();
+  State<GrowerDiaryTabScreen> createState() => _GrowerDiaryTabScreenState();
 }
 
-class _GrowerDashboardScreenState
-    extends RevalidatableState<GrowerDashboardScreen> {
+class _GrowerDiaryTabScreenState
+    extends RevalidatableState<GrowerDiaryTabScreen> {
   final _repository = GrowerRepository();
 
   bool _loading = true;
@@ -50,9 +52,9 @@ class _GrowerDashboardScreenState
     }
   }
 
-  /// `GrowerShell`이 홈 탭 재진입 시 호출한다. 일지/환경점검 탭에 다녀오는 동안
-  /// 통계가 바뀌었을 수 있으니 다시 불러오되, 기존 목록은 그대로 둔 채 응답이 오면
-  /// 조용히 교체한다.
+  /// `GrowerShell`이 일지 탭 재진입 시 호출한다. 다른 탭에 다녀오는 동안 담당 묘목이
+  /// 바뀌었을 수 있으니 다시 불러오되, 기존 목록은 그대로 둔 채 응답이 오면 조용히
+  /// 교체한다.
   @override
   Future<void> revalidate() async {
     if (!_hasLoadedOnce) return _load();
@@ -64,22 +66,10 @@ class _GrowerDashboardScreenState
     }
   }
 
-  Future<void> _openComplete(Seedling seedling) async {
-    await Navigator.of(context).pushNamed(
-      '/grower/complete',
-      arguments: GrowerCompleteArgs(
-        seedlingId: seedling.id,
-        seedlingName: '무화과 #${seedling.id}',
-        adopterName: '입양자 #${seedling.adopterId}',
-      ),
-    );
-    // 완성 신고를 마치고 돌아오면(또는 그냥 닫아도) 최신 상태를 다시 불러온다.
-    if (mounted) _load();
-  }
-
-  void _showAlreadyCompletedMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('이미 완성된 묘목이에요 🎉')),
+  void _openDiaryList(Seedling seedling) {
+    Navigator.of(context).pushNamed(
+      '/grower/diary-list',
+      arguments: GrowerDiaryListArgs(seedlingId: seedling.id),
     );
   }
 
@@ -125,9 +115,7 @@ class _GrowerDashboardScreenState
                 final seedling = _seedlings[index];
                 return GrowerSeedlingListCard(
                   seedling: seedling,
-                  onTap: seedling.status == SeedlingStatus.growing
-                      ? () => _openComplete(seedling)
-                      : _showAlreadyCompletedMessage,
+                  onTap: () => _openDiaryList(seedling),
                 );
               },
             ),
