@@ -12,15 +12,19 @@ python manage.py seed_demo
 (비밀번호는 전부 demo1234)
 
 ## 묘목 5개 (전부 grower@demo.com 담당)
-재배중 3그루(#1~#3)는 각각 성장 단계가 다른 시점(rooting만 / rooting→leafing /
+재배중 3그루(#1~#3)는 각각 성장 단계가 다른 시점(mature / rooting→leafing /
 rooting→leafing→branching)까지 진행된 상태로 만들어 재배자 홈(선반 뷰)의 성장 단계
-배지가 묘목마다 다르게 보이도록 한다. 완료 2그루(#4~#5)는 pickup_or_donate까지 이미
-선택된 상태(#4=기부/도시농업 공동체, #5=수령)로 만들어 마이페이지의 기부 인증서 등
-완료 후 화면도 바로 확인할 수 있게 한다.
+배지가 묘목마다 다르게 보이도록 한다. #1은 재배중(growing) 상태를 유지한 채로
+growth_stage만 mature까지 올려뒀다 — "다 자랐지만 재배자가 아직 완성 신고를 하지
+않은" 시나리오를 캡처하기 위한 의도적 조합이다(완성 신고 전에는 성장 단계와 묘목
+상태가 서로 독립적으로 움직일 수 있다는 것을 보여준다). 완료 2그루(#4~#5)는
+pickup_or_donate까지 이미 선택된 상태(#4=기부/도시농업 공동체, #5=수령)로 만들어
+마이페이지의 기부 인증서 등 완료 후 화면도 바로 확인할 수 있게 한다.
 
 ## 일지
-재배중 묘목(#1~#3)은 성장 단계 진행에 맞춰 1~3건, 완료 묘목(#4~#5)은 완성 직전
-mature 단계 1건씩 만든다. 날짜는 전부 `timezone.now()` 기준 최근 2주 이내로 역산한
+재배중 묘목(#1~#3)은 성장 단계 진행에 맞춰 1~3건 만든다(#1은 mature 1건, #2는
+rooting→leafing 2건, #3은 rooting→leafing→branching 3건). 완료 묘목(#4~#5)도
+완성 직전 mature 단계 1건씩 만든다. 날짜는 전부 `timezone.now()` 기준 최근 2주 이내로 역산한
 상대 날짜라, 커맨드를 실행하는 시점에 따라 실제 달력 날짜가 달라진다(고정 달력
 날짜를 쓰던 예전 버전과 다른 점). 모든 일지에 `backend/media/diary/photos/`에 이미
 있는 실사진(SOURCE_PHOTO_NAMES)을 순환 배정해 photo 필드를 실제로 채운다 — 원래
@@ -221,8 +225,8 @@ class Command(BaseCommand):
     def _seed_all_diaries(self, seedlings, grower):
         # (경과일, growth_stage, content) — 경과일이 클수록 과거, 작을수록 최근.
         self._seed_diaries_for_seedling(seedlings['seedling1'], grower, [
-            (5, Diary.GrowthStage.ROOTING,
-             '오늘 첫 새싹이 올라왔어요! 흙 사이로 여린 순이 빼꼼 고개를 내밀었어요 🌱'),
+            (5, Diary.GrowthStage.MATURE,
+             '드디어 다 자랐어요! 무성한 가지와 잎이 정말 든든합니다 🌳'),
         ])
         self._seed_diaries_for_seedling(seedlings['seedling2'], grower, [
             (10, Diary.GrowthStage.ROOTING,
