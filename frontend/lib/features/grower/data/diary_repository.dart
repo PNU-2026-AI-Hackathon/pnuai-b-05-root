@@ -3,24 +3,33 @@ import 'dart:typed_data';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/token_storage.dart';
 
-/// 재배 활동 캘린더(`GrowerActivityCalendarScreen`)에서 날짜별로 묶어 보여줄 때 필요한
-/// 최소 필드만 담는다 — adopter 쪽 `DiaryEntry`와 달리 photo/illustration/yolo 태그는
-/// 이 화면에 쓰이지 않아 넣지 않았다.
+/// 재배 활동 캘린더(`GrowerActivityCalendarScreen`)와 묘목별 일지 리스트
+/// (`GrowerDiaryListScreen`)에서 쓴다 — adopter 쪽 `DiaryEntry`와 달리 photo/illustration은
+/// 이 두 화면에 쓰이지 않아 넣지 않았다.
 class DiaryEntry {
   const DiaryEntry({
     required this.id,
     required this.content,
     required this.createdAt,
+    this.yoloStatusTag,
+    this.growthStageLabel,
   });
 
   final int id;
   final String content;
   final DateTime createdAt;
+  final String? yoloStatusTag;
+
+  /// 재배자가 일지 작성 시 선택한 성장 단계의 한글 라벨(백엔드 `growth_stage_label`).
+  /// 이 필드 도입 이전 일지에는 값이 없어 null일 수 있다.
+  final String? growthStageLabel;
 
   factory DiaryEntry.fromJson(Map<String, dynamic> json) => DiaryEntry(
     id: json['id'] as int,
     content: json['content'] as String,
     createdAt: DateTime.parse(json['created_at'] as String),
+    yoloStatusTag: json['yolo_status_tag'] as String?,
+    growthStageLabel: json['growth_stage_label'] as String?,
   );
 }
 
