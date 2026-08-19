@@ -23,6 +23,7 @@ import 'features/grower/presentation/grower_complete_screen.dart';
 import 'features/grower/presentation/grower_diary_list_screen.dart';
 import 'features/grower/presentation/grower_diary_write_screen.dart';
 import 'features/grower/presentation/grower_faq_screen.dart';
+import 'features/grower/presentation/grower_font_scale_scope.dart';
 import 'features/grower/presentation/grower_seedling_analysis_screen.dart';
 import 'features/grower/presentation/grower_shell.dart';
 import 'features/onboarding/presentation/onboarding_screen.dart';
@@ -58,17 +59,29 @@ class PigFigApp extends StatelessWidget {
         '/register': (context) => const RegisterScreen(),
         '/adopter': (context) => const AdopterShell(),
         '/adopter/adopt': (context) => const AdoptScreen(),
-        '/grower': (context) => const GrowerShell(),
-        '/grower/complete': (context) => const GrowerCompleteScreen(),
-        '/grower/diary-list': (context) => const GrowerDiaryListScreen(),
-        '/grower/diary-write': (context) => const GrowerDiaryWriteScreen(),
-        '/grower/seedling-analysis': (context) =>
-            const GrowerSeedlingAnalysisScreen(),
-        '/grower/activity-calendar': (context) =>
-            const GrowerActivityCalendarScreen(),
-        '/grower/anomaly-summary': (context) =>
-            const GrowerAnomalySummaryScreen(),
-        '/grower/faq': (context) => const GrowerFaqScreen(),
+        // 재배자 화면은 전부 GrowerFontScaleScope로 감싸 저장된 글자 크기 배율을
+        // 적용한다 — 이 프로젝트는 단일 루트 Navigator라(중첩 라우터 없음) push
+        // 화면이 GrowerShell의 자손이 아니므로, GrowerShell 안에서만 MediaQuery를
+        // 감싸면 나머지 /grower/* 화면에는 적용되지 않는다(grower_font_scale_scope.dart 참고).
+        '/grower': (context) =>
+            const GrowerFontScaleScope(child: GrowerShell()),
+        '/grower/complete': (context) =>
+            const GrowerFontScaleScope(child: GrowerCompleteScreen()),
+        '/grower/diary-list': (context) =>
+            const GrowerFontScaleScope(child: GrowerDiaryListScreen()),
+        '/grower/diary-write': (context) =>
+            const GrowerFontScaleScope(child: GrowerDiaryWriteScreen()),
+        '/grower/seedling-analysis': (context) => const GrowerFontScaleScope(
+          child: GrowerSeedlingAnalysisScreen(),
+        ),
+        '/grower/activity-calendar': (context) => const GrowerFontScaleScope(
+          child: GrowerActivityCalendarScreen(),
+        ),
+        '/grower/anomaly-summary': (context) => const GrowerFontScaleScope(
+          child: GrowerAnomalySummaryScreen(),
+        ),
+        '/grower/faq': (context) =>
+            const GrowerFontScaleScope(child: GrowerFaqScreen()),
         '/adopter/care/water': (context) => const WaterCareScreen(),
         '/adopter/care/nutrient': (context) => const NutrientCareScreen(),
         '/adopter/care/sunlight': (context) => const SunlightCareScreen(),

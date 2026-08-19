@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/support_contact.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/revalidatable_state.dart';
+import '../../../core/storage/grower_font_scale_storage.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -12,6 +13,8 @@ import '../../../shared/widgets/service_card.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../auth/presentation/account_actions.dart';
 import '../data/grower_repository.dart';
+import 'grower_font_scale_scope.dart';
+import 'grower_settings_dialog.dart';
 
 /// 재배자용 마이 탭: 프로필 카드(이메일 + 담당 묘목 수) + 2x2 서비스 카드 그리드
 /// (재배 활동 캘린더/도움 요청하기/환경 이상 감지 요약/FAQ) + 로그아웃/회원탈퇴.
@@ -31,6 +34,7 @@ class _GrowerMypageScreenState extends RevalidatableState<GrowerMypageScreen> {
   bool _hasLoadedOnce = false;
   String? _email;
   int _seedlingCount = 0;
+  double _fontScale = GrowerFontScaleStorage.defaultScale;
 
   @override
   void initState() {
@@ -40,8 +44,13 @@ class _GrowerMypageScreenState extends RevalidatableState<GrowerMypageScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    final userId = await TokenStorage().readUserId();
     final email = await TokenStorage().readEmail();
     var seedlingCount = 0;
+    var fontScale = GrowerFontScaleStorage.defaultScale;
+    if (userId != null) {
+      fontScale = await GrowerFontScaleStorage(userId: userId).getScale();
+    }
     try {
       final seedlings = await _repository.fetchSeedlings();
       seedlingCount = seedlings.length;
@@ -53,9 +62,23 @@ class _GrowerMypageScreenState extends RevalidatableState<GrowerMypageScreen> {
     setState(() {
       _email = email;
       _seedlingCount = seedlingCount;
+      _fontScale = fontScale;
       _loading = false;
     });
     _hasLoadedOnce = true;
+  }
+
+  /// 설정 모달에서 저장한 새 배율을 받아 저장된 값과 화면 상태를 함께 갱신하고,
+  /// [GrowerFontScaleScope]가 `/grower` 라우트를 감싼 인스턴스를 찾아 즉시
+  /// 다시 읽게 해 재진입 없이 바로 반영되게 한다.
+  Future<void> _openSettings() async {
+    final newScale = await showGrowerSettingsDialog(
+      context,
+      initialScale: _fontScale,
+    );
+    if (newScale == null || !mounted) return;
+    setState(() => _fontScale = newScale);
+    await GrowerFontScaleScope.refresh(context);
   }
 
   /// `GrowerShell`이 마이 탭 재진입 시 호출한다. 다른 탭에서 묘목 상태가 바뀌었을
@@ -88,6 +111,7 @@ class _GrowerMypageScreenState extends RevalidatableState<GrowerMypageScreen> {
                 : _ProfileCard(
                     email: _email ?? '알 수 없음',
                     seedlingCount: _seedlingCount,
+                    onSettingsTap: _openSettings,
                   ),
             const SizedBox(height: 22),
             Text('주요 서비스', style: AppTextStyles.title(fontSize: 16)),
@@ -291,10 +315,15 @@ Future<void> _launchContact(
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.email, required this.seedlingCount});
+  const _ProfileCard({
+    required this.email,
+    required this.seedlingCount,
+    required this.onSettingsTap,
+  });
 
   final String email;
   final int seedlingCount;
+  final VoidCallback onSettingsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -312,31 +341,50 @@ class _ProfileCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
+      child: Stack(
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: AppColors.pink100,
-              shape: BoxShape.circle,
+          Column(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: AppColors.pink100,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                email,
+                style: AppTextStyles.title(
+                  fontSize: 16,
+                ).copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 8),
+              StatusBadge(
+                label: '담당 묘목 $seedlingCount그루 🌱',
+                background: AppColors.badgeGreenBg,
+                textColor: AppColors.badgeGreenText,
+                pill: false,
+              ),
+            ],
+          ),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: IconButton(
+              onPressed: onSettingsTap,
+              icon: const Icon(
+                Icons.settings_outlined,
+                color: AppColors.textMuted,
+              ),
             ),
-            child: const Icon(Icons.person, color: Colors.white, size: 28),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            email,
-            style: AppTextStyles.title(
-              fontSize: 16,
-            ).copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 8),
-          StatusBadge(
-            label: '담당 묘목 $seedlingCount그루 🌱',
-            background: AppColors.badgeGreenBg,
-            textColor: AppColors.badgeGreenText,
-            pill: false,
           ),
         ],
       ),
