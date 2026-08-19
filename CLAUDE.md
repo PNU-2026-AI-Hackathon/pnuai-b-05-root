@@ -23,10 +23,12 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
 
 ## 기술 스택
 
-- **프론트엔드**: Flutter — 최초 실행 온보딩(3장), 입양자(adopter) 플로우(회원가입/로그인/홈·타임라인·
-  게임·마이페이지 4탭/무화과 입양(결제)/케어 3종/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower)
-  플로우(홈·일지·환경점검·마이 4탭 + 묘목 완성 신고) 구현됨. accounts(회원가입/로그인/로그아웃/
-  `DELETE /api/accounts/me/` 회원탈퇴, Android는 로그인 성공 시 FCM 토큰도 함께 등록), seedlings
+- **프론트엔드**: Flutter — 스플래시(1.2초, `/splash`) → 로그인 화면 진입, 입양자(adopter) 플로우
+  (회원가입(닉네임 입력 포함)/로그인/홈·게임·타임라인·마이페이지 4탭 — 이 순서/무화과 입양(결제)/
+  케어 3종/수령·기부 선택/기부 인증서/AI 챗봇), 재배자(grower) 플로우(홈·일지·환경점검·마이 4탭 +
+  묘목 완성 신고) 구현됨. 입양자는 로그인에 성공할 때마다(최초 1회가 아니라 매번) 온보딩(3장)을 거쳐
+  홈으로 진입합니다. accounts(회원가입/로그인/로그아웃/`GET`·`PATCH`·`DELETE /api/accounts/me/`로
+  프로필 조회·닉네임 수정·회원탈퇴, Android는 로그인 성공 시 FCM 토큰도 함께 등록), seedlings
   (`GET /api/seedlings/` 목록 조회 + `POST /api/seedlings/` 입양(결제 후 생성, 재배자 자동 배정) +
   `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary(`POST /api/diary/` 작성 +
   `GET /api/diary/{seedling_id}/` 조회, 사진은 `image_picker`로 선택해 multipart 업로드), sensor
@@ -37,7 +39,9 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
   (`SharedPreferences`, 로그인한 사용자 id별로 키를 분리해 계정 간 아이템이 섞이지 않음)에 로컬
   저장됩니다. `PATCH /api/seedlings/{id}/pickup-donate/`(완성 묘목
   수령/기부 선택, 아래 "완성 묘목 수령/기부 선택" 참고)도 `pickup_donate_screen.dart`가 실제로
-  연동합니다. 홈 화면의 케어 게이지·마이페이지 프로필은 여전히 로컬 mock입니다
+  연동합니다. 입양자/재배자 마이페이지 모두 2x2 `ServiceCard` 그리드로 개편됐고, 프로필의
+  닉네임·이메일·담당/입양 묘목 수는 실제 서버 데이터(닉네임 수정은 `PATCH /api/accounts/me/`로 실제
+  저장)입니다 — 홈 화면의 케어 게이지 3종만 여전히 로컬(서버 미연동)입니다
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
 - **DB**: MySQL 8.0
 - **비전 분석**: YOLOv8-cls — `vision/yolo_inference.py`에서 `backend/vision/weights/best.pt`
@@ -109,14 +113,18 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 
 ### 커스텀 유저 모델
 `AUTH_USER_MODEL = accounts.User` (`accounts/models.py`). `username` 없이 `email`이 로그인 ID이며,
-`role` 필드(`adopter`/`grower` TextChoices)로 역할을 구분합니다. 별도 Profile 모델은 없습니다.
-`DELETE /api/accounts/me/`(`AccountDeleteView`, 본인만·JWT 인증 필수)는 회원탈퇴를 하드 삭제가 아니라
+`role` 필드(`adopter`/`grower` TextChoices)로 역할을 구분합니다. `nickname`(`CharField`, `blank=True`,
+`default=''`) 필드도 있어 마이페이지 프로필 표시·수정에 씁니다. 별도 Profile 모델은 없습니다.
+`/api/accounts/me/`(`AccountView`, 본인만·JWT 인증 필수)는 GET(프로필 조회)/PATCH(닉네임 수정,
+`ProfileSerializer` partial)/DELETE(회원탈퇴)를 한 뷰에서 지원합니다. DELETE는 하드 삭제가 아니라
 `is_active=False`로만 처리합니다 — `Seedling`/`Diary` 등이 유저를 FK로 물고 있어서, 특히 재배자가
 탈퇴할 때 담당 묘목까지 CASCADE로 사라지면 그 묘목을 보던 입양자 쪽 일지/성장 타임라인까지 깨지기
 때문입니다. `is_active=False`가 되면 `LoginView`가 쓰는 `authenticate()`(Django `ModelBackend`)도,
 기존에 발급된 access 토큰을 검증하는 simplejwt의 `JWTAuthentication.get_user()`도 둘 다 기본 동작으로
 이미 `is_active`를 확인해 거부하므로, 탈퇴 후 재로그인은 물론 탈퇴 시점에 들고 있던 토큰도 즉시
-쓸모없어집니다 — 이 뷰에서 따로 로그인 차단 로직을 추가할 필요가 없었습니다.
+쓸모없어집니다 — 이 뷰에서 따로 로그인 차단 로직을 추가할 필요가 없었습니다. `LoginView` 응답에는
+`access`/`refresh`/`role`과 함께 `id`/`email`/`nickname`도 내려줘, 프론트가 프로필 조회 API를 따로
+부르지 않고도 `TokenStorage`에 캐싱해 쓸 수 있게 합니다.
 
 ### 권한 검사 패턴 (여러 파일에 걸쳐 있어 한눈에 파악하기 어려움)
 이 프로젝트는 DRF의 오브젝트 레벨 permission class를 쓰지 않습니다. 대신 각 view의
@@ -587,25 +595,35 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   움직이는지"를 알려주는 쪽이 낫다고 판단했습니다. `_SeedlingCard`도 `isGrowing` 여부에 따라
   `Opacity(0.65)` + 아이콘 배경색을 `AppColors.dotInactive`(회색)로 바꿔 재배중 카드와 시각적으로
   구분합니다.
-- `main()`이 `Future<void>`로 바뀌어 `runApp()` 전에 `OnboardingStorage().hasSeenOnboarding()`을
-  `await`하고, 그 결과로 `PigFigApp(initialRoute: ...)`을 결정합니다(`/onboarding` 또는 `/`) — 위젯
-  트리 안에서 라우팅을 늦게 리다이렉트하는 대신 첫 프레임부터 올바른 화면으로 시작합니다. `PigFigApp`의
-  `initialRoute`는 기본값이 `/`라서 `widget_test.dart`처럼 `PigFigApp()`을 인자 없이 pump하는 기존
-  테스트는 영향받지 않습니다. `features/onboarding/presentation/onboarding_screen.dart`는 `PageView` 3장
-  (서비스 소개/시니어 재배자/앱으로 케어)이며, 마지막 페이지에서만 "시작하기 🌱" 버튼(`PigFigButton.
-  positive`, `AppColors.green500`)이 보이고 "건너뛰기" 링크는 `Visibility(maintainSize: true)`로
-  자리만 차지한 채 숨겨집니다(디자인 문서가 "건너뛰기" 자리에 투명 placeholder를 두는 것과 동일한
-  방식). 세 번째 페이지("앱으로 케어") 일러스트는 새로 그리지 않고 기존
-  `shared/widgets/fig_tree_illustration.dart`의 `FigTreeIllustration(width: 44)`를 흰 카드 안에
-  중앙 배치한 뒤, 물/햇빛/가지치기 아이콘 배지 3개(영양제 배지는 디자인 원본에 없어 의도적으로
+- `main()`의 `runApp(const PigFigApp(initialRoute: '/splash'))`가 진입점입니다.
+  `features/splash/presentation/splash_screen.dart`의 `SplashScreen`이 베이지 배경에
+  `PigFigLogo`(120px)를 `Hero(tag: 'pigfig-logo')`로 감싼 채 1.2초 보여준 뒤
+  `pushReplacementNamed('/')`(로그인 화면)로 넘어갑니다 — `login_screen.dart`의 로고도 같은
+  `Hero` 태그를 써서 전환 시 74px로 줄어들며 이어지는 애니메이션을 만듭니다. `PigFigApp` 생성자의
+  `initialRoute` 기본값은 여전히 `/`(로그인)라서, `widget_test.dart`처럼 `PigFigApp()`을 인자 없이
+  pump하는 기존 테스트는 영향받지 않고 `main()`에서만 `/splash`로 명시적으로 오버라이드합니다.
+  온보딩(`features/onboarding/presentation/onboarding_screen.dart`, `PageView` 3장 — 서비스
+  소개/시니어 재배자/앱으로 케어)은 이제 **"최초 1회만"이 아니라 입양자로 로그인에 성공할 때마다
+  매번** 보여집니다 — `login_screen.dart`가 `role == adopter`면 무조건 `pushReplacementNamed(
+  '/onboarding')`로 이동합니다. 예전에 노출 여부를 기록하던 `core/storage/onboarding_storage.dart`
+  의 `OnboardingStorage`(`hasSeenOnboarding()`/`markSeen()`)는 이 흐름에서 더 이상 호출되지 않는
+  **죽은 코드**입니다 — 클래스 자체는 나중에 "1회만 노출"로 되돌릴 가능성을 대비해 지우지 않고
+  남겨뒀을 뿐, 지금은 어디서도 인스턴스화되지 않습니다. 마지막 페이지에서만 "시작하기 🌱" 버튼
+  (`PigFigButton.positive`, `AppColors.green500`)이 보이고 "건너뛰기" 링크는 `Visibility(
+  maintainSize: true)`로 자리만 차지한 채 숨겨집니다(디자인 문서가 "건너뛰기" 자리에 투명
+  placeholder를 두는 것과 동일한 방식). 세 번째 페이지("앱으로 케어") 일러스트는 새로 그리지 않고
+  기존 `shared/widgets/fig_tree_illustration.dart`의 `FigTreeIllustration(width: 44)`를 흰 카드
+  안에 중앙 배치한 뒤, 물/햇빛/가지치기 아이콘 배지 3개(영양제 배지는 디자인 원본에 없어 의도적으로
   제외)를 감쌌습니다 — 배지는 온보딩 2가 이미 쓰던 `_EmojiBadge`를 재사용하되, 흰 배경에 옅은
   그림자가 있는 디자인이라 기본값 `false`인 `shadow` 파라미터를 추가해 온보딩 2 호출부는 그대로
   그림자 없이 두고 온보딩 3에서만 `true`로 켰습니다. `_pageCount` 상수 하나가 페이지 수·마지막
   페이지 판정·점 인디케이터 개수·건너뛰기 숨김을 전부 구동하는 구조라, 페이지를 추가할 때 이
-  상수와 `PageView.children`만 바꾸면 나머지 로직은 그대로 따라옵니다.
-- `adopter_shell.dart`도 `grower_shell.dart`와 동일하게 홈/타임라인(`GrowthTimelineScreen`)/게임/
-  마이페이지 4탭을 `IndexedStack`으로 유지하는 `StatefulWidget`입니다(처음엔 `switch` 식으로 선택된
-  화면 하나만 트리에 뒀는데, 두 `Shell` 모두 `IndexedStack`으로 바꿔 상태 보존과 구현 방식을
+  상수와 `PageView.children`만 바꾸면 나머지 로직은 그대로 따라옵니다. 온보딩 마지막 페이지의
+  "시작하기"는 `/adopter`로 push할 뿐이라, 로그인 직후 온보딩을 거쳐 홈으로 들어가는 흐름이 매번
+  반복됩니다.
+- `adopter_shell.dart`도 `grower_shell.dart`와 동일하게 홈/게임/타임라인(`GrowthTimelineScreen`)/
+  마이페이지 4탭(이 순서)을 `IndexedStack`으로 유지하는 `StatefulWidget`입니다(처음엔 `switch` 식으로
+  선택된 화면 하나만 트리에 뒀는데, 두 `Shell` 모두 `IndexedStack`으로 바꿔 상태 보존과 구현 방식을
   통일했습니다). 홈/타임라인도 `grower_shell.dart` 문단에서 설명한 `RevalidatableState` +
   `GlobalKey` 패턴으로 탭 재진입 시 백그라운드 재조회를 합니다(완성 신고나 새 일지처럼 다른 곳에서
   바뀐 데이터가 반영되어야 하므로). `games_screen.dart`
@@ -670,42 +688,68 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   넘기지 않음), `games_screen.dart`는 `initState`에서 `TokenStorage.readUserId()`로 로그인한
   사용자 id를 먼저 조회한 뒤에만 `InventoryStorage` 인스턴스를 만든다(조회 전에는 `_inventory`가
   `null`이라 아이템 획득 콜백은 `_inventory?.addItem()`으로 안전하게 무시된다). userId는
-  `AuthRepository.login()`이 로그인 응답의 `id`(accounts 앱의 `LoginView`가 `role`과 함께 내려줌)를
-  받아 `email`과 동일한 패턴으로 `TokenStorage`에 함께 저장해둔 값이다. 로그아웃은 계정이 그대로
+  `AuthRepository.login()`이 로그인 응답의 `id`(accounts 앱의 `LoginView`가 `role`/`email`/
+  `nickname`과 함께 내려줌)를 받아 `email`/`nickname`과 동일한 패턴으로 `TokenStorage`에 함께
+  저장해둔 값이다. 로그아웃은 계정이 그대로
   남으므로 인벤토리를 지우지 않지만(다음에 같은 계정으로 로그인하면 자연히 그 계정 것만 다시
   보임), 회원탈퇴는 `AuthRepository.deleteAccount()`가 `DELETE /api/accounts/me/` 성공 직후 —
   `TokenStorage.clear()`로 userId를 지우기 전에 — `TokenStorage.readUserId()`로 얻은 값으로
   `InventoryStorage(userId: ...).clear()`를 호출해 그 계정의 로컬 아이템까지 함께 삭제한다.
   `frontend/test/inventory_storage_test.dart`가 userId별 키 분리와 `clear()`가 다른 계정 데이터에
-  영향을 주지 않는지를 `SharedPreferences.setMockInitialValues`로 검증한다. `mypage_screen.dart`
-  는 프로필 카드 + 리스트 메뉴입니다. "성장 타임라인"은 하단 탭으로 승격되면서 이 메뉴 목록에서는
-  빠졌고(아래 참고), "AI 챗봇"과 "수령 / 기부 선택"·"기부 인증서"는 실제로 이동하며, 이번 범위 밖인
-  "알림 설정"/"입양 내역"만 탭하면 스낵바만 띄웁니다. "기부 인증서"는
-  마이페이지에서 곧장 진입할 때는 하드코딩된 mock 인자를 쓰고, `pickup_donate_screen.dart`에서
-  기부처를 선택해 진입할 때는 실제 선택한 기부처 이름을 `DonationCertificateArgs`로 넘깁니다(둘 다
-  `GrowerCompleteArgs`와 동일한 route-argument 패턴). `pickup_donate_screen.dart`는 수령/기부 두
-  옵션과 기부처 3곳을 모두 로컬 `State`로만 관리하며(수령 선택 시 기부처 목록·버튼 자체가 숨겨짐),
-  `Seedling.pickup_or_donate`/`donate_type` API 연동은 하지 않는 순수 정적 UI입니다. 디자인의 점선
-  테두리(일지 사진 업로드 박스, 기부 인증서 카드)는 Flutter에 내장 dashed border가 없어 실선으로
-  근사했습니다. `mypage_screen.dart` 하단(메뉴 리스트 밖, 별도 배치)에는 "로그아웃"(muted 텍스트)과
-  "회원탈퇴"(더 작은 회색 텍스트)가 있습니다 — 로직은 `features/auth/presentation/account_actions.dart`
-  의 `confirmLogout()`/`confirmDeleteAccount()`를 그대로 호출하는데, 이 두 함수는 `AlertDialog` 확인 →
-  `AuthRepository.logout()`(로컬 토큰 삭제만)/`deleteAccount()`(`DELETE /api/accounts/me/` 호출 후
-  토큰 삭제) → `pushNamedAndRemoveUntil('/', (route) => false)`로 로그인 화면 이동(뒤로가기로 못
-  돌아오게 네비게이션 스택을 전부 비움)까지를 한 번에 처리합니다. `GrowerShell`도 이제 홈/일지/
-  환경점검/마이 4탭이라 같은 로직을 `grower_mypage_screen.dart`(마이 탭)에서 그대로 재사용합니다 —
-  처음엔 마이페이지 탭이 없던 시절이라 `GrowerDashboardScreen` 앱바에 사람 아이콘+바텀시트로
-  로그아웃 진입점을 임시로 넣었었는데(`PigFigAppBar`의 `onProfileTap` 옵션), 마이 탭이 생기면서
-  중복이라 그 옵션과 바텀시트 코드는 완전히 제거했습니다. `grower_mypage_screen.dart`는 프로필
-  카드(이메일 + "담당 묘목 N그루", `GrowerRepository.fetchSeedlings().length`로 계산)와 로그아웃/
-  회원탈퇴만 있는 단순한 화면입니다 — 이메일은 백엔드에 프로필 조회 API가 없어서, 로그인 시점에
-  이미 알고 있는 값을 `TokenStorage`에 함께 저장해뒀다가(`AuthRepository.login()`이 토큰과 같이
-  `email`도 저장, `logout()`/`deleteAccount()`가 토큰과 함께 지움) 읽어오는 방식입니다. 프로필
-  카드 아래 "📅 나의 재배 활동 보기" 버튼은 `grower_activity_calendar_screen.dart`의
-  `GrowerActivityCalendarScreen`으로 push합니다 — 묘목별 일지 화면(`grower_diary_screen.dart`)은
-  새로 작성할 때만 쓰여서 과거 작성 이력을 전체적으로 돌아볼 방법이 없었던 것을 보완한 월별 달력
-  화면입니다. 탭 화면이 아니라 `Navigator.pushNamed`로 진입하는 독립 push 화면이라
-  `RevalidatableState` 대신 일반 `State`를 씁니다. `initState`에서 `GrowerRepository.
+  영향을 주지 않는지를 `SharedPreferences.setMockInitialValues`로 검증한다.
+
+  `mypage_screen.dart`(`AdopterShell`의 네 번째 탭)는 이제 프로필 카드 + 2x2 `ServiceCard` 그리드로
+  전면 개편됐습니다(과거엔 세로 리스트 메뉴 + "서포터 등급" 배너였으나 둘 다 제거). `StatelessWidget`
+  이던 것도 `StatefulWidget`(`RevalidatableState`)으로 바뀌어, `AdopterShell`이 다른 탭에서 마이
+  탭으로 돌아올 때마다 담당 묘목 수를 백그라운드로 재조회합니다. 프로필 카드는 `TokenStorage`에
+  캐싱된 닉네임(비어있으면 "입양자"로 대체)/이메일과, `SeedlingRepository.fetchSeedlings()`로 실제
+  조회한 "입양 중: N그루"(`StatusBadge`)를 보여줍니다 — 기존에 있던 무화과 진행률 게이지 박스는
+  실제 데이터에 대응하는 값이 없어 제거했습니다. 카드 우상단 톱니바퀴 아이콘을 누르면
+  `frontend/lib/features/adopter/presentation/account_settings_dialog.dart`의
+  `showAccountSettingsDialog()`가 뜹니다 — 닉네임 입력 필드는 `frontend/lib/features/auth/data/
+  accounts_repository.dart`의 `AccountsRepository.updateNickname()`으로 실제
+  `PATCH /api/accounts/me/`를 호출해 서버에 저장한 뒤 `TokenStorage.saveNickname()`으로 로컬 캐시도
+  갱신합니다. 알림 토글 3종(묘목 상태/이상, 오늘의 성장 일지, 수확&배송 일정)은
+  `core/storage/notification_preference_storage.dart`의 `NotificationPreferenceStorage`(계정별
+  `SharedPreferences` 키, 다른 로컬 storage 클래스와 동일한 컨벤션)에만 저장됩니다 — 서버에
+  이 값으로 실제 발송을 필터링하는 로직은 아직 없어서, 다이얼로그에 "아직 실제 알림 종류 제어에는
+  반영되지 않아요" 안내 문구를 함께 둡니다. 메뉴 그리드는
+  `frontend/lib/shared/widgets/service_card.dart`의 공용 `ServiceCard` 위젯(재배자 마이페이지와
+  공유)으로 4개(🎁 수령/기부 선택, 📜 기부 인증서, 🤖 AI 챗봇, 📋 입양 내역서 — 마지막 하나는 이번
+  범위 밖이라 탭하면 스낵바만) 구성됩니다. "성장 타임라인"은 하단 탭으로 이미 승격돼 있어 그리드에는
+  없습니다. "기부 인증서" 카드는 마이페이지에서 곧장 진입할 때는 하드코딩된 mock 인자를 쓰고,
+  `pickup_donate_screen.dart`에서 기부처를 선택해 진입할 때는 실제 선택한 기부처 이름을
+  `DonationCertificateArgs`로 넘깁니다(둘 다 `GrowerCompleteArgs`와 동일한 route-argument 패턴).
+  `pickup_donate_screen.dart`는 수령/기부 두 옵션과 기부처 3곳을 모두 로컬 `State`로만 관리하며(수령
+  선택 시 기부처 목록·버튼 자체가 숨겨짐), `Seedling.pickup_or_donate`/`donate_type` API 연동은 하지
+  않는 순수 정적 UI입니다. 디자인의 점선 테두리(일지 사진 업로드 박스, 기부 인증서 카드)는 Flutter에
+  내장 dashed border가 없어 실선으로 근사했습니다. 화면 하단(그리드 밖, 별도 배치)에는
+  "로그아웃"(muted 텍스트)과 "회원탈퇴"(더 작은 회색 텍스트)가 있습니다 — 로직은
+  `features/auth/presentation/account_actions.dart`의 `confirmLogout()`/`confirmDeleteAccount()`를
+  그대로 호출하는데, 이 두 함수는 `AlertDialog` 확인 → `AuthRepository.logout()`(로컬 토큰 삭제만)/
+  `deleteAccount()`(`DELETE /api/accounts/me/` 호출 후 토큰 삭제) →
+  `pushNamedAndRemoveUntil('/', (route) => false)`로 로그인 화면 이동(뒤로가기로 못 돌아오게
+  네비게이션 스택을 전부 비움)까지를 한 번에 처리합니다.
+
+  `GrowerShell`도 이제 홈/일지/환경점검/마이 4탭이라 같은 로그아웃/회원탈퇴 로직을
+  `grower_mypage_screen.dart`(마이 탭)에서 그대로 재사용합니다 — 처음엔 마이페이지 탭이 없던
+  시절이라 `GrowerDashboardScreen` 앱바에 사람 아이콘+바텀시트로 로그아웃 진입점을 임시로
+  넣었었는데(`PigFigAppBar`의 `onProfileTap` 옵션), 마이 탭이 생기면서 중복이라 그 옵션과 바텀시트
+  코드는 완전히 제거했습니다. `grower_mypage_screen.dart`도 입양자 마이페이지와 동일하게 프로필
+  카드 + 2x2 `ServiceCard` 그리드로 개편됐습니다(과거엔 "📅 나의 재배 활동 보기" 버튼 하나만 있는
+  단순한 화면). 프로필 카드는 이메일(백엔드에 프로필 조회 API가 없던 시절 로그인 시점 값을
+  `TokenStorage`에 함께 저장해뒀다가 읽는 방식 유지 — 닉네임은 재배자 화면에는 아직 노출하지
+  않음) + "담당 묘목 N그루"(`GrowerRepository.fetchSeedlings().length`)를 보여줍니다. 그리드 4개는
+  📅 재배 활동 캘린더(`grower_activity_calendar_screen.dart`의 `GrowerActivityCalendarScreen`으로
+  push), 🆘 도움 요청하기(바텀시트로 전화/문자 연결), 📊 환경 이상 감지 요약
+  (`grower_anomaly_summary_screen.dart`, 신규 — `GrowerRepository.fetchSeedlings()`와
+  `SensorRepository.fetchAnomalyHistory()`를 `Future.wait()`로 병렬 조회해 담당 묘목별 이상 건수를
+  `GaugeBar`로 시각화하고 최근 발생일을 보여줌, 로딩/에러/빈 목록/데이터 4상태 분기), ❓ FAQ
+  (`grower_faq_screen.dart`, 신규 — API 호출 없이 정적 데이터 7문항을 `ExpansionTile` 아코디언으로
+  나열)입니다. 재배 활동 캘린더 화면은 묘목별 일지 화면(`grower_diary_screen.dart`)이 새로 작성할
+  때만 쓰여서 과거 작성 이력을 전체적으로 돌아볼 방법이 없었던 것을 보완한 월별 달력 화면입니다.
+  탭 화면이 아니라 `Navigator.pushNamed`로 진입하는 독립 push 화면이라 `RevalidatableState` 대신
+  일반 `State`를 씁니다. `initState`에서 `GrowerRepository.
   fetchSeedlings()`로 담당 묘목 전체를 조회한 뒤, 각 묘목마다 `DiaryRepository.fetchDiaries()`를
   `Future.wait()`로 병렬 호출해 모든 일지를 모으고, `entry.createdAt.toLocal()`을 시분초 없이 자른
   날짜를 키로 `Map<DateTime, List<_DiaryOccurrence>>`에 묶습니다(`created_at`이 UTC라 그대로 자르면
@@ -726,9 +770,10 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   로딩/에러/(묘목 없음→ 입양 유도 CTA)/데이터 4가지 상태를 분기하며, 물주기 등 케어 게이지 3종은
   실제 묘목 데이터와 무관하게 동작합니다(로컬 영속화만 하며 서버에는 연동하지 않음, 위 케어 화면
   문단 참고).
-- `growth_timeline_screen.dart`는 `AdopterShell`의 두 번째 탭("타임라인")입니다 — 원래 마이페이지의
-  "성장 타임라인" 메뉴를 눌러야 들어갈 수 있었는데, 자주 확인하는 화면이라 하단 탭으로 승격하면서
-  마이페이지 메뉴 목록에서는 해당 항목을 뺐습니다(탭과 메뉴에 같은 목적지가 중복되는 걸 피함). 앱바도
+- `growth_timeline_screen.dart`는 `AdopterShell`의 세 번째 탭("타임라인", 홈→게임→타임라인→마이
+  순서)입니다 — 원래 마이페이지의 "성장 타임라인" 메뉴를 눌러야 들어갈 수 있었는데, 자주 확인하는
+  화면이라 하단 탭으로 승격했습니다(마이페이지가 이후 리스트 메뉴 자체를 그리드로 개편하면서 이제는
+  애초에 중복될 리스트 항목도 없습니다). 앱바도
   다른 탭 화면과 통일하려고 `closeLabel: '닫기'`(누르면 pop) 대신 `showNotificationBell: true`로
   바꿨습니다 — 탭 화면은 애초에 push되는 게 아니라 `IndexedStack`으로 항상 트리에 떠 있어서 "닫을"
   대상이 없기 때문입니다. `StatefulWidget`으로
@@ -846,11 +891,15 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   응답도 지금은 실제로는 같은 이유로 조용히 정적 폴백/mock으로 떨어지고 있을 가능성이 있음 —
   https://ai.studio/spend 에서 한도를 올린 뒤 세 기능 모두 재검증 필요
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
-- 프론트엔드: 최초 실행 온보딩(3장, `SharedPreferences` 플래그로 1회만 노출), 입양자 플로우
-  (회원가입/로그인/홈·타임라인·게임·마이페이지 4탭/무화과 입양(결제)/케어 3종/수령·기부 선택/기부
-  인증서/AI 챗봇), 재배자 플로우(홈·일지·환경점검·마이 4탭 + 묘목 완성 신고) 모두 구현됨.
-  `AdopterShell`/`GrowerShell` 둘 다 `IndexedStack`으로 탭 상태를 보존합니다. accounts(회원가입·
-  로그인·로그아웃·회원탈퇴, Android는 FCM 토큰 등록도 함께), seedlings(`GET /api/seedlings/` 목록
+- 프론트엔드: 스플래시(`/splash`, `Hero` 전환) → 로그인, 입양자로 로그인 성공 시마다(1회성이 아님)
+  온보딩(3장) 노출, 입양자 플로우(닉네임 입력 포함 회원가입/로그인/홈·게임·타임라인·마이페이지 4탭
+  (이 순서)/무화과 입양(결제)/케어 3종/수령·기부 선택/기부 인증서/AI 챗봇), 재배자 플로우(홈·일지·
+  환경점검·마이 4탭 + 묘목 완성 신고) 모두 구현됨. `AdopterShell`/`GrowerShell` 둘 다 `IndexedStack`
+  으로 탭 상태를 보존합니다. 입양자/재배자 마이페이지는 2x2 `ServiceCard` 그리드(재배자는 재배 활동
+  캘린더/도움 요청하기/환경 이상 감지 요약/FAQ, 입양자는 수령·기부 선택/기부 인증서/AI 챗봇/입양
+  내역서)로 개편되었고, 톱니바퀴 아이콘의 `AccountSettingsDialog`로 닉네임을 실제 서버에 저장할 수
+  있습니다. accounts(회원가입·로그인·로그아웃·프로필 조회/수정·회원탈퇴, Android는 FCM 토큰 등록도
+  함께), seedlings(`GET /api/seedlings/` 목록
   조회, `POST /api/seedlings/` 입양(mock 결제 후 생성, 재배자 자동 배정), `PATCH /api/seedlings/{id}/
   complete/` 완성 신고), diary(`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회),
   vision(`POST /api/vision/analyze/`, 일지 사진 업로드 후 자동 분석), sensor
@@ -866,8 +915,8 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   것까지 확인 — 데모 계정(`adopter@demo.com` 등)은 탈퇴 검증에 쓰지 않아 seed 데이터가 그대로
   보존됨; 무화과 입양(결제) 플로우는 로그인 → 입양 → 결제 → 홈 반영 → grower 자동 배정까지
   실기기(크롬)로 확인됨). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지/환경 점검 작성·묘목
-  입양·수령/기부 선택이 모두 실제 데이터를 쓰지만, 마이페이지 프로필은 여전히 로컬 mock 상태
-  (라우트 이동/새 탭 진입 시 초기화)이며 서버에 저장되지 않음. 케어 게이지 3종(물주기/영양제
+  입양·수령/기부 선택·마이페이지 프로필(닉네임 조회·수정, `GET`/`PATCH /api/accounts/me/`)이 모두
+  실제 데이터를 씀. 케어 게이지 3종(물주기/영양제
   2종은 `CareStorage`로 로컬 영속화, 햇빛은 완료 개념이 없어 제외)은 계획서상 "실제
   재배와 분리된 미션형 연출"이라는 의도적 설계라 서버에는 연동하지 않음(위 "케어 화면" 문단 참고).
   물주기/영양제/돼지먹이 횟수제 전환(`CareInventoryStorage`), 나무 방치 상태(`TreeStatus`), 돼지
