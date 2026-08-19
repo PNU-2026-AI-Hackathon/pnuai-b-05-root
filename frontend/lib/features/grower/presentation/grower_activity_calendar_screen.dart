@@ -23,8 +23,9 @@ class _DiaryOccurrence {
 }
 
 /// 재배자 마이 탭 "📅 나의 재배 활동 보기"에서 진입하는 월별 달력. 담당하는 모든 묘목의
-/// 일지 작성일을 한 화면에 점으로 모아 보여준다 — 묘목별 일지 화면(`grower_diary_screen.dart`)은
-/// 새로 작성할 때만 쓰여서, 과거 작성 이력을 전체적으로 돌아볼 방법이 없었다.
+/// 일지 작성일을 한 화면에 점으로 모아 보여준다 — 묘목별 일지 작성 화면
+/// (`grower_diary_write_screen.dart`)은 새로 작성할 때만 쓰여서, 과거 작성 이력을 전체적으로
+/// 돌아볼 방법이 없었다.
 /// `Navigator.pushNamed`로 진입하는 독립 push 화면이라(탭 화면이 아님) `RevalidatableState`
 /// 대신 일반 `State`를 쓴다.
 class GrowerActivityCalendarScreen extends StatefulWidget {

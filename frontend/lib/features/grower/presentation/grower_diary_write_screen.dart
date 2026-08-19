@@ -11,20 +11,29 @@ import '../../../shared/widgets/photo_source_dialog.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../data/diary_repository.dart';
-import '../data/grower_repository.dart';
 import '../data/vision_repository.dart';
+
+/// `/grower/diary-write` route argument: 어떤 묘목에 대한 일지를 쓸지는 이 화면에
+/// 진입하기 전에(다음 단계에서 만들 일지 리스트 화면에서) 이미 정해진다.
+class GrowerDiaryWriteArgs {
+  const GrowerDiaryWriteArgs({required this.seedlingId});
+
+  final int seedlingId;
+}
 
 /// 1s — 재배자 일지 작성: 사진 업로드(선택) + 기록 입력. `POST /api/diary/`와 실제 연동한다.
 /// "성장 단계" 칩은 백엔드 `Diary.GrowthStage` choices(rooting/leafing/branching/mature)와
-/// 실제로 연동되어 선택한 코드값이 `growth_stage`로 전송된다.
-class GrowerDiaryScreen extends StatefulWidget {
-  const GrowerDiaryScreen({super.key});
+/// 실제로 연동되어 선택한 코드값이 `growth_stage`로 전송된다. 대상 묘목은 route argument
+/// (`GrowerDiaryWriteArgs`)로 이미 정해진 채로 진입한다 — 이 화면 자체에서 묘목을 고르지 않는다.
+class GrowerDiaryWriteScreen extends StatefulWidget {
+  const GrowerDiaryWriteScreen({super.key});
 
   @override
-  State<GrowerDiaryScreen> createState() => _GrowerDiaryScreenState();
+  State<GrowerDiaryWriteScreen> createState() =>
+      _GrowerDiaryWriteScreenState();
 }
 
-class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
+class _GrowerDiaryWriteScreenState extends State<GrowerDiaryWriteScreen> {
   /// (한글 라벨, 백엔드 코드값) 쌍 — `backend/diary/models.py`의
   /// `Diary.GrowthStage`와 순서·값을 그대로 맞춘다.
   static const _stages = <(String label, String code)>[
@@ -34,16 +43,10 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
     ('묘목 완성', 'mature'),
   ];
 
-  final _seedlingRepository = GrowerRepository();
   final _diaryRepository = DiaryRepository();
   final _visionRepository = VisionRepository();
   final _noteController = TextEditingController();
   final _picker = ImagePicker();
-
-  bool _loadingSeedlings = true;
-  String? _loadErrorMessage;
-  List<Seedling> _seedlings = const [];
-  int? _selectedSeedlingId;
 
   int _selectedStage = 1;
   Uint8List? _photoBytes;
@@ -53,38 +56,9 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
   String? _lastAnalysisTag;
 
   @override
-  void initState() {
-    super.initState();
-    _loadSeedlings();
-  }
-
-  @override
   void dispose() {
     _noteController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadSeedlings() async {
-    setState(() {
-      _loadingSeedlings = true;
-      _loadErrorMessage = null;
-    });
-    try {
-      final seedlings = await _seedlingRepository.fetchSeedlings();
-      final growing = seedlings
-          .where((s) => s.status == SeedlingStatus.growing)
-          .toList();
-      setState(() {
-        _seedlings = seedlings;
-        _selectedSeedlingId = growing.isNotEmpty
-            ? growing.first.id
-            : (seedlings.isNotEmpty ? seedlings.first.id : null);
-      });
-    } on ApiException catch (e) {
-      setState(() => _loadErrorMessage = e.message);
-    } finally {
-      if (mounted) setState(() => _loadingSeedlings = false);
-    }
   }
 
   Future<void> _choosePhotoSource() async {
@@ -110,9 +84,7 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
     }
   }
 
-  Future<void> _submit() async {
-    final seedlingId = _selectedSeedlingId;
-    if (seedlingId == null) return;
+  Future<void> _submit(int seedlingId) async {
     final content = _noteController.text.trim();
     if (content.isEmpty) {
       ScaffoldMessenger.of(
@@ -196,48 +168,19 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final args =
+        ModalRoute.of(context)!.settings.arguments as GrowerDiaryWriteArgs;
+
     return Scaffold(
-      appBar: const PigFigAppBar(showNotificationBell: true),
+      appBar: const PigFigAppBar(closeLabel: '닫기'),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-        child: _buildBody(),
+        child: _buildBody(args.seedlingId),
       ),
     );
   }
 
-  Widget _buildBody() {
-    if (_loadingSeedlings) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.pink500),
-      );
-    }
-    if (_loadErrorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _loadErrorMessage!,
-              style: AppTextStyles.body(
-                fontSize: 14,
-                color: AppColors.textMuted,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextButton(onPressed: _loadSeedlings, child: const Text('다시 시도')),
-          ],
-        ),
-      );
-    }
-    if (_seedlings.isEmpty) {
-      return Center(
-        child: Text(
-          '아직 담당하는 묘목이 없어요',
-          style: AppTextStyles.body(fontSize: 14, color: AppColors.textMuted),
-        ),
-      );
-    }
-
+  Widget _buildBody(int seedlingId) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -257,23 +200,10 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
         ),
         const SizedBox(height: 14),
         Text(
-          '어떤 묘목인가요?',
+          '무화과 #$seedlingId',
           style: AppTextStyles.body(
             fontSize: 13,
           ).copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final seedling in _seedlings)
-              _SeedlingChip(
-                label: '무화과 #${seedling.id}',
-                selected: seedling.id == _selectedSeedlingId,
-                onTap: () => setState(() => _selectedSeedlingId = seedling.id),
-              ),
-          ],
         ),
         const SizedBox(height: 14),
         GestureDetector(
@@ -405,7 +335,7 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
         const SizedBox(height: 16),
         PigFigButton.primary(
           label: '입양자에게 전달하기',
-          onPressed: _submit,
+          onPressed: () => _submit(seedlingId),
           loading: _submitting,
         ),
         if (_analyzing) ...[
@@ -452,42 +382,6 @@ class _GrowerDiaryScreenState extends State<GrowerDiaryScreen> {
         ],
         const SizedBox(height: 14),
       ],
-    );
-  }
-}
-
-class _SeedlingChip extends StatelessWidget {
-  const _SeedlingChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.pink500 : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: selected
-              ? null
-              : Border.all(color: AppColors.outline, width: 1.5),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.body(
-            fontSize: 13,
-            color: selected ? Colors.white : AppColors.textMuted,
-          ).copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
-        ),
-      ),
     );
   }
 }

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/revalidatable_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/pigfig_app_bar.dart';
 import 'grower_dashboard_screen.dart';
-import 'grower_diary_screen.dart';
 import 'grower_mypage_screen.dart';
 import 'grower_sensor_screen.dart';
 
@@ -27,7 +27,7 @@ class _GrowerShellState extends State<GrowerShell> {
 
   late final _screens = [
     GrowerDashboardScreen(key: _dashboardKey),
-    const GrowerDiaryScreen(),
+    const _DiaryTabPlaceholder(),
     const GrowerSensorScreen(),
     GrowerMypageScreen(key: _mypageKey),
   ];
@@ -87,6 +87,35 @@ class _GrowerShellState extends State<GrowerShell> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 일지 탭 자리의 임시 플레이스홀더. 작성 폼(`GrowerDiaryWriteScreen`)이 이 탭 자체가 아니라
+/// 별도 push 화면(`/grower/diary-write`)으로 옮겨가면서, 이 탭에 들어갈 실제 화면(묘목별
+/// 일지 리스트)은 다음 단계에서 만든다.
+class _DiaryTabPlaceholder extends StatelessWidget {
+  const _DiaryTabPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const PigFigAppBar(showNotificationBell: true),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('📋', style: TextStyle(fontSize: 40)),
+            const SizedBox(height: 12),
+            Text(
+              '일지 화면을 준비하고 있어요',
+              style: AppTextStyles.body(
+                fontSize: 15,
+              ).copyWith(fontWeight: FontWeight.w700),
+            ),
+          ],
         ),
       ),
     );
