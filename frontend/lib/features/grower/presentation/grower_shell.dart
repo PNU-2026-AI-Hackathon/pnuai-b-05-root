@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../core/revalidatable_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
-import 'grower_dashboard_screen.dart';
 import 'grower_diary_tab_screen.dart';
 import 'grower_mypage_screen.dart';
 import 'grower_sensor_screen.dart';
+import 'grower_shelf_screen.dart';
 
-/// 재배자 하단 내비게이션 뼈대: 홈(대시보드) / 일지 / 환경점검 / 마이.
+/// 재배자 하단 내비게이션 뼈대: 홈(선반 뷰) / 일지 / 환경점검 / 마이.
 /// `IndexedStack`으로 네 화면을 모두 유지해 탭을 전환해도 상태가 초기화되지 않는다.
 /// 대신 홈/마이는 일지·환경점검 탭에 다녀오는 동안 통계가 바뀔 수 있어 탭 재진입 시
 /// [RevalidatableState]로 백그라운드 재조회 신호를 보낸다.
@@ -27,7 +27,7 @@ class _GrowerShellState extends State<GrowerShell> {
   final _mypageKey = GlobalKey<RevalidatableState>();
 
   late final _screens = [
-    GrowerDashboardScreen(key: _dashboardKey),
+    GrowerShelfScreen(key: _dashboardKey),
     GrowerDiaryTabScreen(key: _diaryKey),
     const GrowerSensorScreen(),
     GrowerMypageScreen(key: _mypageKey),

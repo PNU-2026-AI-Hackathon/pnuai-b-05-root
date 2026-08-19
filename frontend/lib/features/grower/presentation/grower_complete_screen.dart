@@ -9,7 +9,8 @@ import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../data/grower_repository.dart';
 
-/// `/grower/complete` route argument: 대시보드에서 탭한 담당 묘목 정보.
+/// `/grower/complete` route argument: 묘목 분석 화면(`GrowerSeedlingAnalysisScreen`)에서
+/// 넘어온 담당 묘목 정보.
 class GrowerCompleteArgs {
   const GrowerCompleteArgs({
     required this.seedlingId,
