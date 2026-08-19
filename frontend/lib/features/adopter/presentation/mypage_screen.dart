@@ -6,6 +6,7 @@ import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
+import '../../../shared/widgets/service_card.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../auth/presentation/account_actions.dart';
 import '../data/seedling_repository.dart';
@@ -120,7 +121,7 @@ class _MypageScreenState extends RevalidatableState<MypageScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: _ServiceCard(
+                    child: ServiceCard(
                       emoji: '🎁',
                       iconBg: AppColors.green500,
                       title: '수령 / 기부 선택',
@@ -132,7 +133,7 @@ class _MypageScreenState extends RevalidatableState<MypageScreen> {
                   ),
                   const SizedBox(width: 14),
                   Expanded(
-                    child: _ServiceCard(
+                    child: ServiceCard(
                       emoji: '📜',
                       iconBg: AppColors.pink100,
                       title: '기부 인증서',
@@ -155,7 +156,7 @@ class _MypageScreenState extends RevalidatableState<MypageScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: _ServiceCard(
+                    child: ServiceCard(
                       emoji: '🤖',
                       iconBg: AppColors.green500,
                       title: 'AI 챗봇 (무화과 Q&A)',
@@ -166,7 +167,7 @@ class _MypageScreenState extends RevalidatableState<MypageScreen> {
                   ),
                   const SizedBox(width: 14),
                   Expanded(
-                    child: _ServiceCard(
+                    child: ServiceCard(
                       emoji: '📋',
                       iconBg: AppColors.green500,
                       title: '입양 내역서',
@@ -294,72 +295,6 @@ class _ProfileCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ServiceCard extends StatelessWidget {
-  const _ServiceCard({
-    required this.emoji,
-    required this.iconBg,
-    required this.title,
-    required this.description,
-    required this.onTap,
-  });
-
-  final String emoji;
-  final Color iconBg;
-  final String title;
-  final String description;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-              child: Text(emoji, style: const TextStyle(fontSize: 17)),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: AppTextStyles.body(
-                fontSize: 14,
-              ).copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              description,
-              style: AppTextStyles.caption(
-                fontSize: 12,
-                color: AppColors.textMuted,
-              ).copyWith(height: 1.4),
-            ),
-          ],
-        ),
       ),
     );
   }
