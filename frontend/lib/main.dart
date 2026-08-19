@@ -23,6 +23,7 @@ import 'features/grower/presentation/grower_complete_screen.dart';
 import 'features/grower/presentation/grower_faq_screen.dart';
 import 'features/grower/presentation/grower_shell.dart';
 import 'features/onboarding/presentation/onboarding_screen.dart';
+import 'features/splash/presentation/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,7 +32,7 @@ Future<void> main() async {
   if (!kIsWeb && Platform.isAndroid) {
     await Firebase.initializeApp();
   }
-  runApp(const PigFigApp());
+  runApp(const PigFigApp(initialRoute: '/splash'));
 }
 
 class PigFigApp extends StatelessWidget {
@@ -48,6 +49,7 @@ class PigFigApp extends StatelessWidget {
       theme: AppTheme.light(),
       initialRoute: initialRoute,
       routes: {
+        '/splash': (context) => const SplashScreen(),
         '/onboarding': (context) => const OnboardingScreen(),
         '/': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
