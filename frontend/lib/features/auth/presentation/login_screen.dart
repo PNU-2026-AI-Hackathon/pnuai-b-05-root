@@ -128,7 +128,10 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             children: [
               const SizedBox(height: 84),
-              const PigFigLogo(size: 74, variant: PigFigLogoVariant.symbol),
+              const Hero(
+                tag: 'pigfig-logo',
+                child: PigFigLogo(size: 74, variant: PigFigLogoVariant.symbol),
+              ),
               const SizedBox(height: 12),
               Text('Pig.Fig.', style: AppTextStyles.display(fontSize: 34)),
               const SizedBox(height: 4),
