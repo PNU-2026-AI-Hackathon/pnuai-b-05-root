@@ -428,6 +428,13 @@ class _SeedlingHome extends StatelessWidget {
         DateTime.now().difference(seedling.startedAt).inDays + 1;
 
     return Stack(
+      // 기본값 topStart(좌상단)면 아래 non-positioned Column이 자기 콘텐츠 폭(가장 넓은
+      // 자식 기준)으로 shrink-wrap된 채 왼쪽에 붙어버려 나무가 화면 중앙이 아니라
+      // 왼쪽으로 치우쳐 보인다 — Column의 cross-axis(가로)는 stretch가 아닌 한 부모가
+      // 준 loose 제약을 다 채우지 않는다. topCenter로 지정해 나무를 포함한 콘텐츠를
+      // 화면 가로 중앙에 오게 한다. Positioned로 배치된 케어 버튼/하단 카드는 이
+      // alignment와 무관하게 기존 좌표 그대로 유지된다.
+      alignment: Alignment.topCenter,
       children: [
         Column(
           children: [
@@ -456,7 +463,7 @@ class _SeedlingHome extends StatelessWidget {
             ] else
               const SizedBox(height: 28),
             _GrowAnimatedTree(
-              width: 190,
+              width: 380,
               // TEMP(포스터 캡처용, 커밋 금지): 나무 색/에셋만 강제로 healthy로 고정.
               // 돼지 오버레이는 아래 showPig(실제 treeStatus 기반)를 그대로 쓰므로
               // 영향 없음 — 캡처 끝나면 `status: treeStatus`로 되돌릴 것.
