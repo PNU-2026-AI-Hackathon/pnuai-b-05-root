@@ -40,6 +40,7 @@ class AuthRepository {
       refresh: response['refresh'] as String,
       email: email,
       userId: userId,
+      nickname: response['nickname'] as String?,
     );
     // 최초 로그인 시에만 물주기/영양제를 각 2개씩 지급한다(멱등, 재로그인 시 재지급 안 됨).
     await CareInventoryStorage(userId: userId).grantInitialIfNeeded();
