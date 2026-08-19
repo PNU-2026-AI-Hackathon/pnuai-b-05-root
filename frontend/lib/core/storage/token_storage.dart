@@ -49,6 +49,13 @@ class TokenStorage {
     return prefs.getString(_nicknameKey);
   }
 
+  /// 닉네임만 갱신한다. `PATCH /api/accounts/me/` 성공 직후 access/refresh를 다시
+  /// 넘길 필요 없이 캐시된 닉네임만 최신 값으로 바꿀 때 쓴다.
+  Future<void> saveNickname(String nickname) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_nicknameKey, nickname);
+  }
+
   Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessKey);

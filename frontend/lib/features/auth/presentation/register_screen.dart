@@ -19,6 +19,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _authRepository = AuthRepository();
   final _emailController = TextEditingController();
+  final _nicknameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmController = TextEditingController();
 
@@ -37,6 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _emailController.dispose();
+    _nicknameController.dispose();
     _passwordController.dispose();
     _passwordConfirmController.dispose();
     super.dispose();
@@ -56,6 +58,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
         role: _selectedRole!,
+        nickname: _nicknameController.text.trim(),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -95,6 +98,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(hintText: '이메일'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _nicknameController,
+                decoration: const InputDecoration(hintText: '닉네임 (선택)'),
               ),
               const SizedBox(height: 12),
               TextField(

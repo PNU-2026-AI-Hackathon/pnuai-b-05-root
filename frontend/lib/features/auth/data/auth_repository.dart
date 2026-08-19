@@ -53,10 +53,16 @@ class AuthRepository {
     required String email,
     required String password,
     required UserRole role,
+    String nickname = '',
   }) async {
     await _apiClient.post(
       '/api/accounts/register/',
-      body: {'email': email, 'password': password, 'role': role.apiValue},
+      body: {
+        'email': email,
+        'password': password,
+        'role': role.apiValue,
+        'nickname': nickname,
+      },
     );
   }
 

@@ -30,12 +30,13 @@ class _AdopterShellState extends State<AdopterShell> {
 
   final _homeKey = GlobalKey<RevalidatableState>();
   final _timelineKey = GlobalKey<RevalidatableState>();
+  final _mypageKey = GlobalKey<RevalidatableState>();
 
   late final _screens = [
     HomeScreen(key: _homeKey),
     const GamesScreen(),
     GrowthTimelineScreen(key: _timelineKey),
-    const MypageScreen(),
+    MypageScreen(key: _mypageKey),
   ];
 
   void _switchTab(int index) {
@@ -46,6 +47,8 @@ class _AdopterShellState extends State<AdopterShell> {
         _homeKey.currentState?.revalidate();
       case _timeline:
         _timelineKey.currentState?.revalidate();
+      case _mypage:
+        _mypageKey.currentState?.revalidate();
     }
   }
 
