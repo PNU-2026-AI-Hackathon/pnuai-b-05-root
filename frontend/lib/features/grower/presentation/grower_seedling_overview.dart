@@ -6,8 +6,9 @@ import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../data/grower_repository.dart';
 
-/// 담당 묘목 통계 3칸(담당 묘목/재배중/완료) — `GrowerDashboardScreen`(홈 탭)과
-/// `GrowerDiaryTabScreen`(일지 탭)이 동일한 디자인을 공유하기 위해 뽑은 위젯이다.
+/// 담당 묘목 통계 3칸(담당 묘목/재배중/완료). 원래는 홈 탭(대시보드)과 일지 탭이 동일한
+/// 디자인을 공유하기 위해 뽑은 위젯인데, 홈 탭이 "선반 뷰"(`GrowerShelfScreen`)로 바뀌면서
+/// 지금은 `GrowerDiaryTabScreen`(일지 탭)만 사용한다.
 class GrowerSeedlingStatsRow extends StatelessWidget {
   const GrowerSeedlingStatsRow({super.key, required this.seedlings});
 

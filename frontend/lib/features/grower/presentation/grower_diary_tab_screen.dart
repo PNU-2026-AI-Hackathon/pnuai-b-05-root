@@ -11,9 +11,9 @@ import '../data/grower_repository.dart';
 import 'grower_diary_list_screen.dart';
 import 'grower_seedling_overview.dart';
 
-/// "일지" 탭: `GrowerDashboardScreen`(홈 탭)과 동일한 디자인(통계 3칸 + 담당 묘목 목록
-/// 카드)을 공유하되, 카드를 탭하면 완성 신고가 아니라 그 묘목의 일지 리스트 화면
-/// (`GrowerDiaryListScreen`)으로 이동한다.
+/// "일지" 탭: 예전 대시보드(현재는 "선반 뷰"인 홈 탭으로 대체됨)가 쓰던 것과 동일한
+/// 디자인(통계 3칸 + 담당 묘목 목록 카드)을 쓰되, 카드를 탭하면 완성 신고가 아니라 그
+/// 묘목의 일지 리스트 화면(`GrowerDiaryListScreen`)으로 이동한다.
 class GrowerDiaryTabScreen extends StatefulWidget {
   const GrowerDiaryTabScreen({super.key});
 

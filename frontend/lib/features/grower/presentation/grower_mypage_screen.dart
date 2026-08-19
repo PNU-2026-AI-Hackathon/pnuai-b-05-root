@@ -15,7 +15,8 @@ import '../data/grower_repository.dart';
 
 /// 재배자용 마이 탭: 프로필 카드(이메일 + 담당 묘목 수) + 2x2 서비스 카드 그리드
 /// (재배 활동 캘린더/도움 요청하기/환경 이상 감지 요약/FAQ) + 로그아웃/회원탈퇴.
-/// `GrowerDashboardScreen` 앱바에 있던 사람 아이콘 진입점을 이 탭으로 대체했다.
+/// 예전 대시보드(현재는 "선반 뷰"인 홈 탭으로 대체됨) 앱바에 있던 사람 아이콘 진입점을
+/// 이 탭으로 대체했다.
 class GrowerMypageScreen extends StatefulWidget {
   const GrowerMypageScreen({super.key});
 

@@ -23,6 +23,7 @@ import 'features/grower/presentation/grower_complete_screen.dart';
 import 'features/grower/presentation/grower_diary_list_screen.dart';
 import 'features/grower/presentation/grower_diary_write_screen.dart';
 import 'features/grower/presentation/grower_faq_screen.dart';
+import 'features/grower/presentation/grower_seedling_analysis_screen.dart';
 import 'features/grower/presentation/grower_shell.dart';
 import 'features/onboarding/presentation/onboarding_screen.dart';
 import 'features/splash/presentation/splash_screen.dart';
@@ -61,6 +62,8 @@ class PigFigApp extends StatelessWidget {
         '/grower/complete': (context) => const GrowerCompleteScreen(),
         '/grower/diary-list': (context) => const GrowerDiaryListScreen(),
         '/grower/diary-write': (context) => const GrowerDiaryWriteScreen(),
+        '/grower/seedling-analysis': (context) =>
+            const GrowerSeedlingAnalysisScreen(),
         '/grower/activity-calendar': (context) =>
             const GrowerActivityCalendarScreen(),
         '/grower/anomaly-summary': (context) =>
