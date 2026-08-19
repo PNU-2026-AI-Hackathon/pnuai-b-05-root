@@ -342,6 +342,13 @@ class _ProfileCard extends StatelessWidget {
         ],
       ),
       child: Stack(
+        // 기본값 topStart(좌상단)면 아래 Column이 자기 콘텐츠 폭(가장 넓은 자식
+        // 기준)으로 shrink-wrap된 채 왼쪽에 붙어버린다(Stack의 non-positioned 자식은
+        // 부모 폭까지 "채워지지" 않고, loosen()된 constraint 안에서 스스로 좁아질 수
+        // 있음 — Column의 cross-axis는 stretch가 아닌 한 항상 이렇게 동작한다).
+        // topCenter로 지정해 프로필 콘텐츠를 화면 중앙에 오게 한다. 우상단 설정
+        // 아이콘은 Positioned라 이 alignment와 무관하게 그대로 고정된다.
+        alignment: Alignment.topCenter,
         children: [
           Column(
             children: [

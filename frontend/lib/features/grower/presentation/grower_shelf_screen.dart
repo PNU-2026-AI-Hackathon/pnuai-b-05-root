@@ -34,9 +34,9 @@ List<List<_ShelfEntry>> _chunkIntoTiers(List<_ShelfEntry> entries, int size) {
 /// 각 단은 참고 React 목업의 렌더링 순서(단 헤더 → 브라켓+쿨링팬 로우+LED 3단 후드 →
 /// 은은한 하향 글로우 → 화분 3개 → 선반 받침대)를 그대로 옮긴 `_ShelfTier`다. 쿨링팬
 /// 아이콘/텍스트나 온습도 수치처럼 실제 데이터가 없는 부분은 장식(정적)으로만
-/// 표현한다 — 실제 재배 데이터는 화분번호/입양자/성장단계 배지뿐이고, 카드를 탭하면
-/// 묘목 분석 화면(`/grower/seedling-analysis`, 현재는 최소 뼈대)으로 이동하는 로직은
-/// 그대로다.
+/// 표현한다 — 실제 재배 데이터는 화분번호/성장단계 배지뿐이다(입양자 정보는 화분 카드가
+/// 좁아 제거했다). 카드를 탭하면 묘목 분석 화면(`/grower/seedling-analysis`, 현재는
+/// 최소 뼈대)으로 이동하는 로직은 그대로다.
 class GrowerShelfScreen extends StatefulWidget {
   const GrowerShelfScreen({super.key});
 
@@ -163,6 +163,11 @@ class _GrowerShelfScreenState extends RevalidatableState<GrowerShelfScreen> {
             color: AppColors.badgeGreenText,
           ),
         ),
+        const SizedBox(height: 6),
+        Text(
+          '오늘도 무화과들이 무럭무럭 자라고 있어요 🌿',
+          style: AppTextStyles.caption(fontSize: 12, color: AppColors.textMuted),
+        ),
         const SizedBox(height: 14),
         Expanded(
           child: RefreshIndicator(
@@ -286,9 +291,13 @@ class _TierHeaderBar extends StatelessWidget {
 
 /// 오버헤드 후드의 금속 브라켓 — 어두운 얇은 바 "안에" 볼트 점 2개를 `Row(spaceBetween)`로
 /// 배치한다(참고 React가 점을 별도 오버레이가 아니라 바 자체의 flex 자식으로 넣는 것과
-/// 동일 구조). 색은 새 hex 대신 [AppColors.textPrimary] 토큰을 재사용한다.
+/// 동일 구조). 색은 [AppColors]에 마땅한 회색 톤이 없어(가장 가까운 textPrimary는
+/// 검정에 가까운 웜톤이라 "금속 브라켓"보다는 어두운 나무 톤으로 읽힘) 화면 전용
+/// 인라인 상수로 진한 은색/메탈 톤을 추가했다.
 class _BracketBar extends StatelessWidget {
   const _BracketBar();
+
+  static const _metalColor = Color(0xFF6B7280);
 
   @override
   Widget build(BuildContext context) {
@@ -296,7 +305,7 @@ class _BracketBar extends StatelessWidget {
       height: 4,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: const BoxDecoration(
-        color: AppColors.textPrimary,
+        color: _metalColor,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(2),
           topRight: Radius.circular(2),
@@ -467,7 +476,6 @@ class _ShelfPot extends StatelessWidget {
   static const _potBorder = Color(0xFFBCA28E); // lerp(brown600, white, 0.42)
   static const _potRim = Color(0xFFAE8E77); // lerp(brown600, white, 0.30)
   static const _potCodeText = Color(0xFF4B3320); // lerp(brown600, black, 0.46)
-  static const _potAdopterText = Color(0xFF6F4B30); // lerp(brown600, black, 0.20)
 
   @override
   Widget build(BuildContext context) {
@@ -544,32 +552,13 @@ class _ShelfPot extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
 
-                // 화분 몸통 "안"의 텍스트 — 묘목번호 + 입양자.
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '무화과 #${seedling.id}',
-                      style: AppTextStyles.body(
-                        fontSize: 10,
-                        color: _potCodeText,
-                      ).copyWith(fontWeight: FontWeight.w900, height: 1),
-                    ),
-                    const SizedBox(width: 4),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 45),
-                      child: Text(
-                        '입양자 #${seedling.adopterId}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.body(
-                          fontSize: 9,
-                          color: _potAdopterText,
-                        ).copyWith(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ],
+                // 화분 몸통 "안"의 텍스트 — 묘목번호만(입양자 정보는 제거됨).
+                Text(
+                  '무화과 #${seedling.id}',
+                  style: AppTextStyles.body(
+                    fontSize: 10,
+                    color: _potCodeText,
+                  ).copyWith(fontWeight: FontWeight.w900, height: 1),
                 ),
 
                 // 성장단계 배지 — 화분 톤에 맞춘 저채도 칩(원본 React엔 없는 항목).

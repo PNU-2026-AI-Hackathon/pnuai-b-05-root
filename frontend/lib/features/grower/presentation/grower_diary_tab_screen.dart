@@ -13,7 +13,8 @@ import 'grower_seedling_overview.dart';
 
 /// "일지" 탭: 예전 대시보드(현재는 "선반 뷰"인 홈 탭으로 대체됨)가 쓰던 것과 동일한
 /// 디자인(통계 3칸 + 담당 묘목 목록 카드)을 쓰되, 카드를 탭하면 완성 신고가 아니라 그
-/// 묘목의 일지 리스트 화면(`GrowerDiaryListScreen`)으로 이동한다.
+/// 묘목의 일지 리스트 화면(`GrowerDiaryListScreen`)으로 이동한다. 상단 헤더(이모지+
+/// 타이틀, 부제목)는 `grower_shelf_screen.dart`의 톤을 그대로 따른다.
 class GrowerDiaryTabScreen extends StatefulWidget {
   const GrowerDiaryTabScreen({super.key});
 
@@ -100,6 +101,21 @@ class _GrowerDiaryTabScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          '📋 담당 묘목 일지',
+          style: AppTextStyles.title(
+            fontSize: 20,
+          ).copyWith(fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '묘목을 선택해 성장 기록을 남겨보세요',
+          style: AppTextStyles.guide(
+            fontSize: 14,
+            color: AppColors.badgeGreenText,
+          ),
+        ),
+        const SizedBox(height: 16),
         GrowerSeedlingStatsRow(seedlings: _seedlings),
         const SizedBox(height: 16),
         Text('담당 묘목 목록', style: AppTextStyles.title(fontSize: 17)),

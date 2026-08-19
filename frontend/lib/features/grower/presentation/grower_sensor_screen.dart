@@ -8,8 +8,16 @@ import '../../../shared/widgets/pigfig_button.dart';
 import '../data/grower_repository.dart';
 import '../data/sensor_repository.dart';
 
-/// 1t — 환경 점검: 재배지 방문 시 온도/습도/조도를 수동 입력. `POST /api/sensor/data/`,
-/// `GET /api/sensor/anomaly/{seedling_id}/`와 실제 연동한다.
+/// 1t — 환경 점검: 재배지 방문 시 온도/습도/조도를 수동 입력. 담당 묘목은 전부 같은
+/// 재배 공간(같은 환경)에 있다는 전제로, 묘목을 개별 선택하지 않고 화면 전체가 하나의
+/// 환경값만 다룬다 — 저장 시 담당 중인 재배중(growing) 묘목 "전부"에 같은 값을 각각
+/// `POST /api/sensor/data/`로 저장한다(백엔드 `SensorData.seedling`이 필수 FK이고,
+/// Prophet 기반 이상 감지·`grower_anomaly_summary_screen.dart`가 전부 묘목별 이력을
+/// 기준으로 동작해서, 대표 묘목 하나에만 저장하면 나머지 묘목의 이력이 계속 비게 되고
+/// 이상 감지 요약 화면의 묘목별 비교가 무의미해진다 — 그래서 대표 1건 저장 대신
+/// 묘목 수만큼 반복 호출하는 쪽을 선택했다). "최근 이상 이력"도
+/// `GET /api/sensor/anomaly/{seedling_id}/`를 묘목마다 호출해 합친 뒤 최신순으로
+/// 보여준다.
 class GrowerSensorScreen extends StatefulWidget {
   const GrowerSensorScreen({super.key});
 
@@ -24,17 +32,21 @@ class _GrowerSensorScreenState extends State<GrowerSensorScreen> {
   bool _loadingSeedlings = true;
   String? _loadErrorMessage;
   List<Seedling> _seedlings = const [];
-  int? _selectedSeedlingId;
 
   int _temperature = 16;
   int _humidity = 82;
   int _lux = 1400;
 
   bool _saving = false;
-  SensorReading? _lastReading;
+  List<SensorReading> _lastReadings = const [];
 
   bool _historyLoading = false;
   List<SensorReading> _history = const [];
+
+  /// 환경 기록의 실제 대상 — 담당 묘목 중 재배중(growing)인 것만. 완료된 묘목은
+  /// 이미 수확된 상태라 새 환경 기록을 쌓을 이유가 없어 제외한다.
+  List<Seedling> get _growingSeedlings =>
+      _seedlings.where((s) => s.status == SeedlingStatus.growing).toList();
 
   @override
   void initState() {
@@ -49,17 +61,8 @@ class _GrowerSensorScreenState extends State<GrowerSensorScreen> {
     });
     try {
       final seedlings = await _seedlingRepository.fetchSeedlings();
-      final growing = seedlings
-          .where((s) => s.status == SeedlingStatus.growing)
-          .toList();
-      final selectedId = growing.isNotEmpty
-          ? growing.first.id
-          : (seedlings.isNotEmpty ? seedlings.first.id : null);
-      setState(() {
-        _seedlings = seedlings;
-        _selectedSeedlingId = selectedId;
-      });
-      if (selectedId != null) _loadHistory(selectedId);
+      setState(() => _seedlings = seedlings);
+      await _loadHistory();
     } on ApiException catch (e) {
       setState(() => _loadErrorMessage = e.message);
     } finally {
@@ -67,11 +70,21 @@ class _GrowerSensorScreenState extends State<GrowerSensorScreen> {
     }
   }
 
-  Future<void> _loadHistory(int seedlingId) async {
+  /// 재배중인 묘목 전부의 이상 이력을 병렬 조회해 하나로 합친 뒤 최신순으로 정렬한다.
+  Future<void> _loadHistory() async {
+    final growing = _growingSeedlings;
+    if (growing.isEmpty) {
+      setState(() => _history = const []);
+      return;
+    }
     setState(() => _historyLoading = true);
     try {
-      final history = await _sensorRepository.fetchAnomalyHistory(seedlingId);
-      if (mounted) setState(() => _history = history);
+      final results = await Future.wait(
+        growing.map((s) => _sensorRepository.fetchAnomalyHistory(s.id)),
+      );
+      final merged = results.expand((list) => list).toList()
+        ..sort((a, b) => b.recordedAt.compareTo(a.recordedAt));
+      if (mounted) setState(() => _history = merged);
     } on ApiException {
       // 이력 조회 실패는 화면 전체를 막을 정도는 아니라 조용히 빈 목록으로 둔다.
       if (mounted) setState(() => _history = const []);
@@ -80,36 +93,40 @@ class _GrowerSensorScreenState extends State<GrowerSensorScreen> {
     }
   }
 
-  void _selectSeedling(int seedlingId) {
-    setState(() {
-      _selectedSeedlingId = seedlingId;
-      _lastReading = null;
-    });
-    _loadHistory(seedlingId);
-  }
-
   Future<void> _save() async {
-    final seedlingId = _selectedSeedlingId;
-    if (seedlingId == null) return;
+    final growing = _growingSeedlings;
+    if (growing.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('재배중인 묘목이 없어 저장할 수 없어요')),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
     try {
-      final reading = await _sensorRepository.createSensorData(
-        seedlingId: seedlingId,
-        temperature: _temperature.toDouble(),
-        humidity: _humidity.toDouble(),
-        light: _lux.toDouble(),
-      );
-      if (!mounted) return;
-      setState(() => _lastReading = reading);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            reading.isAnomaly ? '기록을 저장했어요 · 이상이 감지됐어요 ⚠️' : '기록을 저장했어요 ✅',
+      final readings = await Future.wait(
+        growing.map(
+          (s) => _sensorRepository.createSensorData(
+            seedlingId: s.id,
+            temperature: _temperature.toDouble(),
+            humidity: _humidity.toDouble(),
+            light: _lux.toDouble(),
           ),
         ),
       );
-      _loadHistory(seedlingId);
+      if (!mounted) return;
+      setState(() => _lastReadings = readings);
+      final anomalyCount = readings.where((r) => r.isAnomaly).length;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            anomalyCount > 0
+                ? '담당 묘목 ${growing.length}그루에 기록을 저장했어요 · $anomalyCount그루 이상 감지 ⚠️'
+                : '담당 묘목 ${growing.length}그루에 기록을 저장했어요 ✅',
+          ),
+        ),
+      );
+      await _loadHistory();
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -187,26 +204,6 @@ class _GrowerSensorScreenState extends State<GrowerSensorScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '어떤 묘목인가요?',
-                  style: AppTextStyles.body(
-                    fontSize: 13,
-                  ).copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final seedling in _seedlings)
-                      _SeedlingChip(
-                        label: '무화과 #${seedling.id}',
-                        selected: seedling.id == _selectedSeedlingId,
-                        onTap: () => _selectSeedling(seedling.id),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
                 _MetricRow(
                   icon: '🌡️',
                   iconBg: const Color(0xFFFDF3DC),
@@ -236,9 +233,9 @@ class _GrowerSensorScreenState extends State<GrowerSensorScreen> {
                   onDecrement: () => setState(() => _lux -= 100),
                   onIncrement: () => setState(() => _lux += 100),
                 ),
-                if (_lastReading != null) ...[
+                if (_lastReadings.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  _ResultBox(reading: _lastReading!),
+                  _ResultBox(readings: _lastReadings),
                 ],
                 const SizedBox(height: 16),
                 Text(
@@ -425,51 +422,25 @@ class _StepperButton extends StatelessWidget {
   }
 }
 
-class _SeedlingChip extends StatelessWidget {
-  const _SeedlingChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.pink500 : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: selected
-              ? null
-              : Border.all(color: AppColors.outline, width: 1.5),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.body(
-            fontSize: 13,
-            color: selected ? Colors.white : AppColors.textMuted,
-          ).copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
-        ),
-      ),
-    );
-  }
-}
-
-/// 방금 저장한 값의 판정 결과. `is_anomaly`/`gemini_diagnosis` 모두 서버 응답 그대로다.
+/// 방금 저장한 값의 판정 결과 — 담당 재배중 묘목 전부에 같은 값을 저장했으므로
+/// 묘목마다 판정이 다를 수 있다(Prophet 기반 이상 감지는 묘목별 과거 이력을 본다).
+/// 개별 묘목 단위로 나열하지 않고 "N그루 중 M그루 이상"으로 요약하며, 진단 문구는
+/// 같은 값이면 서로 겹치는 경우가 많아 중복을 제거해 보여준다.
 class _ResultBox extends StatelessWidget {
-  const _ResultBox({required this.reading});
+  const _ResultBox({required this.readings});
 
-  final SensorReading reading;
+  final List<SensorReading> readings;
 
   @override
   Widget build(BuildContext context) {
-    final isAnomaly = reading.isAnomaly;
+    final anomalyReadings = readings.where((r) => r.isAnomaly).toList();
+    final isAnomaly = anomalyReadings.isNotEmpty;
+    final diagnoses = anomalyReadings
+        .map((r) => r.geminiDiagnosis)
+        .whereType<String>()
+        .toSet()
+        .toList();
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -481,7 +452,9 @@ class _ResultBox extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isAnomaly ? '⚠️ 이상 감지' : '✅ 정상이에요',
+            isAnomaly
+                ? '⚠️ ${readings.length}그루 중 ${anomalyReadings.length}그루 이상 감지'
+                : '✅ ${readings.length}그루 모두 정상이에요',
             style: AppTextStyles.body(
               fontSize: 14,
               color: isAnomaly
@@ -489,10 +462,10 @@ class _ResultBox extends StatelessWidget {
                   : AppColors.badgeGreenText,
             ).copyWith(fontWeight: FontWeight.w700),
           ),
-          if (isAnomaly && reading.geminiDiagnosis != null) ...[
+          for (final diagnosis in diagnoses) ...[
             const SizedBox(height: 6),
             Text(
-              reading.geminiDiagnosis!,
+              diagnosis,
               style: AppTextStyles.body(
                 fontSize: 13,
                 color: const Color(0xFF6B675C),
