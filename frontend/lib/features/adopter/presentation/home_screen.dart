@@ -394,8 +394,8 @@ class _SeedlingHome extends StatelessWidget {
   /// 부모의 [playGrowAnimation] 플래그를 리셋한다.
   final VoidCallback onGrowAnimationConsumed;
 
-  /// 현재 성장 단계 코드(rooting/leafing/branching/mature) — healthy 상태일 때
-  /// [_GrowthStageTree]가 idle-loop할 프레임 구간을 결정한다.
+  /// 현재 성장 단계 코드(rooting/leafing/branching/mature) — [treeStatus]와
+  /// 무관하게 [_GrowthStageTree]가 idle-loop할 프레임 구간을 결정한다.
   final String growthStage;
 
   /// non-null이면 [growthStage] 직전 단계 — [_GrowthStageTree]가 그 구간 시작
@@ -585,10 +585,12 @@ class _SeedlingHome extends StatelessWidget {
 }
 
 /// [FigTreeIllustration] 자리에 들어가 "좋아지는 전환" 순간에만
-/// `tree_growing.json`을 한 번 재생한 뒤 정적 일러스트로 되돌아가는 POC 위젯
-/// (Lottie 도입 시범 적용, 12번 브랜치). [playAnimation]은 이 위젯이 처음
-/// build될 때만 확인한다 — 이후 재생 중에 [FigTreeIllustration.status]가
-/// 바뀌어도(예: 케어 게이지 조작) 재생을 중단하지 않는다.
+/// `tree_growing.json`을 한 번 재생한 뒤(회복 flourish), 평상시에는
+/// [status]에 맞는 에셋(healthy=`tree_growing.json`, wilted/pigInfested=
+/// `tree_wilted.json`)으로 [_GrowthStageTree]를 그리는 위젯(Lottie 도입 시범
+/// 적용, 12번 브랜치에서 시작해 이후 wilted 톤까지 확장). [playAnimation]은 이
+/// 위젯이 처음 build될 때만 확인한다 — 이후 재생 중에 [status]가 바뀌어도(예:
+/// 케어 게이지 조작) 재생을 중단하지 않는다.
 class _GrowAnimatedTree extends StatefulWidget {
   const _GrowAnimatedTree({
     required this.width,
@@ -604,8 +606,9 @@ class _GrowAnimatedTree extends StatefulWidget {
   final bool playAnimation;
   final VoidCallback onAnimationConsumed;
 
-  /// 회복 flourish("좋아지는 전환")와 별개인 성장 단계 신호 — healthy 상태에서만
-  /// [_GrowthStageTree]로 전달된다. flourish 재생 중에는 쓰이지 않는다.
+  /// 회복 flourish("좋아지는 전환")와 별개인 성장 단계 신호 — [status]와 무관하게
+  /// 항상 [_GrowthStageTree]로 전달된다(어느 상태든 같은 프레임 구간을 쓰므로).
+  /// flourish 재생 중에는 쓰이지 않는다.
   final String growthStage;
   final String? growthStageAdvanceFrom;
 
@@ -633,14 +636,12 @@ class _GrowAnimatedTreeState extends State<_GrowAnimatedTree> {
   @override
   Widget build(BuildContext context) {
     if (!_showingAnimation) {
-      if (widget.status == TreeStatus.healthy) {
-        return _GrowthStageTree(
-          width: widget.width,
-          stage: widget.growthStage,
-          advanceFrom: widget.growthStageAdvanceFrom,
-        );
-      }
-      return FigTreeIllustration(width: widget.width, status: widget.status);
+      return _GrowthStageTree(
+        width: widget.width,
+        status: widget.status,
+        stage: widget.growthStage,
+        advanceFrom: widget.growthStageAdvanceFrom,
+      );
     }
     // FigTreeIllustration과 동일한 박스 크기를 유지해 애니메이션↔정적 일러스트
     // 전환 시 레이아웃이 흔들리지 않게 한다.
@@ -671,25 +672,37 @@ class _GrowAnimatedTreeState extends State<_GrowAnimatedTree> {
 }
 
 /// 무화과 성장 단계(rooting/leafing/branching/mature)에 맞는 프레임 구간을
-/// tree_growing.json에서 idle-loop 재생하고, 단계가 진행되면([advanceFrom] non-null)
-/// 이전 구간 시작 지점부터 새 구간 시작 지점까지 순방향으로 한 번 재생한 뒤 다시
-/// idle로 돌아간다. healthy 상태에서만 쓰인다([_GrowAnimatedTree] 참고) —
-/// wilted/pigInfested는 여전히 정적 [FigTreeIllustration]을 그대로 쓴다.
+/// idle-loop 재생하고, 단계가 진행되면([advanceFrom] non-null) 이전 구간 시작
+/// 지점부터 새 구간 시작 지점까지 순방향으로 한 번 재생한 뒤 다시 idle로
+/// 돌아간다. 프레임 구간/idle 로직 자체는 [status]와 무관하게 동일하게
+/// 적용되고, [status]는 오직 어느 에셋을 재생할지만 결정한다([_assetPath]
+/// 참고) — healthy는 `tree_growing.json`, wilted/pigInfested는 같은 프레임
+/// 구성을 시든 색으로 리스킨한 `tree_wilted.json`을 쓴다. 두 상태
+/// 모두 같은 파일을 쓰므로 나무 톤만으로는 wilted/pigInfested를 구분할 수
+/// 없는데, 이 구분은 여전히 [_LottiePig] 오버레이(pigInfested일 때만 등장)가
+/// 담당한다([_SeedlingHome] 참고) — 이 위젯 자체는 관여하지 않는다.
 ///
 /// `AdopterShell`이 `IndexedStack`으로 홈 탭을 계속 마운트 상태로 유지하는 탓에,
 /// 다른 탭에 있다가 홈 탭으로 돌아올 때([RevalidatableState.revalidate]가 호출하는
 /// 조회 경로)는 이 위젯이 새로 마운트되지 않고 [didUpdateWidget]만 호출된다 — 재배자가
 /// 새 일지를 남기는 시점은 대부분 입양자가 홈 탭을 보고 있지 않을 때이므로, 실제
 /// 사용에서 "단계 진행"은 거의 항상 이 경로로 감지된다. 따라서 [didUpdateWidget]
-/// 오버라이드가 장식이 아니라 이 기능이 동작하기 위한 필수 조건이다.
+/// 오버라이드가 장식이 아니라 이 기능이 동작하기 위한 필수 조건이다. 같은 이유로
+/// [status] 전환(예: 3일 경과로 healthy→wilted) 역시 새로 마운트되지 않고
+/// [didUpdateWidget]에서 에셋 경로 변경으로 감지된다.
 class _GrowthStageTree extends StatefulWidget {
   const _GrowthStageTree({
     required this.width,
+    required this.status,
     required this.stage,
     required this.advanceFrom,
   });
 
   final double width;
+
+  /// 재생할 에셋만 결정한다([_assetPath] 참고) — 프레임 구간/idle 로직에는
+  /// 영향을 주지 않는다.
+  final TreeStatus status;
   final String stage;
   final String? advanceFrom;
 
@@ -725,10 +738,24 @@ class _GrowthStageTreeState extends State<_GrowthStageTree>
   void didUpdateWidget(covariant _GrowthStageTree oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_composition == null) return; // 아직 로드 전 — onLoaded가 최신 값을 읽는다.
+    if (widget.status != oldWidget.status) {
+      // 에셋 경로가 바뀌어 Lottie가 새 composition을 다시 로드한다(lottie
+      // 패키지의 LottieBuilder가 provider 변경을 감지해 자동으로 재요청) —
+      // 재적용은 build()의 onLoaded가 최신 widget.stage/advanceFrom으로
+      // 처리하므로 여기서 별도로 호출할 필요가 없다. 두 에셋이 프레임
+      // 구성(ip/op/fr)까지 동일해 재생 위치가 끊기지 않는다.
+      return;
+    }
     if (widget.advanceFrom != oldWidget.advanceFrom) {
       _applyStage(stage: widget.stage, advanceFrom: widget.advanceFrom);
     }
   }
+
+  /// healthy면 원본 성장 애니메이션, wilted/pigInfested면 동일한 프레임
+  /// 구성을 시든 색으로 리스킨한 파일을 고른다.
+  String get _assetPath => widget.status == TreeStatus.healthy
+      ? 'assets/lottie/tree_growing.json'
+      : 'assets/lottie/tree_wilted.json';
 
   /// 알 수 없는 단계 코드(백엔드에 나중에 choice가 추가되는 등)가 들어오면 'rooting'
   /// 구간으로 방어적 폴백한다.
@@ -784,7 +811,7 @@ class _GrowthStageTreeState extends State<_GrowthStageTree>
       width: widget.width,
       height: widget.width * 1.27,
       child: Lottie.asset(
-        'assets/lottie/tree_growing.json',
+        _assetPath,
         controller: _controller,
         fit: BoxFit.contain,
         onLoaded: (composition) {
@@ -792,10 +819,7 @@ class _GrowthStageTreeState extends State<_GrowthStageTree>
           _applyStage(stage: widget.stage, advanceFrom: widget.advanceFrom);
         },
         errorBuilder: (context, error, stackTrace) {
-          return FigTreeIllustration(
-            width: widget.width,
-            status: TreeStatus.healthy,
-          );
+          return FigTreeIllustration(width: widget.width, status: widget.status);
         },
       ),
     );
