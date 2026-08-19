@@ -95,14 +95,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 22),
               TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(hintText: '이메일'),
+                controller: _nicknameController,
+                decoration: const InputDecoration(hintText: '닉네임'),
               ),
               const SizedBox(height: 12),
               TextField(
-                controller: _nicknameController,
-                decoration: const InputDecoration(hintText: '닉네임 (선택)'),
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(hintText: '이메일'),
               ),
               const SizedBox(height: 12),
               TextField(
