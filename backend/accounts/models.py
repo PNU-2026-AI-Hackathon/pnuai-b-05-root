@@ -33,6 +33,9 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=10, choices=Role.choices)
+    # CharField에는 null=True를 쓰지 않는 게 Django 관례라 "값 없음"을 빈 문자열
+    # 하나로만 표현한다(회원가입 시 입력이 없어도 이메일 앞부분 등으로 자동 채우지 않음).
+    nickname = models.CharField(max_length=50, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     is_active = models.BooleanField(default=True)

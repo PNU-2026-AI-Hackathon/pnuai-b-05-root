@@ -11,6 +11,7 @@ Pig.Fig. 백엔드의 테이블(모델) 설계 문서입니다. 실제 구현 �
 | email | EmailField (unique) | 이메일 (로그인 ID) |
 | password | CharField | 비밀번호 (해시 저장) |
 | role | CharField (choices) | `adopter`(입양자) / `grower`(재배자) |
+| nickname | CharField (blank, default='') | 닉네임. 회원가입 시 선택 입력, 미입력 시 빈 문자열(자동 채움 없음) |
 | created_at | DateTimeField | 가입일시 |
 
 ## Seedling (`seedlings`)
