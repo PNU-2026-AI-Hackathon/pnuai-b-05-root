@@ -457,7 +457,10 @@ class _SeedlingHome extends StatelessWidget {
               const SizedBox(height: 28),
             _GrowAnimatedTree(
               width: 190,
-              status: treeStatus,
+              // TEMP(포스터 캡처용, 커밋 금지): 나무 색/에셋만 강제로 healthy로 고정.
+              // 돼지 오버레이는 아래 showPig(실제 treeStatus 기반)를 그대로 쓰므로
+              // 영향 없음 — 캡처 끝나면 `status: treeStatus`로 되돌릴 것.
+              status: TreeStatus.healthy,
               playAnimation: playGrowAnimation,
               onAnimationConsumed: onGrowAnimationConsumed,
               growthStage: growthStage,
@@ -543,9 +546,12 @@ class _SeedlingHome extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      '나의 무화과 #${seedling.id} 🌱',
-                      style: AppTextStyles.title(),
+                    Expanded(
+                      child: Text(
+                        '나의 무화과 #${seedling.id} 🌱',
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.title(),
+                      ),
                     ),
                     StatusBadge(
                       label: isGrowing ? '재배중' : '완료',
@@ -764,7 +770,13 @@ class _GrowthStageTreeState extends State<_GrowthStageTree>
 
   double _progress(int frame) {
     final c = _composition!;
-    return (frame - c.startFrame) / (c.endFrame - c.startFrame);
+    // lottie 패키지는 endFrame을 op - 0.01로 파싱한다(LottieCompositionParser) —
+    // 그 결과 frame이 op와 정확히 같은 마지막 구간(mature: 1000~1200)에서는
+    // raw가 1.0을 미세하게 초과해 AnimationController.repeat()의
+    // `max <= upperBound` assert를 위반한다. clamp로 진짜 마지막 지점(1.0)에
+    // 정확히 맞춘다.
+    final raw = (frame - c.startFrame) / (c.endFrame - c.startFrame);
+    return raw.clamp(0.0, 1.0);
   }
 
   Duration _durationForFrames(int frames) =>
