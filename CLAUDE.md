@@ -759,6 +759,28 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   묘목 id와 함께 요약 카드로 보여주고(여러 묘목의 일지가 같은 날 섞여 있을 수 있음), 일지가 없으면
   "이 날은 작성한 일지가 없어요"를 보여줍니다. 담당 묘목이 하나도 없으면 달력 대신 안내 문구만
   띄웁니다(다른 화면들과 동일한 로딩/에러/빈 목록/데이터 4상태 분기).
+
+  재배자 화면 전용 글자 크기 조절 기능도 있습니다. `grower_mypage_screen.dart`의 프로필 카드에
+  입양자 마이페이지와 같은 톱니바퀴 아이콘을 추가했고(`_ProfileCard`를 `Stack`으로 바꿔 우상단에
+  `IconButton` 배치), 탭하면 `grower_settings_dialog.dart`의 `showGrowerSettingsDialog()`가
+  작게(1.0, 기존 화면 기본 크기와 동일)/보통(1.15)/크게(1.3) 3단계 버튼 + 실시간 미리보기 텍스트 +
+  저장 버튼 모달을 띄웁니다. 배율은 `core/storage/grower_font_scale_storage.dart`의
+  `GrowerFontScaleStorage`(`CareInventoryStorage`와 동일한 계정별 `SharedPreferences` 저장 패턴)에
+  저장됩니다. 이 프로젝트는 `main.dart`의 `MaterialApp.routes`가 단일 루트 Navigator로 화면을 전부
+  등록해(중첩 라우터 없음) `/grower/*` push 화면들이 `GrowerShell`의 자손이 아니라서, `GrowerShell`
+  안에만 `MediaQuery` override를 두면 push 화면(완성 신고/일지/재배 활동 캘린더/이상 감지 요약/FAQ
+  등)에는 적용되지 않는 문제가 있었습니다 — 그래서 `main.dart`가 `/grower`로 시작하는 라우트 엔트리
+  8개 전부를 `grower_font_scale_scope.dart`의 `GrowerFontScaleScope`(저장된 배율을 읽어
+  `MediaQuery(textScaler: TextScaler.linear(...))`로 감싸는 위젯)로 개별적으로 감쌉니다. 설정
+  모달에서 저장 직후 재진입 없이 바로 반영되도록, `GrowerFontScaleScope.refresh(context)`가
+  `context.findAncestorStateOfType()`으로 가장 가까운 조상 scope(=`/grower` 라우트를 감싼
+  인스턴스, `GrowerShell`과 그 4탭 전체)를 찾아 저장된 값을 다시 읽게 합니다 — 다른 push 화면들은
+  매번 새 라우트 인스턴스가 생성되므로 다음 진입 시 자연히 최신 값을 읽어 별도 갱신이 필요
+  없습니다. `flutter build web` + Playwright(크롬 헤드리스, semantics DOM 활성화 후 시맨틱
+  텍스트/좌표 클릭 혼용)로 데모 재배자 계정 로그인 → 크게(1.3배) 선택·저장 → 마이/홈(선반 뷰)/
+  일지/환경점검/재배 활동 캘린더/FAQ(아코디언 펼침 포함)를 실제로 스크린샷 검증함 — 카드형
+  레이아웃이 많은 화면들에서도 텍스트가 줄바꿈될 뿐 overflow(RenderFlex 경고)는 없었고, 마이 탭은
+  재진입 없이 즉시 확대 반영되는 것까지 확인했습니다.
 - `features/adopter/data/seedling_repository.dart`는 `grower/data/grower_repository.dart`와 동일한
   패턴(같은 `GET /api/seedlings/`, 같은 `Seedling`/`SeedlingStatus` 모양)을 입양자 쪽에도 그대로
   적용한 별도 파일입니다 — 기능이 겹치더라도 feature 간 참조 없이 각 feature가 자기 데이터 계층을
@@ -939,3 +961,13 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   analyze`/`flutter test` 통과 확인, 실행 중인 백엔드에 데모 계정으로 로그인해 PATCH 왕복(기부
   선택 → 수령으로 변경)까지 HTTP로 직접 검증함 — Chrome에서 화면을 직접 조작하는 수동 시연 확인은
   아직 별도로 하지 않았으므로 실제 배포/시연 전에 한 번 더 확인 권장
+- 재배자 화면 전용 글자 크기 조절(작게/보통/크게, 위 "재배 활동 캘린더" 문단 아래 참고)은 프론트엔드
+  전용 기능(백엔드 변경 없음)으로 완료. `flutter analyze`/`flutter test` 통과, `flutter build web` +
+  Playwright 헤드리스 크롬으로 데모 재배자 계정 로그인 → 설정 모달에서 크게(1.3배) 선택·저장 →
+  마이/홈(선반 뷰)/일지/환경점검/재배 활동 캘린더/FAQ(아코디언 펼침 포함) 스크린샷 검증까지 마침 —
+  카드형 레이아웃이 밀집된 화면들에서도 overflow 없이 텍스트가 줄바꿈됨을 확인했고, 마이 탭은 저장
+  즉시(재진입 없이) 확대 반영됨을 확인. 이 검증 중 별개로 로컬 개발 DB에 diary 앱의
+  `0003_diary_growth_stage` 마이그레이션이 아직 적용되지 않아 `GET /api/diary/{id}/`가 500을
+  내는 것을 발견함(`Unknown column 'diary_diary.growth_stage'`) — 이번 작업과 무관한 기존 이슈라
+  손대지 않았으며, `backend/`에서 `python manage.py migrate`만 실행하면 해결됨(다음 세션이 이
+  화면들에서 원인 불명의 500/빈 목록을 마주치면 먼저 확인할 것).
