@@ -8,7 +8,7 @@ import 'growth_timeline_screen.dart';
 import 'home_screen.dart';
 import 'mypage_screen.dart';
 
-/// 입양자 하단 내비게이션 뼈대: 홈 / 타임라인 / 게임 / 마이페이지.
+/// 입양자 하단 내비게이션 뼈대: 홈 / 게임 / 타임라인 / 마이페이지.
 /// `IndexedStack`으로 네 화면을 모두 유지해 탭을 전환해도 상태(스크롤 위치,
 /// 불러온 데이터 등)가 초기화되지 않는다. 대신 홈/타임라인은 다른 탭에 다녀오는 동안
 /// 데이터가 바뀔 수 있어(완성 신고, 새 일지 등) 탭 재진입 시 [RevalidatableState]로
@@ -22,8 +22,8 @@ class AdopterShell extends StatefulWidget {
 
 class _AdopterShellState extends State<AdopterShell> {
   static const _home = 0;
-  static const _timeline = 1;
-  static const _games = 2;
+  static const _games = 1;
+  static const _timeline = 2;
   static const _mypage = 3;
 
   int _tab = _home;
@@ -33,8 +33,8 @@ class _AdopterShellState extends State<AdopterShell> {
 
   late final _screens = [
     HomeScreen(key: _homeKey),
-    GrowthTimelineScreen(key: _timelineKey),
     const GamesScreen(),
+    GrowthTimelineScreen(key: _timelineKey),
     const MypageScreen(),
   ];
 
@@ -73,16 +73,16 @@ class _AdopterShellState extends State<AdopterShell> {
                   onTap: () => _switchTab(_home),
                 ),
                 _NavItem(
-                  icon: Icons.timeline,
-                  label: '타임라인',
-                  active: _tab == _timeline,
-                  onTap: () => _switchTab(_timeline),
-                ),
-                _NavItem(
                   icon: Icons.sports_esports_outlined,
                   label: '게임',
                   active: _tab == _games,
                   onTap: () => _switchTab(_games),
+                ),
+                _NavItem(
+                  icon: Icons.timeline,
+                  label: '타임라인',
+                  active: _tab == _timeline,
+                  onTap: () => _switchTab(_timeline),
                 ),
                 _NavItem(
                   icon: Icons.person_outline,
