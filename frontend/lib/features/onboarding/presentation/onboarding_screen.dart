@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/storage/onboarding_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../../../shared/widgets/step_indicator.dart';
 
-/// 1b~1d — 온보딩: 서비스 소개 / 시니어 재배자 / 앱으로 케어. 최초 실행 시 1회만 노출된다.
+/// 1b~1d — 온보딩: 서비스 소개 / 시니어 재배자 / 앱으로 케어. 입양자로 로그인에
+/// 성공할 때마다 매번 노출된다(재노출 여부를 따지지 않음).
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -19,7 +19,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   static const _pageCount = 3;
 
   final _controller = PageController();
-  final _storage = OnboardingStorage();
   int _page = 0;
 
   @override
@@ -28,10 +27,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  Future<void> _finish() async {
-    await _storage.markSeen();
-    if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed('/');
+  void _finish() {
+    Navigator.of(context).pushReplacementNamed('/adopter');
   }
 
   void _next() {

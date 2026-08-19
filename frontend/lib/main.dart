@@ -4,7 +4,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'core/storage/onboarding_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'features/adopter/presentation/adopt/adopt_screen.dart';
 import 'features/adopter/presentation/adopter_shell.dart';
@@ -30,14 +29,13 @@ Future<void> main() async {
   if (!kIsWeb && Platform.isAndroid) {
     await Firebase.initializeApp();
   }
-  final hasSeenOnboarding = await OnboardingStorage().hasSeenOnboarding();
-  runApp(PigFigApp(initialRoute: hasSeenOnboarding ? '/' : '/onboarding'));
+  runApp(const PigFigApp());
 }
 
 class PigFigApp extends StatelessWidget {
   const PigFigApp({super.key, this.initialRoute = '/'});
 
-  /// 최초 실행이면 `/onboarding`, 이미 온보딩을 봤으면 `/`(로그인)로 시작한다.
+  /// 항상 `/`(로그인)에서 시작한다. 온보딩은 입양자 로그인 성공 직후에만 보여준다.
   final String initialRoute;
 
   @override
