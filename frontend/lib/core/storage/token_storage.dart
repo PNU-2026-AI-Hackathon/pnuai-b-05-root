@@ -6,18 +6,21 @@ class TokenStorage {
   static const _refreshKey = 'pigfig.refresh_token';
   static const _emailKey = 'pigfig.email';
   static const _userIdKey = 'pigfig.user_id';
+  static const _nicknameKey = 'pigfig.nickname';
 
   Future<void> save({
     required String access,
     required String refresh,
     String? email,
     String? userId,
+    String? nickname,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accessKey, access);
     await prefs.setString(_refreshKey, refresh);
     if (email != null) await prefs.setString(_emailKey, email);
     if (userId != null) await prefs.setString(_userIdKey, userId);
+    if (nickname != null) await prefs.setString(_nicknameKey, nickname);
   }
 
   Future<String?> readAccessToken() async {
@@ -39,11 +42,19 @@ class TokenStorage {
     return prefs.getString(_userIdKey);
   }
 
+  /// 로그인 응답의 닉네임. 서버에서 빈 문자열(`''`)로 내려올 수 있다(회원가입 시
+  /// 선택 입력이라 미입력 계정이 있을 수 있음) — 빈 값 처리는 호출부 책임이다.
+  Future<String?> readNickname() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_nicknameKey);
+  }
+
   Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessKey);
     await prefs.remove(_refreshKey);
     await prefs.remove(_emailKey);
     await prefs.remove(_userIdKey);
+    await prefs.remove(_nicknameKey);
   }
 }
