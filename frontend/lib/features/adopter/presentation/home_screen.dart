@@ -438,7 +438,73 @@ class _SeedlingHome extends StatelessWidget {
       children: [
         Column(
           children: [
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
+            // "나의 무화과" 정보 카드 — 원래는 화면 최하단에 Positioned(bottom:14)로
+            // 고정돼 있었으나, 나무가 2배로 커지면서 방치(pigInfested) 상태에서 나무
+            // 아래로 등장하는 돼지가 이 카드에 가려 거의 안 보이는 문제가 있었다. 카드를
+            // 최상단(배너보다도 위)으로 옮기고 하단을 완전히 비워 돼지가 가려지지 않게
+            // 했다. Positioned(left:16, right:16)이 주던 좌우 인셋/전체 폭 채우기를
+            // Column 자식이 된 뒤에도 재현하기 위해 margin과 width를 명시한다 — 제목
+            // Row의 Expanded가 우연히 폭을 채워주는 데 기대지 않는다.
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '나의 무화과 #${seedling.id} 🌱',
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.title(),
+                        ),
+                      ),
+                      StatusBadge(
+                        label: isGrowing ? '재배중' : '완료',
+                        background: isGrowing
+                            ? AppColors.green500
+                            : AppColors.pink100,
+                        textColor: isGrowing
+                            ? Colors.white
+                            : AppColors.badgePinkText,
+                        pill: false,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isGrowing
+                        ? '재배자가 정성껏 돌보고 있어요 · 함께한 지 $daysTogether일째'
+                        : '무화과가 다 자랐어요! 마이페이지에서 수령/기부를 선택해보세요 🎉',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    formatLastCare(lastCareCompletedAt),
+                    style: AppTextStyles.caption(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             if (treeStatus != TreeStatus.healthy) ...[
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -459,9 +525,9 @@ class _SeedlingHome extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
             ] else
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
             _GrowAnimatedTree(
               width: 380,
               // TEMP(포스터 캡처용, 커밋 금지): 나무 색/에셋만 강제로 healthy로 고정.
@@ -498,7 +564,7 @@ class _SeedlingHome extends StatelessWidget {
         ),
         Positioned(
           right: 14,
-          top: 96,
+          top: 206,
           child: Column(
             children: [
               CareActionButton(
@@ -529,67 +595,6 @@ class _SeedlingHome extends StatelessWidget {
                 onTap: onPigTap,
               ),
             ],
-          ),
-        ),
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: 14,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '나의 무화과 #${seedling.id} 🌱',
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.title(),
-                      ),
-                    ),
-                    StatusBadge(
-                      label: isGrowing ? '재배중' : '완료',
-                      background: isGrowing
-                          ? AppColors.green500
-                          : AppColors.pink100,
-                      textColor: isGrowing
-                          ? Colors.white
-                          : AppColors.badgePinkText,
-                      pill: false,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  isGrowing
-                      ? '재배자가 정성껏 돌보고 있어요 · 함께한 지 $daysTogether일째'
-                      : '무화과가 다 자랐어요! 마이페이지에서 수령/기부를 선택해보세요 🎉',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.body(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  formatLastCare(lastCareCompletedAt),
-                  style: AppTextStyles.caption(),
-                ),
-              ],
-            ),
           ),
         ),
       ],
