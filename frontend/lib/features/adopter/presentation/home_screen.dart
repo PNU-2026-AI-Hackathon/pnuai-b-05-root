@@ -545,16 +545,25 @@ class _SeedlingHome extends StatelessWidget {
               // 화면과 폭이 같아 문제없었지만 이 로컬 Stack은 명시적으로 풀어줘야 한다.
               clipBehavior: Clip.none,
               children: [
-                _GrowAnimatedTree(
-                  width: 380,
-                  // TEMP(포스터 캡처용, 커밋 금지): 나무 색/에셋만 강제로 healthy로 고정.
-                  // 돼지 오버레이는 아래 showPig(실제 treeStatus 기반)를 그대로 쓰므로
-                  // 영향 없음 — 캡처 끝나면 `status: treeStatus`로 되돌릴 것.
-                  status: TreeStatus.healthy,
-                  playAnimation: playGrowAnimation,
-                  onAnimationConsumed: onGrowAnimationConsumed,
-                  growthStage: growthStage,
-                  growthStageAdvanceFrom: growthStageAdvanceFrom,
+                // Transform.translate는 페인트 단계에서만 그림을 옮길 뿐 레이아웃
+                // 크기/위치는 그대로라서, 이 Stack의 크기(=나무의 원래 380×482.6
+                // 레이아웃 박스)와 그 아래 SizedBox(8)/Spacer 등 Column 흐름에는
+                // 전혀 영향이 없다 — 나무만 시각적으로 50px 위로 옮겨지고, 아래
+                // Positioned 돼지는 여전히 이 Stack의 원래 박스 기준으로 배치되어
+                // 제자리(밑동 밴드)에 남는다.
+                Transform.translate(
+                  offset: const Offset(0, -50),
+                  child: _GrowAnimatedTree(
+                    width: 380,
+                    // TEMP(포스터 캡처용, 커밋 금지): 나무 색/에셋만 강제로 healthy로 고정.
+                    // 돼지 오버레이는 아래 showPig(실제 treeStatus 기반)를 그대로 쓰므로
+                    // 영향 없음 — 캡처 끝나면 `status: treeStatus`로 되돌릴 것.
+                    status: TreeStatus.healthy,
+                    playAnimation: playGrowAnimation,
+                    onAnimationConsumed: onGrowAnimationConsumed,
+                    growthStage: growthStage,
+                    growthStageAdvanceFrom: growthStageAdvanceFrom,
+                  ),
                 ),
                 // 돼지를 Column 흐름이 아니라 나무 위에 겹치는 오버레이로 배치 —
                 // 예전엔 이 블록이 Column의 세로 흐름에 그대로 더해져(말풍선+돼지
@@ -1017,18 +1026,20 @@ class _LottiePigState extends State<_LottiePig> with TickerProviderStateMixin {
     widget.onPigExitAnimationEnd();
   }
 
-  /// 좌우 배회 폭(중심 기준 ±70px) — 나무 폭(380px) 안에서 밑동을 벗어나지
-  /// 않는 선에서 훨씬 넓게 움직이도록 기존 ±20px에서 확장했다.
-  static const double _wanderRangeX = 70.0;
+  /// 좌우 배회 폭(중심 기준 ±100px) — 나무 폭(380px) 안에서 밑동을 벗어나지
+  /// 않는 선에서 훨씬 넓게 움직이도록 기존 ±20px → ±70px → ±100px로 확장했다.
+  static const double _wanderRangeX = 100.0;
 
   /// 세로 배회 밴드 — 나무 줄기 하단 1/5 구간(전체 높이 482.6 × 0.2 ≈ 96.5px)
   /// 안에서만 움직이도록, [_LottiePig.baseBottomOffset](20)을 기준(dy=0)으로
   /// 한 bottom 값의 허용 범위를 [ _wanderBandMin, _wanderBandMax ]로 둔다 —
   /// 밴드의 정확한 양 끝(0, 96.5)까지 쓰지 않고 위아래로 약간의 여유를 남긴다.
-  static const double _wanderBandMin = 6.0;
-  static const double _wanderBandMax = 88.0;
+  /// 위쪽 한계(bandMax)는 20px 줄이고 아래쪽 한계(bandMin)는 20px 늘려, 중심
+  /// (구간 중앙값 47)은 그대로 두고 범위만 위아래로 20px씩 좁혔다.
+  static const double _wanderBandMin = 26.0;
+  static const double _wanderBandMax = 68.0;
 
-  /// 3~5초 간격으로 나무 밑동 하단 밴드 안(좌우 ±70px, 상하 [_wanderBandMin]~
+  /// 3~5초 간격으로 나무 밑동 하단 밴드 안(좌우 ±100px, 상하 [_wanderBandMin]~
   /// [_wanderBandMax])에서 랜덤하게 배회한다. `mounted`/`_phase` 체크로 퇴장
   /// 시작 시 스스로 멈춘다.
   Future<void> _scheduleWander() async {
