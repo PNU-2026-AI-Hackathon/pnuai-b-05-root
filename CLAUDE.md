@@ -546,7 +546,7 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   (`_isPigExiting == true`) 상태를 리셋하는 가드가 있습니다. 홈 화면 우측 케어 버튼 3개
   (`CareActionButton`)에는 물주기/영양제 보유 개수 배지가 붙어 `_fetchCareState()`가 조회한
   `CareInventoryStorage` 값을 표시합니다(햇빛은 소비 개념이 없어 배지 없음).
-- `features/grower/presentation/grower_shell.dart`는 홈(`GrowerDashboardScreen`)/일지
+- `features/grower/presentation/grower_shell.dart`는 홈(`GrowerShelfScreen`)/일지
   (`GrowerDiaryScreen`)/환경점검(`GrowerSensorScreen`)/마이(`GrowerMypageScreen`) 4탭
   `StatefulWidget`입니다. `body: IndexedStack(index: _index, children: _screens)`로 네 화면을 전부
   트리에 유지한 채 화면만 바꿔치기하므로, 탭을 벗어났다 돌아와도 각 화면의 `State`(불러온 데이터,
@@ -567,34 +567,26 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   패턴을 따릅니다 — 로딩 스피너를 띄우거나 기존 데이터를 지우지 않고 백그라운드로만 다시 불러와
   성공하면 조용히 교체하고, 실패하면 기존 데이터를 그대로 둡니다(첫 진입이 아직 안 끝난 예외 상황만
   일반 로드로 대체). 현재 `HomeScreen`/`GrowthTimelineScreen`(`AdopterShell`)과
-  `GrowerDashboardScreen`/`GrowerMypageScreen`(`GrowerShell`)이 이 패턴을 쓰고, `GrowerDiaryScreen`/
+  `GrowerShelfScreen`/`GrowerMypageScreen`(`GrowerShell`)이 이 패턴을 쓰고, `GrowerDiaryScreen`/
   `GrowerSensorScreen`은 입력값이 매번 새로 작성되는 화면이라 재조회 이슈가 없어 적용하지 않았습니다.
-  대시보드/일지/환경점검 모두 mock 데이터이며 sensor/diary API를 호출하지 않습니다.
   `login_screen.dart`는 로그인 응답의 `role`이 `grower`면 `pushReplacementNamed('/grower')`로 이동합니다
   (이전엔 "재배자 화면은 준비 중이에요" 스낵바만 띄웠으나 grower 플로우 구현 후 실제 이동으로 변경).
-- `GrowerDashboardScreen`은 `StatefulWidget`으로 `initState`에서 `GrowerRepository.fetchSeedlings()`
-  (`GET /api/seedlings/`, 인증 토큰 필요)를 호출해 로딩/에러/빈 목록/데이터 4가지 상태를 분기합니다.
-  이를 위해 `core/network/api_client.dart`에 `get()`이 추가됐습니다 — `patch()`처럼 새 HTTP 메서드라
-  별도 메서드로 뒀지만, 목록 엔드포인트는 최상위가 JSON 배열이라 `post()`/`patch()`와 달리
-  `Future<dynamic>`을 반환하고 호출부(`fetchSeedlings()`)에서 `as List<dynamic>`으로 캐스팅합니다.
-  통계 카드 3개(담당 묘목/재배중/완료)는 응답 리스트에서 직접 계산하며, 디자인 원본의 "완성 임박"/
-  "이상 감지"는 실제 `Seedling` 모델에 대응하는 필드가 없어(진행 단계·이상탐지는 diary/sensor
-  API 영역이라 이번에도 미연동) "재배중"/"완료" 카운트로 대체했습니다. 카드의 "입양자 #{id}" 표기도
-  같은 이유입니다 — `SeedlingSerializer`가 `adopter`를 FK id로만 내려주고 이름을 함께 주는
-  엔드포인트가 없어서, 실제 값(id)만 그대로 보여줍니다. 재배중인 묘목 카드를 탭하면
-  `GrowerCompleteArgs`(seedlingId/seedlingName/adopterName — 이제 adopterName엔
-  "입양자 #6"처럼 완성된 표시 문구 전체가 들어가므로 `grower_complete_screen.dart`는 앞에 "입양자"를
-  더 붙이지 않습니다)를 route argument로 담아 `/grower/complete`로 이동하며, 이 화면의 "완성 신고하기"
-  버튼이 `completeSeedling()`으로 실제 `PATCH /api/seedlings/{id}/complete/`를 호출합니다. 성공 후
-  `Navigator.pop()`으로 대시보드에 돌아오면 `await`로 이어받아 곧바로 `fetchSeedlings()`를 다시
-  호출해 목록·통계를 최신 상태로 갱신합니다(완성 처리 직후에도 화면이 낡은 mock처럼 안 바뀌는 문제
-  방지). 탭한 seedlingId는 이제 항상 실제 `Seedling.pk`입니다(목록 자체가 실제 응답이므로). 완료된
-  묘목 카드는 탭 자체를 막지 않고 여전히 `onTap`이 걸려 있지만, 콜백이 `_openComplete()` 대신
-  `_showAlreadyCompletedMessage()`(스낵바 "이미 완성된 묘목이에요 🎉")로 분기해 완성 화면으로
-  이동하지 않고 안내만 하고 끝냅니다 — 탭이 씹히는 것처럼 보이는 것(아무 반응 없음)보다 "왜 안
-  움직이는지"를 알려주는 쪽이 낫다고 판단했습니다. `_SeedlingCard`도 `isGrowing` 여부에 따라
-  `Opacity(0.65)` + 아이콘 배경색을 `AppColors.dotInactive`(회색)로 바꿔 재배중 카드와 시각적으로
-  구분합니다.
+- 재배자 홈 탭(`GrowerShelfScreen`, `RevalidatableState`)은 담당 묘목을 "N단 선반"(참고 React 목업의
+  구조를 그대로 포팅한 `_ShelfTier` — 브라켓바+쿨링팬 로우+LED바+화분 로우+받침대) 형태로 보여줍니다.
+  `_fetchData()`가 `GrowerRepository.fetchSeedlings()`로 담당 묘목을 조회한 뒤, 묘목마다
+  `DiaryRepository.fetchDiaries()`를 병렬 호출해 **가장 최근 일지**(`createdAt` 기준,
+  백엔드 응답 순서가 보장되지 않으므로 클라이언트에서 직접 최댓값을 찾음 —
+  `growth_timeline_screen.dart`와 동일한 이유)의 성장 단계(`growthStage` 코드값/한글 라벨)를
+  화분마다 묶습니다. 헤더 아래 필터 버튼 4개(전체/발근중/잎성장/가지발달, `_ShelfFilterBar` — 4개가
+  한 줄에서 밀리지 않도록 `Row`+`Expanded`로 균등 배분하고 `FittedBox(scaleDown)`로 긴 라벨도 줄바꿈
+  없이 맞춥니다)가 이 성장 단계 코드값을 기준으로 화분을 걸러냅니다 — "전체"만 모든 화분(완료
+  단계 포함)을 보여주고, 나머지 세 필터는 정확히 그 단계와 일치하는 화분만 남기므로 완료(mature)
+  단계 화분은 "전체"에서만 보입니다. 필터 결과가 0개면 화분 없이 빈 선반 틀(브라켓/팬/LED/받침대)
+  1단과 "해당 단계의 묘목이 없어요" 안내만 보여줍니다(`_EmptyPotArea`) — 담당 묘목 자체가 0마리인
+  경우(`_EmptyState`)와는 다른 상태입니다. 한 단에는 화분 2개씩(`_chunkIntoTiers(entries, 2)`)
+  배치되며, 화분 몸통/식물 아이콘/텍스트 치수는 원래 대비 1.2배 확대되어 있습니다(`_ShelfPot`,
+  `maxWidth: 120`). 화분을 탭하면 `GrowerSeedlingAnalysisArgs`를 route argument로 담아
+  `/grower/seedling-analysis`(현재는 최소 뼈대)로 이동합니다.
 - `main()`의 `runApp(const PigFigApp(initialRoute: '/splash'))`가 진입점입니다.
   `features/splash/presentation/splash_screen.dart`의 `SplashScreen`이 베이지 배경에
   `PigFigLogo`(120px)를 `Hero(tag: 'pigfig-logo')`로 감싼 채 1.2초 보여준 뒤

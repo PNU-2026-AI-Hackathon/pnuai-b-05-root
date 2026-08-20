@@ -12,6 +12,7 @@ class DiaryEntry {
     required this.content,
     required this.createdAt,
     this.yoloStatusTag,
+    this.growthStage,
     this.growthStageLabel,
   });
 
@@ -19,6 +20,11 @@ class DiaryEntry {
   final String content;
   final DateTime createdAt;
   final String? yoloStatusTag;
+
+  /// 재배자가 일지 작성 시 선택한 성장 단계의 코드값(백엔드 `growth_stage`,
+  /// rooting/leafing/branching/mature). 선반 뷰의 필터 버튼이 이 값을 기준으로 묘목을
+  /// 걸러낸다 — [growthStageLabel](한글 라벨)은 표시용이라 필터 비교에는 코드값을 쓴다.
+  final String? growthStage;
 
   /// 재배자가 일지 작성 시 선택한 성장 단계의 한글 라벨(백엔드 `growth_stage_label`).
   /// 이 필드 도입 이전 일지에는 값이 없어 null일 수 있다.
@@ -29,6 +35,7 @@ class DiaryEntry {
     content: json['content'] as String,
     createdAt: DateTime.parse(json['created_at'] as String),
     yoloStatusTag: json['yolo_status_tag'] as String?,
+    growthStage: json['growth_stage'] as String?,
     growthStageLabel: json['growth_stage_label'] as String?,
   );
 }
