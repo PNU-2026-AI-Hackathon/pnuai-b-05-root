@@ -555,10 +555,7 @@ class _SeedlingHome extends StatelessWidget {
                   offset: const Offset(0, -50),
                   child: _GrowAnimatedTree(
                     width: 380,
-                    // TEMP(포스터 캡처용, 커밋 금지): 나무 색/에셋만 강제로 healthy로 고정.
-                    // 돼지 오버레이는 아래 showPig(실제 treeStatus 기반)를 그대로 쓰므로
-                    // 영향 없음 — 캡처 끝나면 `status: treeStatus`로 되돌릴 것.
-                    status: TreeStatus.healthy,
+                    status: treeStatus,
                     playAnimation: playGrowAnimation,
                     onAnimationConsumed: onGrowAnimationConsumed,
                     growthStage: growthStage,
