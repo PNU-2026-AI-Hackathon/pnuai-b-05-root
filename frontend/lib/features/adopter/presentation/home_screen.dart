@@ -505,8 +505,19 @@ class _SeedlingHome extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            if (treeStatus != TreeStatus.healthy) ...[
-              Container(
+            // Visibility(maintainSize: true)로 배너가 없는 healthy 상태에서도
+            // 항상 같은 높이를 예약한다 — 예전엔 if/else로 healthy일 때만 배너
+            // Container 자체를 렌더링하지 않아 그만큼 높이가 줄어, 아래 나무가
+            // 상태에 따라 다른 Y 위치에 그려지는 문제가 있었다(로컬 Stack으로
+            // 나무를 감싼 것과는 무관 — 그 Stack은 나무 하나만으로 크기가
+            // 정해져 자체적으로는 위치를 바꾸지 않는다). 나무 위치를 항상
+            // healthy 상태 기준으로 고정하기 위한 조치.
+            Visibility(
+              visible: treeStatus != TreeStatus.healthy,
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
+              child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 10,
@@ -525,40 +536,54 @@ class _SeedlingHome extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-            ] else
-              const SizedBox(height: 20),
-            _GrowAnimatedTree(
-              width: 380,
-              // TEMP(포스터 캡처용, 커밋 금지): 나무 색/에셋만 강제로 healthy로 고정.
-              // 돼지 오버레이는 아래 showPig(실제 treeStatus 기반)를 그대로 쓰므로
-              // 영향 없음 — 캡처 끝나면 `status: treeStatus`로 되돌릴 것.
-              status: TreeStatus.healthy,
-              playAnimation: playGrowAnimation,
-              onAnimationConsumed: onGrowAnimationConsumed,
-              growthStage: growthStage,
-              growthStageAdvanceFrom: growthStageAdvanceFrom,
             ),
-            const SizedBox(height: 8),
-            if (showPig || isPigExiting)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SpeechBubble(text: '꿀꿀~ 내가 왔다!'),
-                      _LottiePig(
+            const SizedBox(height: 20),
+            Stack(
+              // 로컬 Stack의 폭(380)은 화면보다 좁아 기본 Clip.hardEdge를 쓰면
+              // 돼지의 등장/퇴장 슬라이드(화면 밖 → 중앙, screenWidth 기준)가 이
+              // 경계에서 잘린다 — 바깥 화면폭 Stack(alignment: topCenter)은 이미
+              // 화면과 폭이 같아 문제없었지만 이 로컬 Stack은 명시적으로 풀어줘야 한다.
+              clipBehavior: Clip.none,
+              children: [
+                _GrowAnimatedTree(
+                  width: 380,
+                  // TEMP(포스터 캡처용, 커밋 금지): 나무 색/에셋만 강제로 healthy로 고정.
+                  // 돼지 오버레이는 아래 showPig(실제 treeStatus 기반)를 그대로 쓰므로
+                  // 영향 없음 — 캡처 끝나면 `status: treeStatus`로 되돌릴 것.
+                  status: TreeStatus.healthy,
+                  playAnimation: playGrowAnimation,
+                  onAnimationConsumed: onGrowAnimationConsumed,
+                  growthStage: growthStage,
+                  growthStageAdvanceFrom: growthStageAdvanceFrom,
+                ),
+                // 돼지를 Column 흐름이 아니라 나무 위에 겹치는 오버레이로 배치 —
+                // 예전엔 이 블록이 Column의 세로 흐름에 그대로 더해져(말풍선+돼지
+                // 106px) 방치 상태에서 하단 오버플로가 났었다. Positioned로 빼면
+                // 이 Stack의 크기는 여전히 비-Positioned 자식인 나무(380×482.6)
+                // 하나로만 결정되어 Column 총 높이가 healthy 상태와 동일하게
+                // 유지된다.
+                if (showPig || isPigExiting)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    // 나무 밑동 근처(전체 높이 482.6의 하단 1/5≈96.5px 밴드) 안에서
+                    // 쉬는 기준점. [_LottiePigState]의 배회 오프셋(dy)이 이 값을
+                    // 0점으로 삼아 밴드 안을 오르내리므로, 두 상수가 어긋나지
+                    // 않도록 [_LottiePig.baseBottomOffset]을 그대로 쓴다.
+                    bottom: _LottiePig.baseBottomOffset,
+                    child: Center(
+                      child: _LottiePig(
                         showPig: showPig,
                         isPigExiting: isPigExiting,
                         exitDirectionLeft: exitDirectionLeft,
                         onPigTap: onPigTap,
                         onPigExitAnimationEnd: onPigExitAnimationEnd,
                       ),
-                    ],
+                    ),
                   ),
-                ],
-              ),
+              ],
+            ),
+            const SizedBox(height: 8),
             const Spacer(),
           ],
         ),
@@ -864,6 +889,11 @@ class _LottiePig extends StatefulWidget {
     required this.onPigExitAnimationEnd,
   });
 
+  /// 호출부(_SeedlingHome)의 바깥 Positioned가 쓰는 bottom 기준값이자,
+  /// [_LottiePigState]의 배회 밴드 계산에서 dy=0에 해당하는 쉬는 지점.
+  /// 두 곳이 각자 상수를 들고 있으면 어긋날 수 있어 하나로 공유한다.
+  static const double baseBottomOffset = 20.0;
+
   // 호출부(_SeedlingHome)의 기존 파라미터 구성을 그대로 유지하기 위해 받지만,
   // 등장 시점은 항상 이 위젯이 새로 mount되는 순간과 일치해(부모가 showPig ||
   // isPigExiting일 때만 트리에 넣음) 내부 로직에서는 쓰이지 않는다.
@@ -890,6 +920,10 @@ class _LottiePigState extends State<_LottiePig> with TickerProviderStateMixin {
   bool _exitEndCalled = false;
   Offset _wanderFrom = Offset.zero;
   Offset _wanderTarget = Offset.zero;
+
+  /// 5초마다 한 번, 2초 동안만 말풍선을 보여준다([_scheduleBubble] 참고). idle
+  /// 상태일 때만 순환하고, 등장/퇴장 중에는 항상 false.
+  bool _bubbleVisible = false;
 
   @override
   void initState() {
@@ -964,6 +998,7 @@ class _LottiePigState extends State<_LottiePig> with TickerProviderStateMixin {
     if (!mounted || _phase != _PigPhase.entering) return;
     setState(() => _phase = _PigPhase.idle);
     _scheduleWander();
+    _scheduleBubble();
   }
 
   Future<void> _startExit() async {
@@ -974,6 +1009,7 @@ class _LottiePigState extends State<_LottiePig> with TickerProviderStateMixin {
       _phase = _PigPhase.exiting;
       _wanderFrom = Offset.zero;
       _wanderTarget = Offset.zero;
+      _bubbleVisible = false;
     });
     await _hopController.forward(from: 0);
     if (!mounted || _exitEndCalled) return;
@@ -981,17 +1017,50 @@ class _LottiePigState extends State<_LottiePig> with TickerProviderStateMixin {
     widget.onPigExitAnimationEnd();
   }
 
-  /// 3~5초 간격으로 나무 근처 좁은 범위(좌우 ±20px)에서 랜덤하게 배회한다.
-  /// `mounted`/`_phase` 체크로 퇴장 시작 시 스스로 멈춘다.
+  /// 좌우 배회 폭(중심 기준 ±70px) — 나무 폭(380px) 안에서 밑동을 벗어나지
+  /// 않는 선에서 훨씬 넓게 움직이도록 기존 ±20px에서 확장했다.
+  static const double _wanderRangeX = 70.0;
+
+  /// 세로 배회 밴드 — 나무 줄기 하단 1/5 구간(전체 높이 482.6 × 0.2 ≈ 96.5px)
+  /// 안에서만 움직이도록, [_LottiePig.baseBottomOffset](20)을 기준(dy=0)으로
+  /// 한 bottom 값의 허용 범위를 [ _wanderBandMin, _wanderBandMax ]로 둔다 —
+  /// 밴드의 정확한 양 끝(0, 96.5)까지 쓰지 않고 위아래로 약간의 여유를 남긴다.
+  static const double _wanderBandMin = 6.0;
+  static const double _wanderBandMax = 88.0;
+
+  /// 3~5초 간격으로 나무 밑동 하단 밴드 안(좌우 ±70px, 상하 [_wanderBandMin]~
+  /// [_wanderBandMax])에서 랜덤하게 배회한다. `mounted`/`_phase` 체크로 퇴장
+  /// 시작 시 스스로 멈춘다.
   Future<void> _scheduleWander() async {
     while (mounted && _phase == _PigPhase.idle) {
       final waitMs = 3000 + _random.nextInt(2000);
       await Future.delayed(Duration(milliseconds: waitMs));
       if (!mounted || _phase != _PigPhase.idle) return;
       _wanderFrom = _wanderTarget;
-      _wanderTarget = Offset((_random.nextDouble() * 40) - 20, 0);
+      final targetBottom =
+          _wanderBandMin +
+          _random.nextDouble() * (_wanderBandMax - _wanderBandMin);
+      _wanderTarget = Offset(
+        (_random.nextDouble() * (_wanderRangeX * 2)) - _wanderRangeX,
+        // Transform.translate의 dy는 양수일 때 아래로 이동하므로, "밴드 안의
+        // 목표 bottom"을 얻으려면 기준 bottom에서 뺀 값을 써야 한다.
+        _LottiePig.baseBottomOffset - targetBottom,
+      );
       await _wanderController.forward(from: 0);
       if (!mounted || _phase != _PigPhase.idle) return;
+    }
+  }
+
+  /// 5초마다 한 번, 2초 동안만 말풍선을 노출한다. [_scheduleWander]와 동일한
+  /// async-while 패턴 — idle 상태가 아니게 되면(퇴장 시작 등) 스스로 멈춘다.
+  Future<void> _scheduleBubble() async {
+    while (mounted && _phase == _PigPhase.idle) {
+      await Future.delayed(const Duration(seconds: 5));
+      if (!mounted || _phase != _PigPhase.idle) return;
+      setState(() => _bubbleVisible = true);
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted || _phase != _PigPhase.idle) return;
+      setState(() => _bubbleVisible = false);
     }
   }
 
@@ -1047,18 +1116,38 @@ class _LottiePigState extends State<_LottiePig> with TickerProviderStateMixin {
           };
           return Transform.translate(
             offset: positionOffset,
-            child: Transform.scale(scale: _tapScale.value, child: child),
+            // 말풍선을 돼지와 같은 Transform 아래 두어 배회 중에도 돼지 머리
+            // 위에 항상 붙어 함께 움직이게 한다(예전엔 말풍선이 이 Transform
+            // 밖에 있어 돼지가 배회해도 제자리에 머무는 문제가 있었다).
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedOpacity(
+                  opacity: _bubbleVisible ? 1 : 0,
+                  duration: const Duration(milliseconds: 250),
+                  // 말풍선이 보이지 않을 때도(opacity 0) 레이아웃 공간은
+                  // 차지하므로, GestureDetector가 이 트리 전체를 감싸는 상황에서
+                  // 우발적으로 탭 히트 영역에 들어가지 않게 막는다 — 기존처럼
+                  // "돼지 180×180만 탭 가능"을 유지.
+                  child: const IgnorePointer(
+                    child: SpeechBubble(text: '꿀꿀~ 내가 왔다!'),
+                  ),
+                ),
+                Transform.scale(scale: _tapScale.value, child: child),
+              ],
+            ),
           );
         },
+        // 기존 60×60 대비 3배 확대 — 나무 대비 존재감을 키우기 위한 요청.
         child: SizedBox(
-          width: 60,
-          height: 60,
+          width: 180,
+          height: 180,
           child: Lottie.asset(
             'assets/lottie/pig.json',
             repeat: true,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) =>
-                const PigCharacter(width: 60),
+                const PigCharacter(width: 180),
           ),
         ),
       ),
