@@ -180,6 +180,12 @@ class _GrowerDiaryWriteScreenState extends State<GrowerDiaryWriteScreen> {
     );
   }
 
+  Widget _stageChip(int index) => _StageChip(
+    label: _stages[index].$1,
+    selected: index == _selectedStage,
+    onTap: () => setState(() => _selectedStage = index),
+  );
+
   Widget _buildBody(int seedlingId) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,17 +299,31 @@ class _GrowerDiaryWriteScreenState extends State<GrowerDiaryWriteScreen> {
           ).copyWith(fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        Column(
           children: [
-            for (var i = 0; i < _stages.length; i++)
-              _StageChip(
-                label: _stages[i].$1,
-                selected: i == _selectedStage,
-                onTap: () => setState(() => _selectedStage = i),
-              ),
+            Row(
+              children: [
+                Expanded(child: _stageChip(0)),
+                const SizedBox(width: 8),
+                Expanded(child: _stageChip(1)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _stageChip(2)),
+                const SizedBox(width: 8),
+                Expanded(child: _stageChip(3)),
+              ],
+            ),
           ],
+        ),
+        const SizedBox(height: 8),
+        PigFigButton.outline(
+          label: '🎤 음성으로 입력하기',
+          onPressed: () {
+            // TODO: 다음 단계에서 speech_to_text 연동
+          },
         ),
         const SizedBox(height: 14),
         Expanded(
@@ -402,6 +422,8 @@ class _StageChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        width: double.infinity,
+        alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: selected ? AppColors.green500 : Colors.white,
@@ -412,6 +434,7 @@ class _StageChip extends StatelessWidget {
         ),
         child: Text(
           label,
+          textAlign: TextAlign.center,
           style: AppTextStyles.body(
             fontSize: 14,
             color: selected ? Colors.white : AppColors.textMuted,
