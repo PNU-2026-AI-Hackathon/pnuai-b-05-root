@@ -74,6 +74,11 @@ class _PhotoFrameCarouselState extends State<PhotoFrameCarousel> {
             color: AppColors.textMuted,
           ).copyWith(fontWeight: FontWeight.w700),
         ),
+        const SizedBox(height: 4),
+        Text(
+          '↔ 옆으로 넘겨 프레임을 골라보세요',
+          style: AppTextStyles.caption(fontSize: 11, color: AppColors.textCaption),
+        ),
       ],
     );
   }
