@@ -1,4 +1,8 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -30,20 +34,36 @@ class PhotoFrameCarousel extends StatefulWidget {
   final String imageUrl;
 
   @override
-  State<PhotoFrameCarousel> createState() => _PhotoFrameCarouselState();
+  State<PhotoFrameCarousel> createState() => PhotoFrameCarouselState();
 }
 
-class _PhotoFrameCarouselState extends State<PhotoFrameCarousel> {
+class PhotoFrameCarouselState extends State<PhotoFrameCarousel> {
   static const _viewportFraction = 0.8;
   late final PageController _controller = PageController(
     viewportFraction: _viewportFraction,
   );
   int _frameIndex = 0;
+  final _boundaryKey = GlobalKey();
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// 현재 선택된(스와이프로 고른) 프레임을 화면에 보이는 그대로 PNG로 캡처한다.
+  /// [_buildPage]에서 `index == _frameIndex`인 페이지에만 [RepaintBoundary]를 씌워두므로,
+  /// 캐러셀의 스와이프 스케일/투명도 애니메이션은 조상 레이어에서 합성되어 캡처 결과에
+  /// 섞이지 않는다 — 드래그 도중이라도 항상 "정지 상태 프레임"과 동일한 픽셀을 얻는다.
+  Future<Uint8List?> captureCurrentFrame() async {
+    if (!mounted) return null;
+    final renderObject = _boundaryKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderRepaintBoundary) return null;
+    final image = await renderObject.toImage(
+      pixelRatio: View.of(context).devicePixelRatio,
+    );
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData?.buffer.asUint8List();
   }
 
   @override
@@ -84,6 +104,13 @@ class _PhotoFrameCarouselState extends State<PhotoFrameCarousel> {
   }
 
   Widget _buildPage(int index) {
+    final framedPhoto = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: _FramedPhoto(
+        style: PhotoFrameStyle.values[index],
+        imageUrl: widget.imageUrl,
+      ),
+    );
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -98,13 +125,9 @@ class _PhotoFrameCarouselState extends State<PhotoFrameCarousel> {
           child: Transform.scale(scale: scale, child: child),
         );
       },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: _FramedPhoto(
-          style: PhotoFrameStyle.values[index],
-          imageUrl: widget.imageUrl,
-        ),
-      ),
+      child: index == _frameIndex
+          ? RepaintBoundary(key: _boundaryKey, child: framedPhoto)
+          : framedPhoto,
     );
   }
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import '../../../core/download/image_downloader.dart';
 import '../../../core/theme/app_colors.dart';
@@ -32,7 +31,7 @@ String buildDiaryImageFilename(int diaryId, DateTime createdAt) {
   final y = createdAt.year.toString().padLeft(4, '0');
   final m = createdAt.month.toString().padLeft(2, '0');
   final d = createdAt.day.toString().padLeft(2, '0');
-  return 'pigfig_diary_${diaryId}_$y$m$d.jpg';
+  return 'pigfig_diary_${diaryId}_$y$m$d.png';
 }
 
 /// 성장 타임라인 카드 상세를 풀스크린으로 보여준다 — 사진(또는 일러스트)이 세로로 길거나
@@ -50,6 +49,7 @@ class DiaryDetailScreen extends StatefulWidget {
 
 class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
   bool _downloading = false;
+  final _carouselKey = GlobalKey<PhotoFrameCarouselState>();
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +92,7 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
               ),
             ),
             imageUrl != null
-                ? PhotoFrameCarousel(imageUrl: imageUrl)
+                ? PhotoFrameCarousel(key: _carouselKey, imageUrl: imageUrl)
                 : SizedBox(
                     width: double.infinity,
                     height: MediaQuery.of(context).size.height * 0.48,
@@ -128,7 +128,7 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
                 child: PigFigButton.outline(
                   label: '사진 저장하기 📥',
                   loading: _downloading,
-                  onPressed: () => _download(imageUrl, args),
+                  onPressed: () => _download(args),
                 ),
               ),
           ],
@@ -137,15 +137,15 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
     );
   }
 
-  Future<void> _download(String imageUrl, DiaryDetailArgs args) async {
+  Future<void> _download(DiaryDetailArgs args) async {
     setState(() => _downloading = true);
     try {
-      final response = await http.get(Uri.parse(imageUrl));
-      if (response.statusCode != 200) {
+      final bytes = await _carouselKey.currentState?.captureCurrentFrame();
+      if (bytes == null) {
         throw Exception('이미지를 불러오지 못했어요.');
       }
       await saveImageBytes(
-        response.bodyBytes,
+        bytes,
         buildDiaryImageFilename(args.diaryId, args.createdAt),
       );
       if (mounted) {

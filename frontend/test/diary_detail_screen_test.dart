@@ -53,6 +53,6 @@ void main() {
 
   test('buildDiaryImageFilename은 일지 id와 날짜로 파일명을 만든다', () {
     final filename = buildDiaryImageFilename(7, DateTime(2026, 7, 18));
-    expect(filename, 'pigfig_diary_7_20260718.jpg');
+    expect(filename, 'pigfig_diary_7_20260718.png');
   });
 }
