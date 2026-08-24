@@ -2,6 +2,6 @@
 !.claude/skills/
 backend/scripts/
 android/app/google-services.json
-ios/Runner/GoogleService-Info.plist
+frontend/ios/Runner/GoogleService-Info.plist
 firebase_leak_check.txt
 frontend/android/app/google-services.json
