@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/download/image_downloader.dart';
 import '../../../core/theme/app_colors.dart';
@@ -49,6 +50,7 @@ class DiaryDetailScreen extends StatefulWidget {
 
 class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
   bool _downloading = false;
+  bool _sharing = false;
   final _carouselKey = GlobalKey<PhotoFrameCarouselState>();
 
   @override
@@ -73,10 +75,7 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
                     children: [
                       const Text('🌱', style: TextStyle(fontSize: 18)),
                       const SizedBox(width: 6),
-                      Text(
-                        '무화과 이야기',
-                        style: AppTextStyles.title(fontSize: 20),
-                      ),
+                      Text('무화과 이야기', style: AppTextStyles.title(fontSize: 20)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -125,10 +124,24 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
             if (imageUrl != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                child: PigFigButton.outline(
-                  label: '사진 저장하기 📥',
-                  loading: _downloading,
-                  onPressed: () => _download(args),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: PigFigButton.outline(
+                        label: '저장 📥',
+                        loading: _downloading,
+                        onPressed: _sharing ? null : () => _download(args),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: PigFigButton.outline(
+                        label: '공유 📤',
+                        loading: _sharing,
+                        onPressed: _downloading ? null : () => _share(args),
+                      ),
+                    ),
+                  ],
                 ),
               ),
           ],
@@ -161,6 +174,35 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
       }
     } finally {
       if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  Future<void> _share(DiaryDetailArgs args) async {
+    setState(() => _sharing = true);
+    try {
+      final bytes = await _carouselKey.currentState?.captureCurrentFrame();
+      if (bytes == null) {
+        throw Exception('이미지를 불러오지 못했어요.');
+      }
+      final filename = buildDiaryImageFilename(args.diaryId, args.createdAt);
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile.fromData(bytes, mimeType: 'image/png', name: filename)],
+          fileNameOverrides: [filename],
+        ),
+      );
+      // 사용자가 공유 시트를 취소한 것은 실패가 아니므로 에러로 안내하지 않는다.
+      if (result.status == ShareResultStatus.dismissed) {
+        return;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('공유에 실패했어요. 다시 시도해주세요.')));
+      }
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
   }
 }
