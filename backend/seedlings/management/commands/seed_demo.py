@@ -26,12 +26,13 @@ pickup_or_donate까지 이미 선택된 상태(#4=기부/도시농업 공동체,
 rooting→leafing 2건, #3은 rooting→leafing→branching 3건). 완료 묘목(#4~#5)도
 완성 직전 mature 단계 1건씩 만든다. 날짜는 전부 `timezone.now()` 기준 최근 2주 이내로 역산한
 상대 날짜라, 커맨드를 실행하는 시점에 따라 실제 달력 날짜가 달라진다(고정 달력
-날짜를 쓰던 예전 버전과 다른 점). 모든 일지에 `backend/media/diary/photos/`에 이미
-있는 실사진(SOURCE_PHOTO_NAMES)을 순환 배정해 photo 필드를 실제로 채운다 — 원래
-계획은 `backend/media/seed_demo_photos/`라는 전용 폴더에서 사진을 가져오는 것이었지만
-이 커맨드를 작성하는 시점에 그 폴더가 로컬에 없었고(2026-08-19 확인), 이미
-diary/photos/에 있는 무화과 실사진들로 대체하기로 했다 — 나중에 전용 사진을 넣고
-싶다면 SOURCE_PHOTO_NAMES와 `_load_source_photos()`의 경로만 바꾸면 된다.
+날짜를 쓰던 예전 버전과 다른 점). 모든 일지에 `backend/seedlings/fixtures/demo_photos/`에
+있는 실사진(SOURCE_PHOTO_NAMES)을 순환 배정해 photo 필드를 실제로 채운다 — 원래는
+`backend/media/diary/photos/`에서 가져왔는데, `media/`가 `backend/.gitignore`에 걸려 있어
+로컬에만 있고 배포 환경(Render)에는 그 파일들이 존재하지 않아 배포 후 seed_demo를 돌리면
+사진 없는 일지만 생기는 문제가 있었다. git으로 추적 가능한 이 fixtures 경로로 원본 사진
+자체를 복사해 옮겨서 해결했다 — Django 커맨드가 앱 코드와 함께 배포되는 자산(fixture)을
+두는 관례적 위치이기도 하다.
 
 ## 센서 데이터
 5개 묘목에 걸쳐 3~4건씩(총 17건) 만든다. 묘목당 3~4건은 Prophet 학습 최소치
@@ -57,7 +58,6 @@ Gemini 응답으로 채워진다.
 from datetime import timedelta
 from pathlib import Path
 
-from django.conf import settings
 from django.core.files import File
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -97,7 +97,7 @@ SEEDLING_SPECS = [
      '#5 (한겨울, 완료·수령)'),
 ]
 
-# backend/media/diary/photos/에 이미 있는 실사진 중 순환 배정할 파일들.
+# backend/seedlings/fixtures/demo_photos/에 있는 실사진 중 순환 배정할 파일들.
 SOURCE_PHOTO_NAMES = [
     'fig_real.jpg',
     'leaf.jpg',
@@ -193,7 +193,9 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _load_source_photos(self):
-        photos_dir = Path(settings.MEDIA_ROOT) / 'diary' / 'photos'
+        # media/는 .gitignore 대상이라 배포 환경에 없다 — git으로 함께 배포되는
+        # 앱 코드 안의 fixtures 경로(backend/seedlings/fixtures/demo_photos/)에서 읽는다.
+        photos_dir = Path(__file__).resolve().parent.parent.parent / 'fixtures' / 'demo_photos'
         candidates = [photos_dir / name for name in SOURCE_PHOTO_NAMES]
         existing = [path for path in candidates if path.exists()]
         missing = [path.name for path in candidates if not path.exists()]
