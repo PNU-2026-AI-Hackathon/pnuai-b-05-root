@@ -62,6 +62,13 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              child: Text(
+                '무화과 이야기',
+                style: AppTextStyles.title(fontSize: 20),
+              ),
+            ),
             SizedBox(
               width: double.infinity,
               height: MediaQuery.of(context).size.height * 0.48,
