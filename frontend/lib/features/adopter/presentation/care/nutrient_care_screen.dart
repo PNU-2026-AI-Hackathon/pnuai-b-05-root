@@ -117,11 +117,17 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
                     data: 'nutrient',
                     maxSimultaneousDrags: _locked ? 0 : 1,
                     feedback: _nutrientStick(dragging: true),
-                    childWhenDragging: Opacity(
-                      opacity: 0.3,
+                    childWhenDragging: Transform.translate(
+                      offset: const Offset(0, -24),
+                      child: Opacity(
+                        opacity: 0.3,
+                        child: _nutrientStick(),
+                      ),
+                    ),
+                    child: Transform.translate(
+                      offset: const Offset(0, -24),
                       child: _nutrientStick(),
                     ),
-                    child: _nutrientStick(),
                   ),
                 ),
                 Expanded(
@@ -226,12 +232,15 @@ class _NutrientCareScreenState extends State<NutrientCareScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          Transform.rotate(
-            angle: -1.0,
-            child: const Icon(
-              Icons.reply,
-              size: 18,
-              color: AppColors.textCaption,
+          Transform.flip(
+            flipX: true,
+            child: Transform.rotate(
+              angle: -1.0,
+              child: const Icon(
+                Icons.reply,
+                size: 18,
+                color: AppColors.textCaption,
+              ),
             ),
           ),
         ],
