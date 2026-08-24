@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
+import '../../../shared/widgets/status_badge.dart';
 import 'photo_frame_carousel.dart';
 
 /// `/adopter/diary-detail` route argument.
@@ -65,9 +66,29 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              child: Text(
-                '무화과 이야기',
-                style: AppTextStyles.title(fontSize: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('🌱', style: TextStyle(fontSize: 18)),
+                      const SizedBox(width: 6),
+                      Text(
+                        '무화과 이야기',
+                        style: AppTextStyles.title(fontSize: 20),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 28,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: AppColors.pink500,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
               ),
             ),
             imageUrl != null
@@ -82,14 +103,15 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _formatDate(args.createdAt),
-                    style: AppTextStyles.body(
-                      fontSize: 13,
-                      color: AppColors.textMuted,
-                    ),
+                  StatusBadge(
+                    label: _formatDate(args.createdAt),
+                    background: AppColors.badgeGreenBg,
+                    textColor: AppColors.badgeGreenText,
+                    pill: false,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
+                  const Divider(color: AppColors.outline, height: 1),
+                  const SizedBox(height: 14),
                   Text(
                     args.content,
                     style: AppTextStyles.body(
