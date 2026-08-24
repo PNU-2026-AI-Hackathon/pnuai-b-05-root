@@ -7,7 +7,6 @@
 import pandas as pd
 from django.conf import settings
 from langchain_google_genai import ChatGoogleGenerativeAI
-from prophet import Prophet
 
 from .models import SensorData
 
@@ -91,6 +90,11 @@ def _detect_by_prophet(history, current_values):
 
 
 def _forecast_next_value(history, field):
+    # 최초 요청(특히 Render 슬립 복귀 직후 콜드 스타트)에서 프로세스 기동 시간을
+    # 늘리지 않도록, 무거운 prophet 모듈은 실제로 예측이 필요한 시점에만 로드한다.
+    # 파이썬이 모듈을 캐싱하므로 이후 호출부터는 재로드 없이 곧바로 재사용된다.
+    from prophet import Prophet
+
     df = pd.DataFrame({
         'ds': [record.recorded_at.replace(tzinfo=None) for record in history],
         'y': [getattr(record, field) for record in history],
