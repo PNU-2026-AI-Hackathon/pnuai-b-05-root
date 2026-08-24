@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
+import 'photo_frame_carousel.dart';
 
 /// `/adopter/diary-detail` route argument.
 class DiaryDetailArgs {
@@ -69,20 +70,13 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
                 style: AppTextStyles.title(fontSize: 20),
               ),
             ),
-            SizedBox(
-              width: double.infinity,
-              height: MediaQuery.of(context).size.height * 0.48,
-              child: imageUrl != null
-                  ? InteractiveViewer(
-                      child: Image.network(
-                        imageUrl,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const _ImagePlaceholder(),
-                      ),
-                    )
-                  : const _ImagePlaceholder(),
-            ),
+            imageUrl != null
+                ? PhotoFrameCarousel(imageUrl: imageUrl)
+                : SizedBox(
+                    width: double.infinity,
+                    height: MediaQuery.of(context).size.height * 0.48,
+                    child: const _ImagePlaceholder(),
+                  ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               child: Column(
