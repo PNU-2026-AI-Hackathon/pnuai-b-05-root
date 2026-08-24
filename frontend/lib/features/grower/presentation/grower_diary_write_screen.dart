@@ -3,10 +3,13 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/storage/mic_priming_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/mic_priming_dialog.dart';
 import '../../../shared/widgets/photo_source_dialog.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
@@ -47,18 +50,79 @@ class _GrowerDiaryWriteScreenState extends State<GrowerDiaryWriteScreen> {
   final _visionRepository = VisionRepository();
   final _noteController = TextEditingController();
   final _picker = ImagePicker();
+  final _speech = SpeechToText();
+  final _micPrimingStorage = MicPrimingStorage();
 
   int _selectedStage = 1;
   Uint8List? _photoBytes;
   String? _photoFileName;
   bool _submitting = false;
   bool _analyzing = false;
+  bool _isListening = false;
   String? _lastAnalysisTag;
 
   @override
   void dispose() {
     _noteController.dispose();
+    _speech.cancel();
     super.dispose();
+  }
+
+  /// 🎤 버튼 토글 — 듣는 중이면 즉시 종료, 아니면 (필요 시 프라이밍 다이얼로그 후)
+  /// 듣기를 시작한다. 인식 결과는 최종(final) 결과만 기존 텍스트 뒤에 이어붙인다.
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) setState(() => _isListening = false);
+      return;
+    }
+
+    if (!await _micPrimingStorage.hasSeenPriming()) {
+      await _micPrimingStorage.markSeen();
+      if (!mounted) return;
+      final proceed = await showMicPrimingDialog(context);
+      if (proceed != true) return;
+    }
+
+    if (!mounted) return;
+    final available = await _speech.initialize(
+      onStatus: (status) {
+        if (status == 'notListening' || status == 'done') {
+          if (mounted) setState(() => _isListening = false);
+        }
+      },
+      onError: (error) {
+        if (mounted) setState(() => _isListening = false);
+      },
+    );
+
+    if (!available) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('마이크 권한이 필요해요')));
+      return;
+    }
+
+    setState(() => _isListening = true);
+    await _speech.listen(
+      listenOptions: SpeechListenOptions(
+        localeId: 'ko_KR',
+        listenFor: const Duration(minutes: 2),
+        pauseFor: const Duration(seconds: 30),
+      ),
+      onResult: (result) {
+        if (!result.finalResult) return;
+        final recognized = result.recognizedWords.trim();
+        if (recognized.isEmpty) return;
+        final existing = _noteController.text;
+        final merged = existing.isEmpty ? recognized : '$existing $recognized';
+        _noteController.value = _noteController.value.copyWith(
+          text: merged,
+          selection: TextSelection.collapsed(offset: merged.length),
+        );
+      },
+    );
   }
 
   Future<void> _choosePhotoSource() async {
@@ -319,11 +383,12 @@ class _GrowerDiaryWriteScreenState extends State<GrowerDiaryWriteScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        PigFigButton.outline(
-          label: '🎤 음성으로 입력하기',
-          onPressed: () {
-            // TODO: 다음 단계에서 speech_to_text 연동
-          },
+        SizedBox(
+          height: 66, // 기존 outline 버튼 높이(44)의 1.5배 — 이 버튼에만 적용
+          child: PigFigButton.outline(
+            label: _isListening ? '🎤 듣는 중... (탭하면 종료)' : '🎤 음성으로 입력하기',
+            onPressed: _toggleListening,
+          ),
         ),
         const SizedBox(height: 14),
         Expanded(

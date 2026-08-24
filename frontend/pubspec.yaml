@@ -45,6 +45,7 @@ dependencies:
   web: ^1.1.0
   url_launcher: ^6.3.2
   lottie: ^3.5.1
+  speech_to_text: ^7.4.0
 
 dev_dependencies:
   flutter_test:

@@ -8,6 +8,8 @@
     <!-- 일지 사진 다운로드(갤러리 저장, gal 패키지)용. Android 10(API 29)부터는 MediaStore로
          이 권한 없이도 저장되지만, minSdkVersion 24 기기(API 29 미만)를 지원하려면 필요하다. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
+    <!-- "음성으로 입력하기" 버튼(speech_to_text)용 마이크 권한. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="Pig.Fig."
         android:name="${applicationName}"
@@ -61,6 +63,11 @@
         <intent>
             <action android:name="android.intent.action.SENDTO"/>
             <data android:scheme="sms"/>
+        </intent>
+        <!-- Android 11(API 30)+ 패키지 가시성 제한 대응 — speech_to_text가 기기의
+             음성 인식 서비스를 찾으려면 필요하다. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
         </intent>
     </queries>
 </manifest>
