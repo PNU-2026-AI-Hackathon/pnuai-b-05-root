@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
@@ -26,11 +27,16 @@ class _DonationCertificateListScreenState
   bool _loading = true;
   String? _errorMessage;
   List<Seedling> _seedlings = const [];
+  // 카드 모드가 기본값 — donation_certificate_screen.dart와 동일한 인증서
+  // 디자인을 세로 스와이프로 보여준다. "자세히" 아이콘을 누르면 기존 목록형으로 전환.
+  bool _isCardMode = true;
+  String _nickname = '';
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadNickname();
   }
 
   Future<void> _load() async {
@@ -48,6 +54,14 @@ class _DonationCertificateListScreenState
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  // 카드 모드의 모든 인증서가 같은 로그인 계정 닉네임을 쓰므로, 인증서마다
+  // 다시 조회하지 않고 한 번만 불러와 DonationCertificateCard에 내려준다.
+  Future<void> _loadNickname() async {
+    final nickname = await TokenStorage().readNickname();
+    if (!mounted) return;
+    setState(() => _nickname = nickname ?? '');
   }
 
   void _openCertificate(Seedling seedling) {
@@ -71,19 +85,36 @@ class _DonationCertificateListScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '📜 기부 인증서',
-              style: AppTextStyles.title(
-                fontSize: 20,
-              ).copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '지금까지 발급된 기부 인증서를 모두 확인할 수 있어요',
-              style: AppTextStyles.guide(
-                fontSize: 14,
-                color: AppColors.badgeGreenText,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '📜 기부 인증서',
+                        style: AppTextStyles.title(
+                          fontSize: 20,
+                        ).copyWith(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '지금까지 발급된 기부 인증서를 모두 확인할 수 있어요',
+                        style: AppTextStyles.guide(
+                          fontSize: 14,
+                          color: AppColors.badgeGreenText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _ViewModeToggle(
+                  isCardMode: _isCardMode,
+                  onChanged: (isCardMode) =>
+                      setState(() => _isCardMode = isCardMode),
+                ),
+              ],
             ),
             const SizedBox(height: 14),
             Expanded(child: _buildBody()),
@@ -112,6 +143,32 @@ class _DonationCertificateListScreenState
         message: '아직 발급된 기부 인증서가 없어요',
       );
     }
+    return _isCardMode ? _buildCardMode() : _buildListMode();
+  }
+
+  // "아주 큰 아이콘" 모드 — donation_certificate_screen.dart와 동일한 인증서
+  // 카드를 화면 가득 채워 보여주고, 위아래로 스와이프해 다음/이전 인증서로 넘긴다.
+  Widget _buildCardMode() {
+    return PageView.builder(
+      scrollDirection: Axis.vertical,
+      itemCount: _seedlings.length,
+      itemBuilder: (context, index) {
+        final seedling = _seedlings[index];
+        return DonationCertificateCard(
+          args: DonationCertificateArgs(
+            seedlingName: '무화과 #${seedling.id}',
+            organizationName: seedling.donateType?.label ?? '',
+            startedAt: seedling.startedAt,
+            completedAt: seedling.completedAt,
+          ),
+          nickname: _nickname,
+        );
+      },
+    );
+  }
+
+  // "자세히" 모드 — 요약 정보만 나열하는 기존 목록형 뷰(변경 없음).
+  Widget _buildListMode() {
     return ListView.separated(
       padding: const EdgeInsets.only(bottom: 16),
       itemCount: _seedlings.length,
@@ -123,6 +180,65 @@ class _DonationCertificateListScreenState
           onTap: () => _openCertificate(seedling),
         );
       },
+    );
+  }
+}
+
+/// 우측 상단 보기 모드 전환 아이콘 2개 — Windows 탐색기의 "아주 큰 아이콘"/
+/// "자세히" 버튼과 같은 개념. 선택된 쪽만 진한 색으로 강조한다.
+class _ViewModeToggle extends StatelessWidget {
+  const _ViewModeToggle({required this.isCardMode, required this.onChanged});
+
+  final bool isCardMode;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ViewModeIconButton(
+          icon: Icons.view_agenda_outlined,
+          tooltip: '카드로 보기',
+          selected: isCardMode,
+          onPressed: () => onChanged(true),
+        ),
+        _ViewModeIconButton(
+          icon: Icons.view_list_outlined,
+          tooltip: '자세히 보기',
+          selected: !isCardMode,
+          onPressed: () => onChanged(false),
+        ),
+      ],
+    );
+  }
+}
+
+class _ViewModeIconButton extends StatelessWidget {
+  const _ViewModeIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(icon),
+      tooltip: tooltip,
+      onPressed: onPressed,
+      color: selected ? AppColors.pink500 : AppColors.textMuted,
+      style: IconButton.styleFrom(
+        backgroundColor: selected
+            ? AppColors.pink500.withValues(alpha: 0.12)
+            : Colors.transparent,
+      ),
     );
   }
 }
