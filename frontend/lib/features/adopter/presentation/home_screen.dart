@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/care_action_button.dart';
 import '../../../shared/widgets/fig_tree_illustration.dart';
+import '../../../shared/widgets/ground_illustration.dart';
 import '../../../shared/widgets/pig_character.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
@@ -436,6 +437,14 @@ class _SeedlingHome extends StatelessWidget {
       // alignment와 무관하게 기존 좌표 그대로 유지된다.
       alignment: Alignment.topCenter,
       children: [
+        // 화면 전체 폭을 가로지르는 흙 배경 — z-order 최하단(리스트 첫 번째)에만
+        // 추가된 레이어로, 아래 Column/Positioned의 좌표·로직에는 영향을 주지 않는다.
+        const Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: GroundIllustration(),
+        ),
         Column(
           children: [
             const SizedBox(height: 12),
