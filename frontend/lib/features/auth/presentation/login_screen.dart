@@ -210,40 +210,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 60),
-              Row(
-                children: [
-                  const Expanded(child: Divider(color: AppColors.dotInactive)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Text('간편 로그인', style: AppTextStyles.caption()),
-                  ),
-                  const Expanded(child: Divider(color: AppColors.dotInactive)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('카카오 로그인은 준비 중이에요')),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.kakaoYellow,
-                    foregroundColor: AppColors.textPrimary,
-                    elevation: 0,
-                    shape: const StadiumBorder(),
-                  ),
-                  child: Text(
-                    '카카오로 계속하기',
-                    style: AppTextStyles.button(
-                      fontSize: 14,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 40),
             ],
           ),
