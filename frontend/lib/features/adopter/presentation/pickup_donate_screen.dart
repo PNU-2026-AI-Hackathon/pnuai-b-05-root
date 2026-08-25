@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
@@ -17,12 +18,15 @@ class _Organization {
     required this.name,
     required this.detail,
     required this.donateType,
+    this.url,
   });
 
   final String emoji;
   final String name;
   final String detail;
   final DonateType donateType;
+  /// 카테고리를 더 알아볼 수 있는 외부 링크. 앱 내부 기능인 "앱 내 나눔 분양"은 null.
+  final String? url;
 }
 
 /// 계획서 기준 기부처 3개 카테고리. `Seedling.DonateType`(backend TextChoices)과 1:1 대응한다.
@@ -32,12 +36,14 @@ const _organizations = [
     name: '초등학교·복지시설 기증',
     detail: '지역 초등학교나 복지시설에 무화과를 기증해요',
     donateType: DonateType.schoolWelfare,
+    url: 'https://forest.or.kr',
   ),
   _Organization(
     emoji: '🌱',
     name: '도시농업 공동체·시민단체 연계',
     detail: '도시농업 공동체·시민단체와 나눔해요',
     donateType: DonateType.urbanFarmingCommunity,
+    url: 'https://seoulmytree.forest.or.kr',
   ),
   _Organization(
     emoji: '🎁',
@@ -46,6 +52,24 @@ const _organizations = [
     donateType: DonateType.inAppSharing,
   ),
 ];
+
+/// [organization.url]을 외부 브라우저로 연다. `grower_mypage_screen.dart`의
+/// `_launchContact()`와 동일하게 실행 실패(웹/앱 부재 등)에도 앱이 죽지 않도록
+/// try-catch로 감싸고 스낵바로만 안내한다.
+Future<void> _launchOrganizationUrl(BuildContext context, String url) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final launched = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched) {
+      messenger.showSnackBar(const SnackBar(content: Text('링크를 열 수 없어요')));
+    }
+  } catch (_) {
+    messenger.showSnackBar(const SnackBar(content: Text('링크를 열 수 없어요')));
+  }
+}
 
 /// 1o — 수령/기부 선택. 완성된 묘목을 대상으로
 /// `PATCH /api/seedlings/{id}/pickup-donate/`와 실제로 연동한다.
@@ -472,6 +496,19 @@ class _OrganizationRow extends StatelessWidget {
                 ],
               ),
             ),
+            if (organization.url != null)
+              IconButton(
+                onPressed: () =>
+                    _launchOrganizationUrl(context, organization.url!),
+                icon: const Icon(Icons.open_in_new),
+                iconSize: 18,
+                color: AppColors.textMuted,
+                tooltip: '자세히 보기',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(6),
+              ),
+            const SizedBox(width: 4),
             if (selected)
               Container(
                 width: 22,
