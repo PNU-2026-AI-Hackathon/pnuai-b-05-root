@@ -23,11 +23,12 @@ ILLUSTRATION_PROMPT = (
 )
 
 
-def convert_to_illustration(photo_path):
+def convert_to_illustration(photo):
     """묘목 사진을 일러스트로 변환해 이미지 bytes를 반환한다.
 
     Args:
-        photo_path: 원본 사진 파일 경로
+        photo: Diary.photo FieldFile (Django File API로 열 수 있는 객체 — 로컬/Cloudinary
+            등 스토리지 백엔드에 무관하게 동작한다)
 
     Returns:
         bytes | None: 변환된 이미지의 raw bytes. 키 미설정이거나 변환에 실패하면 None.
@@ -35,18 +36,18 @@ def convert_to_illustration(photo_path):
     if not settings.GEMINI_API_KEY:
         return None
     try:
-        return _generate_illustration(photo_path)
+        return _generate_illustration(photo)
     except Exception:
         return None
 
 
-def _generate_illustration(photo_path):
+def _generate_illustration(photo):
     from google import genai
     from google.genai import types
 
-    with open(photo_path, 'rb') as f:
+    with photo.open('rb') as f:
         photo_bytes = f.read()
-    mime_type = mimetypes.guess_type(photo_path)[0] or 'image/jpeg'
+    mime_type = mimetypes.guess_type(photo.name)[0] or 'image/jpeg'
 
     client = genai.Client(
         api_key=settings.GEMINI_API_KEY,
