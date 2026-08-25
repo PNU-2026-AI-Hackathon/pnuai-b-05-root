@@ -245,7 +245,7 @@ class _DonationCertificateScreenState
             ),
             const SizedBox(height: 16),
             Text(
-              '인증서는 마이페이지에서 언제든 볼 수 있어요',
+              '마이페이지 > 기부 인증서에서 다시 볼 수 있어요',
               style: AppTextStyles.body(
                 fontSize: 12,
                 color: const Color(0xFFB7B2A4),

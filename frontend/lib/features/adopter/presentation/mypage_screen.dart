@@ -11,7 +11,6 @@ import '../../../shared/widgets/status_badge.dart';
 import '../../auth/presentation/account_actions.dart';
 import '../data/seedling_repository.dart';
 import 'account_settings_dialog.dart';
-import 'donation_certificate_screen.dart';
 
 /// 1n — 마이페이지: 프로필 카드(실제 닉네임/이메일/입양 그루 수) + 2x2 서비스 카드.
 class MypageScreen extends StatefulWidget {
@@ -83,39 +82,6 @@ class _MypageScreenState extends RevalidatableState<MypageScreen> {
     setState(() => _nickname = newNickname);
   }
 
-  /// 완료 + 기부 확정된 묘목 중 가장 최근 1건으로 인증서 화면을 연다.
-  /// 대상이 없으면(또는 조회 실패 시) 화면 이동 없이 안내 스낵바만 보여준다.
-  Future<void> _openDonationCertificate(BuildContext context) async {
-    List<Seedling> seedlings;
-    try {
-      seedlings = await _seedlingRepository.fetchSeedlings();
-    } on ApiException catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
-      return;
-    }
-    final seedling = pickSeedlingForDonationCertificate(seedlings);
-    if (seedling == null) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('아직 발급된 기부 인증서가 없어요')),
-      );
-      return;
-    }
-    if (!context.mounted) return;
-    Navigator.of(context).pushNamed(
-      '/adopter/donation-certificate',
-      arguments: DonationCertificateArgs(
-        seedlingName: '무화과 #${seedling.id}',
-        organizationName: seedling.donateType?.label ?? '',
-        startedAt: seedling.startedAt,
-        completedAt: seedling.completedAt,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -165,7 +131,9 @@ class _MypageScreenState extends RevalidatableState<MypageScreen> {
                       iconBg: AppColors.pink100,
                       title: '기부 인증서',
                       description: '기부 나눔 인증서를 확인해요',
-                      onTap: () => _openDonationCertificate(context),
+                      onTap: () => Navigator.of(
+                        context,
+                      ).pushNamed('/adopter/donation-certificates'),
                     ),
                   ),
                 ],

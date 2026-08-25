@@ -110,9 +110,9 @@ Seedling? pickSeedlingForPickupDonate(List<Seedling> seedlings) {
   return completed.isEmpty ? null : completed.first;
 }
 
-/// 기부 인증서에 보여줄 대상 묘목을 고른다 — 완료 + 기부 확정된 묘목 중 가장 최근에
-/// 완료된 것. 여러 건이어도 최근 1건만 보여주고, 없으면 `null`을 돌려준다.
-Seedling? pickSeedlingForDonationCertificate(List<Seedling> seedlings) {
+/// 기부 인증서 목록에 보여줄 대상 묘목 전체를 고른다 — 완료 + 기부 확정된 묘목만
+/// 완료일(completedAt) 내림차순으로 정렬해 돌려준다(완료일이 없으면 startedAt으로 대체).
+List<Seedling> filterSeedlingsForDonationCertificates(List<Seedling> seedlings) {
   final donated = seedlings
       .where(
         (s) =>
@@ -125,7 +125,7 @@ Seedling? pickSeedlingForDonationCertificate(List<Seedling> seedlings) {
         a.completedAt ?? a.startedAt,
       ),
     );
-  return donated.isEmpty ? null : donated.first;
+  return donated;
 }
 
 /// backend/seedlings (`GET /api/seedlings/`) 연동 — 입양자용.

@@ -14,6 +14,7 @@ import 'features/adopter/presentation/care/sunlight_care_screen.dart';
 import 'features/adopter/presentation/care/water_care_screen.dart';
 import 'features/adopter/presentation/chatbot_screen.dart';
 import 'features/adopter/presentation/diary_detail_screen.dart';
+import 'features/adopter/presentation/donation_certificate_list_screen.dart';
 import 'features/adopter/presentation/donation_certificate_screen.dart';
 import 'features/adopter/presentation/pickup_donate_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
@@ -90,6 +91,8 @@ class PigFigApp extends StatelessWidget {
         '/adopter/pickup-donate': (context) => const PickupDonateScreen(),
         '/adopter/donation-certificate': (context) =>
             const DonationCertificateScreen(),
+        '/adopter/donation-certificates': (context) =>
+            const DonationCertificateListScreen(),
         '/adopter/chatbot': (context) => const ChatbotScreen(),
         '/adopter/diary-detail': (context) => const DiaryDetailScreen(),
         '/adopter/adoption-history': (context) => const AdoptionHistoryScreen(),
