@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.core import mail
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -110,6 +111,34 @@ class SeedlingCompleteViewTests(APITestCase):
         mock_send_notification.assert_called_once_with(
             self.adopter, '묘목 완성!', '무화과 묘목이 완성됐어요. 수령 또는 기부를 선택해주세요.',
         )
+
+    @patch('seedlings.views.send_notification_to_user')
+    def test_completing_seedling_sends_email_to_adopter(self, mock_send_notification):
+        self.adopter.nickname = '단풍'
+        self.adopter.save(update_fields=['nickname'])
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.patch(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.to, [self.adopter.email])
+        self.assertIn(f'#{self.seedling.pk}', sent.subject)
+        self.assertIn('단풍님', sent.body)
+
+    @patch('seedlings.views.send_mail', side_effect=Exception('smtp down'))
+    @patch('seedlings.views.send_notification_to_user')
+    def test_completing_seedling_succeeds_even_if_email_fails(
+        self, mock_send_notification, mock_send_mail,
+    ):
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.patch(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.seedling.refresh_from_db()
+        self.assertEqual(self.seedling.status, Seedling.Status.COMPLETED)
 
     def test_adopter_cannot_complete_seedling(self):
         self.client.force_authenticate(user=self.adopter)
