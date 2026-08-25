@@ -198,25 +198,29 @@ class _PickupDonateScreenState extends State<PickupDonateScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          children: [
-            Text(
-              '다 자란 무화과,\n어떻게 할까요?',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.display(
-                fontSize: 28,
-                color: const Color(0xFFF7A0AE),
-              ).copyWith(letterSpacing: 2.8),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '묘목 완성! 수령하거나 기부할 수 있어요 🎉',
-              style: AppTextStyles.body(
-                fontSize: 14,
-                color: AppColors.badgeGreenText,
-              ).copyWith(fontWeight: FontWeight.w500),
-            ),
-          ],
+        SizedBox(
+          width: double.infinity,
+          child: Column(
+            children: [
+              Text(
+                '다 자란 무화과,\n어떻게 할까요?',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.display(
+                  fontSize: 28,
+                  color: const Color(0xFFF7A0AE),
+                ).copyWith(letterSpacing: 2.8),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '묘목 완성! 수령하거나 기부할 수 있어요 🎉',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.body(
+                  fontSize: 14,
+                  color: AppColors.badgeGreenText,
+                ).copyWith(fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         Row(
@@ -369,65 +373,38 @@ class _ChoiceCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
-            decoration: BoxDecoration(
-              color: selected ? const Color(0xFFFDEFF2) : Colors.white,
-              border: Border.all(
-                color: selected ? AppColors.pink500 : AppColors.outline,
-                width: 2,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              children: [
-                Text(emoji, style: const TextStyle(fontSize: 32)),
-                const SizedBox(height: 6),
-                Text(
-                  title,
-                  style: AppTextStyles.title(
-                    fontSize: 15,
-                    color: titleColor,
-                  ).copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  description,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.body(
-                    fontSize: 12,
-                    color: descColor,
-                  ).copyWith(height: 1.5),
-                ),
-              ],
-            ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFFDEFF2) : Colors.white,
+          border: Border.all(
+            color: selected ? AppColors.pink500 : AppColors.outline,
+            width: 2,
           ),
-          if (selected)
-            Positioned(
-              top: -10,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.pink500,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Text(
-                  '선택됨 ✓',
-                  style: AppTextStyles.body(
-                    fontSize: 11,
-                    color: Colors.white,
-                  ).copyWith(fontWeight: FontWeight.w700),
-                ),
-              ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 32)),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: AppTextStyles.title(
+                fontSize: 15,
+                color: titleColor,
+              ).copyWith(fontWeight: FontWeight.w900),
             ),
-        ],
+            const SizedBox(height: 6),
+            Text(
+              description,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body(
+                fontSize: 12,
+                color: descColor,
+              ).copyWith(height: 1.5),
+            ),
+          ],
+        ),
       ),
     );
   }
