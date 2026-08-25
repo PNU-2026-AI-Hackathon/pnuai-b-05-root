@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.core.mail import send_mail
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -85,6 +87,26 @@ class SeedlingCompleteView(APIView):
             '묘목 완성!',
             '무화과 묘목이 완성됐어요. 수령 또는 기부를 선택해주세요.',
         )
+
+        try:
+            nickname = seedling.adopter.nickname or '입양자'
+            send_mail(
+                subject=f'[Pig.Fig.] 무화과 #{seedling.pk}가 다 자랐어요 🎉',
+                message=(
+                    f'{nickname}님, 안녕하세요.\n\n'
+                    f'정성껏 함께한 무화과 #{seedling.pk}가 드디어 완성되었어요! 🌱🍃\n\n'
+                    '이제 앱에서 수령 또는 기부 중 하나를 선택해주세요.\n'
+                    '완성된 묘목은 7일 내에 선택해주시면 좋아요.\n\n'
+                    '감사합니다.\n'
+                    'Pig.Fig. 드림 🐷🌱'
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[seedling.adopter.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            # SMTP 오류 등으로 이메일 발송이 실패해도 완성 처리 응답 자체는 그대로 성공시킨다.
+            print(f'[Email] 완성 알림 발송 실패: seedling={seedling.pk} error={e}')
 
         return Response(SeedlingSerializer(seedling).data)
 
