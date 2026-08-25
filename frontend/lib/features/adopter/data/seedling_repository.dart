@@ -31,6 +31,13 @@ extension DonateTypeApi on DonateType {
     DonateType.inAppSharing => 'in_app_sharing',
   };
 
+  /// `Seedling.DonateType`(backend TextChoices)의 한국어 라벨과 1:1 대응.
+  String get label => switch (this) {
+    DonateType.schoolWelfare => '초등학교·복지시설 기증',
+    DonateType.urbanFarmingCommunity => '도시농업 공동체·시민단체 연계',
+    DonateType.inAppSharing => '앱 내 나눔 분양',
+  };
+
   static DonateType? fromApiValue(String? value) => switch (value) {
     'school_welfare' => DonateType.schoolWelfare,
     'urban_farming_community' => DonateType.urbanFarmingCommunity,
@@ -101,6 +108,24 @@ Seedling? pickSeedlingForPickupDonate(List<Seedling> seedlings) {
           ),
         );
   return completed.isEmpty ? null : completed.first;
+}
+
+/// 기부 인증서에 보여줄 대상 묘목을 고른다 — 완료 + 기부 확정된 묘목 중 가장 최근에
+/// 완료된 것. 여러 건이어도 최근 1건만 보여주고, 없으면 `null`을 돌려준다.
+Seedling? pickSeedlingForDonationCertificate(List<Seedling> seedlings) {
+  final donated = seedlings
+      .where(
+        (s) =>
+            s.status == SeedlingStatus.completed &&
+            s.pickupOrDonate == PickupOrDonateChoice.donate,
+      )
+      .toList()
+    ..sort(
+      (a, b) => (b.completedAt ?? b.startedAt).compareTo(
+        a.completedAt ?? a.startedAt,
+      ),
+    );
+  return donated.isEmpty ? null : donated.first;
 }
 
 /// backend/seedlings (`GET /api/seedlings/`) 연동 — 입양자용.
