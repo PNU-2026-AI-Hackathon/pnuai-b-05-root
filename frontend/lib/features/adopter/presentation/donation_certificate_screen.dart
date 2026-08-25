@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pig_character.dart';
@@ -10,15 +11,55 @@ class DonationCertificateArgs {
   const DonationCertificateArgs({
     required this.seedlingName,
     required this.organizationName,
+    this.startedAt,
+    this.completedAt,
   });
 
   final String seedlingName;
   final String organizationName;
+  // 과거 데이터 등으로 하나라도 없을 수 있어 nullable로 받는다 — 없으면
+  // "함께한 N일" 계산 대신 안전한 폴백 문구를 보여준다.
+  final DateTime? startedAt;
+  final DateTime? completedAt;
 }
 
-/// 1p — 기부 인증서: 디지털 발급 화면. mock UI(이미지 저장/공유는 준비 중).
-class DonationCertificateScreen extends StatelessWidget {
+/// 입양자가 실제로 함께한 기간을 "YYYY. MM. DD · 함께한 N일" 형식으로 만든다.
+/// `startedAt`/`completedAt` 중 하나라도 없으면(과거 데이터 등) 계산을 시도하지
+/// 않고 안전한 폴백 문구를 돌려준다.
+String formatCertificatePeriod(DateTime? startedAt, DateTime? completedAt) {
+  if (startedAt == null || completedAt == null) return '기간 정보 없음';
+  final days = completedAt.difference(startedAt).inDays;
+  final y = completedAt.year.toString().padLeft(4, '0');
+  final m = completedAt.month.toString().padLeft(2, '0');
+  final d = completedAt.day.toString().padLeft(2, '0');
+  return '$y. $m. $d · 함께한 $days일';
+}
+
+/// 1p — 기부 인증서: 디지털 발급 화면. 입양자 닉네임은 실제 로그인 계정 값을
+/// 조회해 보여준다(이미지 저장/공유는 여전히 준비 중, 이번 범위 아님).
+class DonationCertificateScreen extends StatefulWidget {
   const DonationCertificateScreen({super.key});
+
+  @override
+  State<DonationCertificateScreen> createState() =>
+      _DonationCertificateScreenState();
+}
+
+class _DonationCertificateScreenState
+    extends State<DonationCertificateScreen> {
+  String _nickname = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNickname();
+  }
+
+  Future<void> _loadNickname() async {
+    final nickname = await TokenStorage().readNickname();
+    if (!mounted) return;
+    setState(() => _nickname = nickname ?? '');
+  }
 
   void _showComingSoon(BuildContext context) {
     ScaffoldMessenger.of(
@@ -30,6 +71,7 @@ class DonationCertificateScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final args =
         ModalRoute.of(context)!.settings.arguments as DonationCertificateArgs;
+    final displayName = _nickname.isEmpty ? '입양자' : _nickname;
 
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
@@ -99,9 +141,9 @@ class DonationCertificateScreen extends StatelessWidget {
                           color: const Color(0xFF6B675C),
                         ).copyWith(height: 1.8),
                         children: [
-                          const TextSpan(
-                            text: '김입양',
-                            style: TextStyle(
+                          TextSpan(
+                            text: displayName,
+                            style: const TextStyle(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.w700,
                             ),
@@ -129,7 +171,7 @@ class DonationCertificateScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '2026. 07. 20 · 함께한 132일',
+                      formatCertificatePeriod(args.startedAt, args.completedAt),
                       style: AppTextStyles.body(
                         fontSize: 12,
                         color: const Color(0xFFB7B2A4),
