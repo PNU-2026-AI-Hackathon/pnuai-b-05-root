@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'core/theme/app_theme.dart';
 import 'features/adopter/presentation/adopt/adopt_screen.dart';
+import 'features/adopter/presentation/adoption_history_screen.dart';
 import 'features/adopter/presentation/adopter_shell.dart';
 import 'features/adopter/presentation/care/nutrient_care_screen.dart';
 import 'features/adopter/presentation/care/pig_feed_care_screen.dart';
@@ -91,6 +92,7 @@ class PigFigApp extends StatelessWidget {
             const DonationCertificateScreen(),
         '/adopter/chatbot': (context) => const ChatbotScreen(),
         '/adopter/diary-detail': (context) => const DiaryDetailScreen(),
+        '/adopter/adoption-history': (context) => const AdoptionHistoryScreen(),
       },
     );
   }

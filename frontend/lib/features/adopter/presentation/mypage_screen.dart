@@ -83,12 +83,6 @@ class _MypageScreenState extends RevalidatableState<MypageScreen> {
     setState(() => _nickname = newNickname);
   }
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('준비 중이에요')));
-  }
-
   /// 완료 + 기부 확정된 묘목 중 가장 최근 1건으로 인증서 화면을 연다.
   /// 대상이 없으면(또는 조회 실패 시) 화면 이동 없이 안내 스낵바만 보여준다.
   Future<void> _openDonationCertificate(BuildContext context) async {
@@ -199,7 +193,9 @@ class _MypageScreenState extends RevalidatableState<MypageScreen> {
                       iconBg: AppColors.green500,
                       title: '입양 내역서',
                       description: '나의 입양 내역을 확인해요',
-                      onTap: () => _showComingSoon(context),
+                      onTap: () => Navigator.of(
+                        context,
+                      ).pushNamed('/adopter/adoption-history'),
                     ),
                   ),
                 ],
