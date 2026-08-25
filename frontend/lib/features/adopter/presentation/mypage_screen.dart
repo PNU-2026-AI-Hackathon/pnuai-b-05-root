@@ -250,7 +250,7 @@ class _ProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
@@ -262,59 +262,61 @@ class _ProfileCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
+        // grower_mypage_screen.dart의 _ProfileCard와 동일한 이유로 topCenter를
+        // 명시한다 — 기본값 topStart면 아래 Column이 자기 콘텐츠 폭만큼
+        // shrink-wrap된 채 왼쪽에 붙어버린다.
+        alignment: Alignment.topCenter,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: AppColors.pink100,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.person, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    Text(
-                      nickname,
-                      style: AppTextStyles.title(
-                        fontSize: 17,
-                      ).copyWith(fontWeight: FontWeight.w900),
-                    ),
-                    StatusBadge(
-                      label: '입양 중: $seedlingCount그루 🌱',
-                      background: AppColors.badgeGreenBg,
-                      textColor: AppColors.badgeGreenText,
-                      pill: false,
-                    ),
-                  ],
+          Column(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: AppColors.pink100,
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  email,
-                  style: AppTextStyles.body(
-                    fontSize: 13,
-                    color: AppColors.textMuted,
-                  ),
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 28,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                nickname,
+                style: AppTextStyles.title(
+                  fontSize: 16,
+                ).copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                email,
+                style: AppTextStyles.body(
+                  fontSize: 13,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(height: 8),
+              StatusBadge(
+                label: '입양 중: $seedlingCount그루 🌱',
+                background: AppColors.badgeGreenBg,
+                textColor: AppColors.badgeGreenText,
+                pill: false,
+              ),
+            ],
           ),
-          IconButton(
-            onPressed: onSettingsTap,
-            icon: const Icon(
-              Icons.settings_outlined,
-              color: AppColors.textMuted,
+          Positioned(
+            top: 0,
+            right: 0,
+            child: IconButton(
+              onPressed: onSettingsTap,
+              icon: const Icon(
+                Icons.settings_outlined,
+                color: AppColors.textMuted,
+              ),
             ),
           ),
         ],
