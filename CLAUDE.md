@@ -331,7 +331,7 @@ fcm_service.dart`의 `FcmService.getDeviceToken()`은 `kIsWeb`이거나 `Platfor
 
 `FcmService.getDeviceToken()` 안에서 `FirebaseMessaging.instance.requestPermission()`을 호출하는
 바로 그 순간 OS의 `POST_NOTIFICATIONS` 권한 다이얼로그가 뜨는데, 이 시스템 다이얼로그는 디자인을
-바꿀 수 없습니다. 그래서 `login_screen.dart`가 (Android에서, 최초 1회만) 그 앞에 Pig.Fig. 브랜드
+바꿀 수 없습니다. 그래서 `login_screen.dart`가 (Android에서, 계정당 최초 1회만) 그 앞에 Pig.Fig. 브랜드
 톤의 커스텀 "프라이밍" 다이얼로그(`shared/widgets/notification_priming_dialog.dart`의
 `showNotificationPrimingDialog()`)를 먼저 보여줍니다 — "허용할게요"를 누른 경우에만
 `_registerPushToken()`(=`getDeviceToken()` 호출 경로)을 실행해 실제 OS 권한 요청까지 이어가고,
@@ -341,10 +341,14 @@ fcm_service.dart`의 `FcmService.getDeviceToken()`은 `kIsWeb`이거나 `Platfor
 때문입니다.
 
 노출 여부는 `core/storage/notification_priming_storage.dart`의 `NotificationPrimingStorage`가
-`OnboardingStorage`와 동일한 `SharedPreferences` 패턴으로 기록합니다 — "허용"이든 "나중에"든
-응답과 무관하게 다시 묻지 않으며, 계정이 아니라 **기기 단위**로 플래그를 둡니다(Android의 실제
-알림 권한도 계정이 아니라 "이 기기의 이 앱" 단위이므로, 다른 계정으로 로그인해도 이미 한 번
-판단이 끝났다면 다시 물을 이유가 없습니다).
+`CareInventoryStorage`/`InventoryStorage`와 동일하게 **계정(userId) 단위**의 `SharedPreferences`
+키(`pigfig.notification_priming_seen.$userId`, 생성자 `NotificationPrimingStorage({required
+this.userId})`)로 기록합니다 — "허용"이든 "나중에"든 응답과 무관하게, 한 번 판단이 끝난 계정에는
+다시 묻지 않습니다. 같은 기기라도 계정마다 따로 판단하므로, A 계정으로 프라이밍에 응답한 뒤 같은
+기기에서 B 계정으로 처음 로그인하면 B 계정에는 프라이밍이 한 번 더 뜹니다(예전에는 기기 단위라
+안 떴음). `_submit()`이 로그인 응답의 `LoginResult.userId`를
+`_needsNotificationPriming(userId)`/`_primeThenMaybeRegister(userId)`에 그대로 넘겨 이 저장소를
+계정별로 생성합니다. (같은 패턴의 `mic_priming_storage.dart`는 이번 범위 밖이라 여전히 기기 단위입니다.)
 
 이 다이얼로그를 넣기 위해 `login_screen.dart`의 `_submit()`에서 기존에 `unawaited(
 _registerPushToken())`로 완전히 fire-and-forget이던 흐름을 바꿔야 했습니다 — 그대로 두면

@@ -54,12 +54,12 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
       if (!mounted) return;
-      if (await _needsNotificationPriming()) {
+      if (await _needsNotificationPriming(result.userId)) {
         // 프라이밍 다이얼로그를 처음 보여주는 순간만 응답을 기다린다 — 사용자의 명시적
         // 선택이 필요한 흐름이라 여기서만큼은 로그인 흐름을 잠깐 막는 게 자연스럽다.
-        await _primeThenMaybeRegister();
+        await _primeThenMaybeRegister(result.userId);
       } else {
-        // 이미 한 번 판단이 끝난 기기라면 기존과 동일하게 로그인 흐름을 막지 않는다.
+        // 이미 이 계정으로 한 번 판단이 끝났다면 기존과 동일하게 로그인 흐름을 막지 않는다.
         unawaited(_registerPushToken());
       }
       if (!mounted) return;
@@ -76,18 +76,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// 알림 권한 프라이밍 다이얼로그를 아직 안 보여준 Android 기기인지 확인한다.
+  /// 이 계정에 알림 권한 프라이밍 다이얼로그를 아직 안 보여준 Android인지 확인한다.
   /// 다른 플랫폼(web/windows 등)은 [FcmService]가 애초에 아무것도 하지 않으므로
   /// 다이얼로그 자체를 띄울 필요가 없다.
-  Future<bool> _needsNotificationPriming() async {
+  Future<bool> _needsNotificationPriming(String userId) async {
     if (kIsWeb || !Platform.isAndroid) return false;
-    return !await NotificationPrimingStorage().hasSeenPriming();
+    return !await NotificationPrimingStorage(userId: userId).hasSeenPriming();
   }
 
   /// 프라이밍 다이얼로그를 보여주고, "허용"을 선택했을 때만 실제 OS 권한 요청(토큰 등록)까지
   /// 이어간다. 응답과 무관하게 다시 묻지 않도록 먼저 "본 적 있음"으로 기록한다.
-  Future<void> _primeThenMaybeRegister() async {
-    await NotificationPrimingStorage().markSeen();
+  Future<void> _primeThenMaybeRegister(String userId) async {
+    await NotificationPrimingStorage(userId: userId).markSeen();
     if (!mounted) return;
     final accepted = await showNotificationPrimingDialog(context);
     if (accepted == true) {
