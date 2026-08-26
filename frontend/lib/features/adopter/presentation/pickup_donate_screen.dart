@@ -152,6 +152,10 @@ class _PickupDonateScreenState extends State<PickupDonateScreen> {
             seedlingId: seedling.id,
             seedlingName: '무화과 #${seedling.id}',
             organizationName: _organizations[_selectedOrgIndex].name,
+            startedAt: seedling.startedAt,
+            completedAt: seedling.completedAt,
+            heightCm: seedling.heightCm,
+            finalIllustrationUrl: seedling.finalIllustrationUrl,
           ),
         );
       } else {

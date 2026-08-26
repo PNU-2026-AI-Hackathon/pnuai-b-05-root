@@ -9,6 +9,7 @@ import '../../../core/download/image_downloader.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/util/season_badge.dart';
 import '../../../shared/widgets/pig_character.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 
@@ -20,6 +21,8 @@ class DonationCertificateArgs {
     required this.organizationName,
     this.startedAt,
     this.completedAt,
+    this.heightCm,
+    this.finalIllustrationUrl,
   });
 
   // 인증서 이미지 저장/공유 시 파일명(pigfig_certificate_{id}.png)에 쓴다.
@@ -30,6 +33,29 @@ class DonationCertificateArgs {
   // "함께한 N일" 계산 대신 안전한 폴백 문구를 보여준다.
   final DateTime? startedAt;
   final DateTime? completedAt;
+  // 완성 신고 시 재배자가 입력한 최종 키(cm). 도입 이전 완료분에는 없다.
+  final int? heightCm;
+  // 완성 사진을 Gemini로 변환한 일러스트 URL. 있으면 인증서 안 손그림 나무 대신 이걸 보여준다.
+  final String? finalIllustrationUrl;
+}
+
+/// completed_at(초 단위까지)을 "🐣 2026. 08. 20 · 14:32:07"로 만든다 —
+/// "탄생 시간" 연출용. completed_at은 UTC일 수 있어 반드시 로컬로 변환 후 포맷한다
+/// (`formatCertificatePeriod`와 달리 시:분:초까지 노출).
+String? formatBirthMoment(DateTime? completedAt) {
+  if (completedAt == null) return null;
+  final d = completedAt.toLocal();
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '🐣 ${d.year}. ${two(d.month)}. ${two(d.day)} · '
+      '${two(d.hour)}:${two(d.minute)}:${two(d.second)}';
+}
+
+/// "☀️ 한여름에 완성" (+ 키가 있으면 " · 34cm") 한 줄. completed_at이 없으면 null.
+String? formatSeasonLine(DateTime? completedAt, int? heightCm) {
+  if (completedAt == null) return null;
+  final badge = seasonBadgeFor(completedAt);
+  final height = heightCm == null ? '' : ' · ${heightCm}cm';
+  return '${badge.emoji} ${badge.label}에 완성$height';
 }
 
 /// 입양자가 실제로 함께한 기간을 "YYYY. MM. DD · 함께한 N일" 형식으로 만든다.
@@ -341,7 +367,7 @@ class _CertificateContent extends StatelessWidget {
               ).copyWith(letterSpacing: 2.16),
             ),
             const SizedBox(height: 6),
-            const _CertificateTreeIcon(),
+            _CertificateArtwork(illustrationUrl: args.finalIllustrationUrl),
             const SizedBox(height: 6),
             Text.rich(
               TextSpan(
@@ -386,6 +412,27 @@ class _CertificateContent extends StatelessWidget {
                 color: const Color(0xFFB7B2A4),
               ),
             ),
+            if (formatSeasonLine(args.completedAt, args.heightCm)
+                case final seasonLine?) ...[
+              const SizedBox(height: 4),
+              Text(
+                seasonLine,
+                style: AppTextStyles.body(
+                  fontSize: 12,
+                  color: AppColors.badgeGreenText,
+                ).copyWith(fontWeight: FontWeight.w700),
+              ),
+            ],
+            if (formatBirthMoment(args.completedAt) case final birthMoment?) ...[
+              const SizedBox(height: 2),
+              Text(
+                birthMoment,
+                style: AppTextStyles.body(
+                  fontSize: 11,
+                  color: const Color(0xFFB7B2A4),
+                ),
+              ),
+            ],
             const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -402,6 +449,32 @@ class _CertificateContent extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 인증서 안의 대표 그림 자리. 완성 사진의 Gemini 일러스트([illustrationUrl])가 있으면
+/// 그걸 둥근 액자로 보여주고, 없거나(미변환·과거 데이터) 로딩 실패면 기존 손그림
+/// 무화과나무 아이콘으로 폴백한다 — `growth_timeline_screen.dart`의
+/// `illustrationUrl ?? photoUrl ?? placeholder` 우선순위와 같은 결.
+class _CertificateArtwork extends StatelessWidget {
+  const _CertificateArtwork({this.illustrationUrl});
+
+  final String? illustrationUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = illustrationUrl;
+    if (url == null) return const _CertificateTreeIcon();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Image.network(
+        url,
+        width: 104,
+        height: 104,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const _CertificateTreeIcon(),
       ),
     );
   }

@@ -46,8 +46,8 @@ extension DonateTypeApi on DonateType {
   };
 }
 
-/// `GET /api/seedlings/` 응답 한 건. 입양자 화면(홈/성장 타임라인/수령·기부 선택)에서 쓰는
-/// 필드만 파싱한다.
+/// `GET /api/seedlings/` 응답 한 건. 입양자 화면(홈/성장 타임라인/수령·기부 선택/기부 인증서)
+/// 에서 쓰는 필드만 파싱한다.
 class Seedling {
   const Seedling({
     required this.id,
@@ -56,6 +56,9 @@ class Seedling {
     this.completedAt,
     this.pickupOrDonate,
     this.donateType,
+    this.heightCm,
+    this.finalPhotoUrl,
+    this.finalIllustrationUrl,
   });
 
   final int id;
@@ -64,6 +67,16 @@ class Seedling {
   final DateTime? completedAt;
   final PickupOrDonateChoice? pickupOrDonate;
   final DonateType? donateType;
+
+  /// 완성 신고 시 재배자가 입력한 최종 키(cm). 도입 이전 완료분·재배중이면 null.
+  final int? heightCm;
+
+  /// 완성 신고 시 재배자가 올린 최종 사진 URL. 없으면 null.
+  final String? finalPhotoUrl;
+
+  /// [finalPhotoUrl]을 Gemini로 변환한 동화풍 일러스트 URL. 변환 실패/미설정이면 null
+  /// (기부 인증서가 이게 있으면 손그림 나무 아이콘 대신 이 일러스트를 보여준다).
+  final String? finalIllustrationUrl;
 
   factory Seedling.fromJson(Map<String, dynamic> json) => Seedling(
     id: json['id'] as int,
@@ -76,6 +89,9 @@ class Seedling {
       json['pickup_or_donate'] as String?,
     ),
     donateType: DonateTypeApi.fromApiValue(json['donate_type'] as String?),
+    heightCm: json['height_cm'] as int?,
+    finalPhotoUrl: json['final_photo'] as String?,
+    finalIllustrationUrl: json['final_illustration'] as String?,
   );
 }
 

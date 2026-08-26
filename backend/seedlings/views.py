@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
@@ -10,10 +11,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import User
+# diary 앱의 사진 -> 일러스트 변환 함수를 그대로 재사용한다. gemini_illustration은 앱 모델을
+# import하지 않아 순환참조가 없다(seedlings -> notifications.fcm 참조와 같은 수준의 앱 간 참조).
+from diary.gemini_illustration import convert_to_illustration
 from notifications.fcm import send_notification_to_user
 
 from .models import Seedling
 from .serializers import (
+    SeedlingCompleteSerializer,
     SeedlingCreateSerializer,
     SeedlingPickupDonateSerializer,
     SeedlingSerializer,
@@ -67,7 +72,13 @@ class SeedlingDetailView(RetrieveAPIView):
 
 
 class SeedlingCompleteView(APIView):
-    """묘목 완성 신고. 담당 재배자만 가능하며 status를 completed로 변경한다."""
+    """묘목 완성 신고. 담당 재배자만 가능하며 status를 completed로 변경한다.
+
+    완성 신고 시 재배자가 입력한 최종 수고(`height_cm`, 필수)와 최종 사진(`final_photo`,
+    선택)을 함께 받는다. 사진이 있으면 `DiaryCreateView.perform_create()`와 동일하게
+    `convert_to_illustration()`으로 동화풍 일러스트 변환까지 시도한다(실패해도 완성 신고
+    자체는 정상 처리 — 원본 사진만 저장).
+    """
 
     permission_classes = [IsAuthenticated]
 
@@ -78,9 +89,19 @@ class SeedlingCompleteView(APIView):
         if user.role != User.Role.GROWER or seedling.grower_id != user.pk:
             raise PermissionDenied('본인이 담당하는 묘목만 완성 신고할 수 있습니다.')
 
+        serializer = SeedlingCompleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        height_cm = serializer.validated_data['height_cm']
+        final_photo = serializer.validated_data.get('final_photo')
+
         seedling.status = Seedling.Status.COMPLETED
         seedling.completed_at = timezone.now()
-        seedling.save(update_fields=['status', 'completed_at'])
+        seedling.height_cm = height_cm
+        update_fields = ['status', 'completed_at', 'height_cm']
+        if final_photo:
+            seedling.final_photo = final_photo
+            update_fields.append('final_photo')
+        seedling.save(update_fields=update_fields)
 
         send_notification_to_user(
             seedling.adopter,
@@ -108,7 +129,22 @@ class SeedlingCompleteView(APIView):
             # SMTP 오류 등으로 이메일 발송이 실패해도 완성 처리 응답 자체는 그대로 성공시킨다.
             print(f'[Email] 완성 알림 발송 실패: seedling={seedling.pk} error={e}')
 
-        return Response(SeedlingSerializer(seedling).data)
+        # 최종 사진 -> 동화풍 일러스트 변환 (diary/views.py의 perform_create와 동일 패턴).
+        # 변환은 알림 발송 뒤에 둬서 Gemini 지연이 입양자 알림까지 늦추지 않게 한다.
+        if seedling.final_photo:
+            illustration_bytes = convert_to_illustration(seedling.final_photo.path)
+            if illustration_bytes:
+                seedling.final_illustration.save(
+                    f'seedling_{seedling.pk}_final_illustration.png',
+                    ContentFile(illustration_bytes),
+                    save=True,
+                )
+
+        # APIView는 generic 뷰와 달리 시리얼라이저 context를 자동으로 넘기지 않으므로,
+        # final_photo/final_illustration URL이 절대경로로 나가도록 request를 직접 넣는다.
+        return Response(
+            SeedlingSerializer(seedling, context={'request': request}).data
+        )
 
 
 class SeedlingPickupDonateView(APIView):

@@ -24,6 +24,9 @@ Pig.Fig. 백엔드의 테이블(모델) 설계 문서입니다. 실제 구현 �
 | status | CharField (choices) | `growing`(재배중) / `completed`(완료) |
 | started_at | DateTimeField | 재배 시작일 |
 | completed_at | DateTimeField (nullable) | 재배 완료일 |
+| height_cm | PositiveSmallIntegerField (nullable) | 완성 신고 시 재배자가 입력하는 최종 수고(키, cm). 도입 이전 완료분은 null |
+| final_photo | ImageField (nullable) | 완성 신고 시 재배자가 올리는 최종 사진 (MEDIA_ROOT에 저장) |
+| final_illustration | ImageField (nullable) | final_photo를 Gemini로 변환한 동화풍 일러스트 (변환 실패/미설정 시 null) |
 | pickup_or_donate | CharField (choices) | 수령(`pickup`) / 기부(`donate`) |
 | donate_type | CharField (choices, nullable) | 기부 유형(기부 선택 시): `school_welfare`(초등학교·복지시설 기증) / `urban_farming_community`(도시농업 공동체·시민단체 연계) / `in_app_sharing`(앱 내 나눔 분양) |
 
