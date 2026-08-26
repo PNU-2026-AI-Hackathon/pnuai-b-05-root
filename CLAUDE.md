@@ -684,6 +684,16 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   여부/획득 아이템 목록/등급)를 만들어 `Navigator.pop(context, result)`로 `games_screen.dart`에
   돌려주는 동일한 패턴을 따릅니다. `GameScaffold.showResultDialog()`가 결과 다이얼로그(성공/실패
   문구 + 등급 배지 + 점수 + 획득 아이템 박스)를 공통으로 띄우는 것도 네 게임이 공유합니다.
+  물주기 타이밍(`watering_timing_screen.dart`)의 `_TimingBar`는 왕복 트랙 + 초록 반투명 타겟 존 박스
+  + 물방울 인디케이터로 구성되는데, "타겟 존 정중앙에서 탭하세요" 안내만 있고 정확한 지점 표시가
+  없어 사용자가 헤매던 문제가 있어 **순수 시각 안내선**(빨간 세로선, width 3, `_centerLineWidth`)을
+  추가했습니다 — 물방울 인디케이터가 `Positioned(left: controller.value * usable)`로 그려지므로
+  같은 식에 `controller.value` 대신 `targetCenter`를 넣고 인디케이터 너비(`_indicatorSize`)의 절반만큼
+  보정해(`targetCenter * usable + _indicatorSize / 2 - _centerLineWidth / 2`) 인디케이터가 정확히
+  targetCenter에 있을 때의 위치, 그리고 타겟 존 박스의 정중앙(`zoneLeft + zoneWidth / 2`)과 좌표가
+  일치합니다. 게임 로직(`_scoreFor`)이나 타겟 존 박스 자체는 그대로입니다. `watering_timing_test.dart`
+  에 안내선 rect의 가로 중앙이 타겟 존 박스의 가로 중앙과 겹치는지(±0.5px) 검증하는 위젯 테스트가
+  있습니다.
   `games_screen.dart`의 `_openGame()`은 `GameType` 기준 `switch`로 각 게임 화면을 push하고, 돌아온
   `GameResult.itemsEarned`(클리어 시에만 채워짐)를 `_saveEarnedItems()`가 순회하며 `core/storage/
   inventory_storage.dart`의 `InventoryStorage.addItem()`으로 하나씩 저장한 뒤 보유 아이템 바를 다시
