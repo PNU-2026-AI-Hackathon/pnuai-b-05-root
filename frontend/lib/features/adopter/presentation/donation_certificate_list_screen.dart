@@ -68,6 +68,7 @@ class _DonationCertificateListScreenState
     Navigator.of(context).pushNamed(
       '/adopter/donation-certificate',
       arguments: DonationCertificateArgs(
+        seedlingId: seedling.id,
         seedlingName: '무화과 #${seedling.id}',
         organizationName: seedling.donateType?.label ?? '',
         startedAt: seedling.startedAt,
@@ -157,7 +158,11 @@ class _DonationCertificateListScreenState
       itemBuilder: (context, index) {
         final seedling = _seedlings[index];
         return DonationCertificateCard(
+          // 카드가 stateful이라(저장/공유 로딩 상태) 세로 스와이프로 페이지
+          // element가 재사용될 때 이전 묘목의 상태가 새지 않도록 키를 고정한다.
+          key: ValueKey(seedling.id),
           args: DonationCertificateArgs(
+            seedlingId: seedling.id,
             seedlingName: '무화과 #${seedling.id}',
             organizationName: seedling.donateType?.label ?? '',
             startedAt: seedling.startedAt,

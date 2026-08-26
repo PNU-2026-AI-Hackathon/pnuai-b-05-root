@@ -149,6 +149,7 @@ class _PickupDonateScreenState extends State<PickupDonateScreen> {
         Navigator.of(context).pushNamed(
           '/adopter/donation-certificate',
           arguments: DonationCertificateArgs(
+            seedlingId: seedling.id,
             seedlingName: '무화과 #${seedling.id}',
             organizationName: _organizations[_selectedOrgIndex].name,
           ),

@@ -735,12 +735,13 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   `frontend/lib/shared/widgets/service_card.dart`의 공용 `ServiceCard` 위젯(재배자 마이페이지와
   공유)으로 4개(🎁 수령/기부 선택, 📜 기부 인증서, 🤖 AI 챗봇, 📋 입양 내역서 — 마지막 하나는 이번
   범위 밖이라 탭하면 스낵바만) 구성됩니다. "성장 타임라인"은 하단 탭으로 이미 승격돼 있어 그리드에는
-  없습니다. "기부 인증서" 카드는 마이페이지에서 곧장 진입할 때는 하드코딩된 mock 인자를 쓰고,
-  `pickup_donate_screen.dart`에서 기부처를 선택해 진입할 때는 실제 선택한 기부처 이름을
-  `DonationCertificateArgs`로 넘깁니다(둘 다 `GrowerCompleteArgs`와 동일한 route-argument 패턴).
-  `pickup_donate_screen.dart`는 수령/기부 두 옵션과 기부처 3곳을 모두 로컬 `State`로만 관리하며(수령
-  선택 시 기부처 목록·버튼 자체가 숨겨짐), `Seedling.pickup_or_donate`/`donate_type` API 연동은 하지
-  않는 순수 정적 UI입니다. 디자인의 점선 테두리(일지 사진 업로드 박스, 기부 인증서 카드)는 Flutter에
+  없습니다. "기부 인증서" 카드는 `/adopter/donation-certificates`(`donation_certificate_list_screen.dart`,
+  완료+기부 확정 묘목 목록 — 카드 모드/목록 모드 토글)로 이동하고, 거기서 인증서를 열면 실제 묘목
+  데이터로 `DonationCertificateArgs`를 채워 `/adopter/donation-certificate`
+  (`donation_certificate_screen.dart`)로 넘깁니다. `pickup_donate_screen.dart`에서 기부처를 선택해
+  바로 진입하는 경로도 같은 args를 씁니다(`GrowerCompleteArgs`와 동일한 route-argument 패턴 —
+  자세한 동작·이미지 저장/공유는 아래 `donation_certificate_screen.dart` 문단 참고).
+  디자인의 점선 테두리(일지 사진 업로드 박스, 기부 인증서 카드)는 Flutter에
   내장 dashed border가 없어 실선으로 근사했습니다. 화면 하단(그리드 밖, 별도 배치)에는
   "로그아웃"(muted 텍스트)과 "회원탈퇴"(더 작은 회색 텍스트)가 있습니다 — 로직은
   `features/auth/presentation/account_actions.dart`의 `confirmLogout()`/`confirmDeleteAccount()`를
@@ -840,13 +841,18 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   목록에만 남아 있고 상세 화면에는 넣지 않았습니다.
 
   화면에 표시된 이미지(일러스트 우선, 없으면 원본 사진 — 카드와 동일한 `illustration ?? photo`
-  우선순위)가 있으면 그 아래에 `PigFigButton.outline(label: '사진 저장하기 📥')` 다운로드 버튼이
+  우선순위)가 있으면 그 아래에 `저장 📥` / `공유 📤` 두 버튼(`PigFigButton.outline`)이
   뜹니다(사진 자체가 없어 placeholder만 보이는 일지는 버튼을 아예 숨김). 원본 사진과 일러스트가
-  둘 다 있는 경우에도 버튼은 하나만 두고 "지금 화면에 보이는 것"을 저장합니다 — 비개발자 사용자가
-  헷갈리지 않도록 선택지를 늘리지 않기로 결정했습니다. `http.get()`으로 이미지 바이트를 받은 뒤
-  `core/download/image_downloader.dart`의 `saveImageBytes(bytes, filename)`(파일명은
-  `diary_detail_screen.dart`의 `buildDiaryImageFilename(diaryId, createdAt)`이 만드는
-  `pigfig_diary_{id}_{yyyyMMdd}.jpg`)를 호출합니다. 이 함수는 웹과 모바일에서 저장 방식이 완전히
+  둘 다 있어도 저장/공유 대상은 "지금 화면에 보이는 것" 하나뿐입니다 — 비개발자 사용자가
+  헷갈리지 않도록 선택지를 늘리지 않기로 결정했습니다. 이미지 영역(스와이프로 프레임을 고르는
+  `PhotoFrameCarousel`)의 현재 프레임을 `RepaintBoundary`로 캡처해 PNG 바이트를 얻은 뒤
+  (`captureCurrentFrame()` — `index == _frameIndex`인 페이지에만 boundary를 씌워 스와이프
+  애니메이션이 캡처에 섞이지 않음), 저장 버튼(`저장 📥`)은
+  `core/download/image_downloader.dart`의 `saveImageBytes(bytes, filename)`, 공유 버튼
+  (`공유 📤`)은 `share_plus`의 `SharePlus.instance.share(ShareParams(files: [XFile.fromData(...)]))`로
+  넘깁니다(둘은 서로 로딩 중이면 상대 버튼을 비활성화. 파일명은 `diary_detail_screen.dart`의
+  `buildDiaryImageFilename(diaryId, createdAt)`이 만드는 `pigfig_diary_{id}_{yyyyMMdd}.png`).
+  `saveImageBytes`는 웹과 모바일에서 저장 방식이 완전히
   달라 `dart.library.io`/`dart.library.html` 조건부 export(`src/image_downloader_io.dart`/
   `src/image_downloader_web.dart`, 두 조건 중 어느 것도 안 맞을 때를 위한
   `src/image_downloader_stub.dart`는 사실상 선택될 일이 없는 더미)로 분기합니다 — 모바일은
@@ -861,6 +867,27 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   분리"하는 톤). Windows 데스크톱(`flutter run -d windows`)에서도 `gal`이 이론적으로는 지원한다고
   문서화돼 있지만 이 프로젝트는 실기기로 검증하지 않았습니다 — 실패하면 예외가 잡혀 스낵바로만
   안내되고 크래시하지 않습니다.
+- `donation_certificate_screen.dart`의 `DonationCertificateCard`(단독 라우트
+  `DonationCertificateScreen`과 `donation_certificate_list_screen.dart`의 카드 모드 세로
+  `PageView` 양쪽에서 재사용)의 "이미지 저장"/"공유하기" 버튼은 이제 실제로 동작합니다 —
+  `diary_detail_screen.dart`와 같은 "화면에 보이는 그대로 캡처 → `saveImageBytes` / `SharePlus`"
+  패턴이지만, 캐러셀이 아니라 고정 카드 하나라 캡처 위임 대신 카드가 인증서 콘텐츠(`_CertificateContent`
+  로 분리)를 직접 `RepaintBoundary(key:)`로 감싸고 `photo_frame_carousel.dart`의
+  `captureCurrentFrame()`과 같은 방식(`RenderRepaintBoundary.toImage` → PNG)으로 캡처합니다.
+  이를 위해 `StatelessWidget` → `StatefulWidget`으로 바꿔 `_downloading`/`_sharing` 로딩 상태
+  (서로 로딩 중이면 상대 버튼 비활성, 각 버튼은 로딩 시 라벨 대신 `PigFigButton`과 같은 스피너)를
+  갖고, `DonationCertificateArgs`에 `seedlingId`(int) 필드를 새로 추가했습니다 — 파일명은
+  `buildCertificateImageFilename(seedlingId)` → `pigfig_certificate_{id}.png`
+  (`buildDiaryImageFilename`과 같은 결의 순수 함수). 호출부 3곳(`donation_certificate_list_screen.dart`
+  의 `_openCertificate`/`_buildCardMode`, `pickup_donate_screen.dart`의 `_submit`)이 전부
+  `seedling.id`를 넘깁니다. 스낵바 톤은 diary_detail 그대로 — 저장 성공 `인증서를 저장했어요 📥`,
+  저장 실패 `인증서 저장에 실패했어요...`, 공유 취소(`ShareResultStatus.dismissed`)는 조용히,
+  공유 실패 `공유에 실패했어요...`(핵심/부가 기능 분리). 카드 모드 `PageView`에서는
+  `DonationCertificateCard`에 `key: ValueKey(seedling.id)`를 줘, 세로 스와이프로 페이지 element가
+  재사용될 때 이전 묘목의 로딩 상태가 새지 않게 합니다. `RepaintBoundary`가 감싸는 outer
+  `Container`의 `boxShadow`는 레이아웃 바깥으로 번져 캡처 PNG에서는 소프트 섀도만 잘려 나옵니다
+  (카드 본체·핑크 테두리·텍스트는 온전). 이번엔 복붙으로 갔고, `_download`/`_share`의 저장·공유·
+  스낵바 본문을 `core/download/`의 공용 헬퍼로 뽑아 두 화면이 공유하는 리팩토링은 후속으로 남겼습니다.
 - `grower_diary_screen.dart`는 이제 탭 진입 시 `GrowerRepository.fetchSeedlings()`로 담당 묘목
   목록을 불러와 상단에 선택 칩으로 보여줍니다(재배중인 묘목이 있으면 자동 선택) — 이전에는 이 화면이
   어떤 묘목에 대한 일지인지 알 방법이 전혀 없었기 때문에 실제 연동을 위해 꼭 필요했던 추가입니다.
@@ -988,6 +1015,17 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   analyze`/`flutter test` 통과 확인, 실행 중인 백엔드에 데모 계정으로 로그인해 PATCH 왕복(기부
   선택 → 수령으로 변경)까지 HTTP로 직접 검증함 — Chrome에서 화면을 직접 조작하는 수동 시연 확인은
   아직 별도로 하지 않았으므로 실제 배포/시연 전에 한 번 더 확인 권장
+- 기부 인증서 카드(`donation_certificate_screen.dart`의 `DonationCertificateCard`)의 "이미지
+  저장"/"공유하기"가 mock(`_showComingSoon`)에서 실제 동작으로 전환 완료(위 "프론트엔드 구조"의
+  `donation_certificate_screen.dart` 문단 참고 — `RepaintBoundary` 캡처 + `saveImageBytes` /
+  `SharePlus`, `diary_detail_screen.dart` 패턴 복붙). `flutter analyze` 0 이슈, 신규
+  `test/donation_certificate_screen_test.dart`(위젯 렌더 + `buildCertificateImageFilename` 단위)
+  포함 `flutter test` 통과(Winsock 플레이크는 파일 단위 재실행). `flutter build web` + Playwright
+  헤드리스 크롬으로 데모 입양자 `dummy2@demo.com`(묘목 #4 완료·기부) 로그인 → 마이 → 기부 인증서
+  진입 후, 카드 모드와 단독 라우트(목록형 → 카드 탭) 양쪽에서 "이미지 저장" 탭 시 브라우저 다운로드
+  (`pigfig_certificate_4.png`, 유효한 PNG로 인증서 카드 이미지가 담김) + "인증서를 저장했어요 📥"
+  스낵바, "공유하기" 탭 시 헤드리스 크롬은 `navigator.share`가 없어 "공유에 실패했어요..." 스낵바로
+  우아하게 폴백(크래시 없음)까지 스크린샷 검증함
 - 재배자 화면 전용 글자 크기 조절(작게/보통/크게, 위 "재배 활동 캘린더" 문단 아래 참고)은 프론트엔드
   전용 기능(백엔드 변경 없음)으로 완료. `flutter analyze`/`flutter test` 통과, `flutter build web` +
   Playwright 헤드리스 크롬으로 데모 재배자 계정 로그인 → 설정 모달에서 크게(1.3배) 선택·저장 →
