@@ -80,31 +80,33 @@ class _GrowerDiaryListScreenState extends State<GrowerDiaryListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '무화과 #$_seedlingId 일지',
-              style: AppTextStyles.title(
-                fontSize: 20,
-              ).copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '지금까지 남긴 성장 기록이에요',
-              style: AppTextStyles.guide(
-                fontSize: 14,
-                color: AppColors.badgeGreenText,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '무화과 #$_seedlingId 일지',
+                style: AppTextStyles.title(
+                  fontSize: 20,
+                ).copyWith(fontWeight: FontWeight.w900),
               ),
-            ),
-            const SizedBox(height: 14),
-            Expanded(child: _buildBody()),
-            const SizedBox(height: 12),
-            PigFigButton.primary(label: '일지 쓰기', onPressed: _openWrite),
-            const SizedBox(height: 14),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                '지금까지 남긴 성장 기록이에요',
+                style: AppTextStyles.guide(
+                  fontSize: 14,
+                  color: AppColors.badgeGreenText,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Expanded(child: _buildBody()),
+              const SizedBox(height: 12),
+              PigFigButton.primary(label: '일지 쓰기', onPressed: _openWrite),
+              const SizedBox(height: 14),
+            ],
+          ),
         ),
       ),
     );

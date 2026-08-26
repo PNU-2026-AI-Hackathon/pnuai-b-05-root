@@ -237,9 +237,11 @@ class _GrowerDiaryWriteScreenState extends State<GrowerDiaryWriteScreen> {
 
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-        child: _buildBody(args.seedlingId),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+          child: _buildBody(args.seedlingId),
+        ),
       ),
     );
   }
@@ -391,28 +393,26 @@ class _GrowerDiaryWriteScreenState extends State<GrowerDiaryWriteScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        Expanded(
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: TextField(
-              controller: _noteController,
-              maxLines: null,
-              expands: true,
-              textAlignVertical: TextAlignVertical.top,
-              style: AppTextStyles.body(fontSize: 14),
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.all(12),
-                hintText: '오늘의 성장 기록을 남겨주세요...',
-                hintStyle: AppTextStyles.body(
-                  fontSize: 14,
-                  color: const Color(0xFFB7B2A4),
-                ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: TextField(
+            controller: _noteController,
+            minLines: 6,
+            maxLines: null,
+            textAlignVertical: TextAlignVertical.top,
+            style: AppTextStyles.body(fontSize: 14),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(12),
+              hintText: '오늘의 성장 기록을 남겨주세요...',
+              hintStyle: AppTextStyles.body(
+                fontSize: 14,
+                color: const Color(0xFFB7B2A4),
               ),
             ),
           ),

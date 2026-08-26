@@ -80,45 +80,47 @@ class _DonationCertificateListScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '📜 기부 인증서',
-                        style: AppTextStyles.title(
-                          fontSize: 20,
-                        ).copyWith(fontWeight: FontWeight.w900),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '지금까지 발급된 기부 인증서를 모두 확인할 수 있어요',
-                        style: AppTextStyles.guide(
-                          fontSize: 14,
-                          color: AppColors.badgeGreenText,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '📜 기부 인증서',
+                          style: AppTextStyles.title(
+                            fontSize: 20,
+                          ).copyWith(fontWeight: FontWeight.w900),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          '지금까지 발급된 기부 인증서를 모두 확인할 수 있어요',
+                          style: AppTextStyles.guide(
+                            fontSize: 14,
+                            color: AppColors.badgeGreenText,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                _ViewModeToggle(
-                  isCardMode: _isCardMode,
-                  onChanged: (isCardMode) =>
-                      setState(() => _isCardMode = isCardMode),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Expanded(child: _buildBody()),
-          ],
+                  _ViewModeToggle(
+                    isCardMode: _isCardMode,
+                    onChanged: (isCardMode) =>
+                        setState(() => _isCardMode = isCardMode),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Expanded(child: _buildBody()),
+            ],
+          ),
         ),
       ),
     );

@@ -170,9 +170,11 @@ class _PickupDonateScreenState extends State<PickupDonateScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-        child: _buildBody(),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+          child: _buildBody(),
+        ),
       ),
     );
   }
