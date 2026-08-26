@@ -62,89 +62,91 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
 
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Text('🌱', style: TextStyle(fontSize: 18)),
-                      const SizedBox(width: 6),
-                      Text('무화과 이야기', style: AppTextStyles.title(fontSize: 20)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 28,
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: AppColors.pink500,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            imageUrl != null
-                ? PhotoFrameCarousel(key: _carouselKey, imageUrl: imageUrl)
-                : SizedBox(
-                    width: double.infinity,
-                    height: MediaQuery.of(context).size.height * 0.48,
-                    child: const _ImagePlaceholder(),
-                  ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  StatusBadge(
-                    label: _formatDate(args.createdAt),
-                    background: AppColors.badgeGreenBg,
-                    textColor: AppColors.badgeGreenText,
-                    pill: false,
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(color: AppColors.outline, height: 1),
-                  const SizedBox(height: 14),
-                  Text(
-                    args.content,
-                    style: AppTextStyles.body(
-                      fontSize: 15,
-                      color: AppColors.textPrimary,
-                    ).copyWith(height: 1.6),
-                  ),
-                ],
-              ),
-            ),
-            if (imageUrl != null)
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: PigFigButton.outline(
-                        label: '저장 📥',
-                        loading: _downloading,
-                        onPressed: _sharing ? null : () => _download(args),
-                      ),
+                    Row(
+                      children: [
+                        const Text('🌱', style: TextStyle(fontSize: 18)),
+                        const SizedBox(width: 6),
+                        Text('무화과 이야기', style: AppTextStyles.title(fontSize: 20)),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: PigFigButton.outline(
-                        label: '공유 📤',
-                        loading: _sharing,
-                        onPressed: _downloading ? null : () => _share(args),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 28,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: AppColors.pink500,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ],
                 ),
               ),
-          ],
+              imageUrl != null
+                  ? PhotoFrameCarousel(key: _carouselKey, imageUrl: imageUrl)
+                  : SizedBox(
+                      width: double.infinity,
+                      height: MediaQuery.of(context).size.height * 0.48,
+                      child: const _ImagePlaceholder(),
+                    ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    StatusBadge(
+                      label: _formatDate(args.createdAt),
+                      background: AppColors.badgeGreenBg,
+                      textColor: AppColors.badgeGreenText,
+                      pill: false,
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(color: AppColors.outline, height: 1),
+                    const SizedBox(height: 14),
+                    Text(
+                      args.content,
+                      style: AppTextStyles.body(
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                      ).copyWith(height: 1.6),
+                    ),
+                  ],
+                ),
+              ),
+              if (imageUrl != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: PigFigButton.outline(
+                          label: '저장 📥',
+                          loading: _downloading,
+                          onPressed: _sharing ? null : () => _download(args),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: PigFigButton.outline(
+                          label: '공유 📤',
+                          loading: _sharing,
+                          onPressed: _downloading ? null : () => _share(args),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

@@ -30,7 +30,7 @@ void main() {
 
     expect(find.text('가지가 3개로 늘었어요!'), findsOneWidget);
     expect(find.text('2026.07.18'), findsOneWidget);
-    expect(find.text('사진 저장하기 📥'), findsOneWidget);
+    expect(find.text('저장 📥'), findsOneWidget);
   });
 
   testWidgets('사진/일러스트가 둘 다 없으면 다운로드 버튼 없이 placeholder만 보여준다', (

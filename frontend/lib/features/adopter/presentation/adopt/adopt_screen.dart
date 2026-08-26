@@ -46,92 +46,94 @@ class _AdoptScreenState extends State<AdoptScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              '🌱 무화과 입양하기',
-              style: AppTextStyles.title(
-                fontSize: 20,
-              ).copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '🌱 무화과 입양하기',
+                style: AppTextStyles.title(
+                  fontSize: 20,
+                ).copyWith(fontWeight: FontWeight.w900),
               ),
-              child: Column(
-                children: [
-                  const FigTreeIllustration(width: 100),
-                  const SizedBox(height: 16),
-                  Text(
-                    '무화과를 입양하면\n재배자가 정성껏 키워드려요',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.title(fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '도심 유휴공간에서 재배자가 직접 키우고,\n다 자라면 수령하거나 기부할 수 있어요.',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.body(
-                      fontSize: 13,
-                      color: AppColors.textMuted,
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const FigTreeIllustration(width: 100),
+                    const SizedBox(height: 16),
+                    Text(
+                      '무화과를 입양하면\n재배자가 정성껏 키워드려요',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.title(fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '도심 유휴공간에서 재배자가 직접 키우고,\n다 자라면 수령하거나 기부할 수 있어요.',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.body(
+                        fontSize: 13,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '무화과 묘목 입양',
+                      style: AppTextStyles.body(
+                        fontSize: 14,
+                      ).copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      '19,900원',
+                      style: AppTextStyles.title(
+                        fontSize: 18,
+                        color: AppColors.pink500,
+                      ).copyWith(fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '무화과 묘목 입양',
-                    style: AppTextStyles.body(
-                      fontSize: 14,
-                    ).copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    '19,900원',
-                    style: AppTextStyles.title(
-                      fontSize: 18,
-                      color: AppColors.pink500,
-                    ).copyWith(fontWeight: FontWeight.w900),
-                  ),
-                ],
+              const Spacer(),
+              PigFigButton.primary(
+                label: '결제하기',
+                onPressed: _pay,
+                loading: _loading,
               ),
-            ),
-            const Spacer(),
-            PigFigButton.primary(
-              label: '결제하기',
-              onPressed: _pay,
-              loading: _loading,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

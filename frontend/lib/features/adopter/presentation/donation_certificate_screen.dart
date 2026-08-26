@@ -70,7 +70,9 @@ class _DonationCertificateScreenState
 
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
-      body: DonationCertificateCard(args: args, nickname: _nickname),
+      body: SafeArea(
+        child: DonationCertificateCard(args: args, nickname: _nickname),
+      ),
     );
   }
 }

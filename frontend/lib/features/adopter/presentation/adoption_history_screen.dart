@@ -59,30 +59,32 @@ class _AdoptionHistoryScreenState extends State<AdoptionHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '📋 입양 내역서',
-              style: AppTextStyles.title(
-                fontSize: 20,
-              ).copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '지금까지 입양한 무화과를 모두 확인할 수 있어요',
-              style: AppTextStyles.guide(
-                fontSize: 14,
-                color: AppColors.badgeGreenText,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '📋 입양 내역서',
+                style: AppTextStyles.title(
+                  fontSize: 20,
+                ).copyWith(fontWeight: FontWeight.w900),
               ),
-            ),
-            const SizedBox(height: 14),
-            PigFigButton.positive(label: '새로 입양하기 🌱', onPressed: _goToAdopt),
-            const SizedBox(height: 14),
-            Expanded(child: _buildBody()),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                '지금까지 입양한 무화과를 모두 확인할 수 있어요',
+                style: AppTextStyles.guide(
+                  fontSize: 14,
+                  color: AppColors.badgeGreenText,
+                ),
+              ),
+              const SizedBox(height: 14),
+              PigFigButton.positive(label: '새로 입양하기 🌱', onPressed: _goToAdopt),
+              const SizedBox(height: 14),
+              Expanded(child: _buildBody()),
+            ],
+          ),
         ),
       ),
     );

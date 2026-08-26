@@ -74,198 +74,200 @@ class _GrowerCompleteScreenState extends State<GrowerCompleteScreen> {
 
     return Scaffold(
       appBar: const PigFigAppBar(closeLabel: '닫기'),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '🎉 묘목 완성 신고',
-              style: AppTextStyles.title(
-                fontSize: 20,
-              ).copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${args.seedlingName} · ${args.adopterName}님에게 알림이 가요',
-              style: AppTextStyles.guide(
-                fontSize: 14,
-                color: AppColors.badgeGreenText,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '🎉 묘목 완성 신고',
+                style: AppTextStyles.title(
+                  fontSize: 20,
+                ).copyWith(fontWeight: FontWeight.w900),
               ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+              const SizedBox(height: 4),
+              Text(
+                '${args.seedlingName} · ${args.adopterName}님에게 알림이 가요',
+                style: AppTextStyles.guide(
+                  fontSize: 14,
+                  color: AppColors.badgeGreenText,
+                ),
               ),
-              child: Column(
-                children: [
-                  Text(
-                    '완성 단계',
-                    style: AppTextStyles.body(
-                      fontSize: 13,
-                      color: AppColors.textMuted,
-                    ).copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  const GaugeBar(value: 1.0, height: 12),
-                  const SizedBox(height: 5),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      '5/5단계 완료!',
-                      style: AppTextStyles.body(
-                        fontSize: 12,
-                        color: AppColors.badgeGreenText,
-                      ).copyWith(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: _showComingSoon,
-              child: Container(
+              const SizedBox(height: 12),
+              Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: const Color(0xFFCBE5C4),
-                      width: 2,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     ),
-                    borderRadius: BorderRadius.circular(14),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      '완성 단계',
+                      style: AppTextStyles.body(
+                        fontSize: 13,
+                        color: AppColors.textMuted,
+                      ).copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    const GaugeBar(value: 1.0, height: 12),
+                    const SizedBox(height: 5),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '5/5단계 완료!',
+                        style: AppTextStyles.body(
+                          fontSize: 12,
+                          color: AppColors.badgeGreenText,
+                        ).copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: _showComingSoon,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Row(
-                    children: [
-                      const FigTreeIllustration(width: 44),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: const Color(0xFFCBE5C4),
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const FigTreeIllustration(width: 44),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '최종 사진 업로드 📷',
+                                style: AppTextStyles.body(
+                                  fontSize: 14,
+                                  color: AppColors.badgeGreenText,
+                                ).copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '완성된 모습을 찍어주세요\n인증서에 일러스트로 실려요',
+                                style: AppTextStyles.body(
+                                  fontSize: 12,
+                                  color: const Color(0xFFB7B2A4),
+                                ).copyWith(height: 1.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    for (var i = 0; i < _checklist.length; i++)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        decoration: BoxDecoration(
+                          border: i == _checklist.length - 1
+                              ? null
+                              : const Border(
+                                  bottom: BorderSide(color: Color(0xFFF3F1E9)),
+                                ),
+                        ),
+                        child: Row(
                           children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(
+                                color: AppColors.green500,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _checklist[i].$1,
+                                style: AppTextStyles.body(
+                                  fontSize: 14,
+                                ).copyWith(fontWeight: FontWeight.w500),
+                              ),
+                            ),
                             Text(
-                              '최종 사진 업로드 📷',
+                              _checklist[i].$2,
                               style: AppTextStyles.body(
-                                fontSize: 14,
+                                fontSize: 13,
                                 color: AppColors.badgeGreenText,
                               ).copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '완성된 모습을 찍어주세요\n인증서에 일러스트로 실려요',
-                              style: AppTextStyles.body(
-                                fontSize: 12,
-                                color: const Color(0xFFB7B2A4),
-                              ).copyWith(height: 1.5),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _errorMessage!,
+                  style: AppTextStyles.body(
+                    fontSize: 13,
+                    color: AppColors.errorRed,
                   ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  for (var i = 0; i < _checklist.length; i++)
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 11),
-                      decoration: BoxDecoration(
-                        border: i == _checklist.length - 1
-                            ? null
-                            : const Border(
-                                bottom: BorderSide(color: Color(0xFFF3F1E9)),
-                              ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 24,
-                            height: 24,
-                            alignment: Alignment.center,
-                            decoration: const BoxDecoration(
-                              color: AppColors.green500,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _checklist[i].$1,
-                              style: AppTextStyles.body(
-                                fontSize: 14,
-                              ).copyWith(fontWeight: FontWeight.w500),
-                            ),
-                          ),
-                          Text(
-                            _checklist[i].$2,
-                            style: AppTextStyles.body(
-                              fontSize: 13,
-                              color: AppColors.badgeGreenText,
-                            ).copyWith(fontWeight: FontWeight.w700),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _errorMessage!,
-                style: AppTextStyles.body(
-                  fontSize: 13,
-                  color: AppColors.errorRed,
                 ),
+              ],
+              const Spacer(),
+              PigFigButton.primary(
+                label: '완성 신고하기 🎉',
+                onPressed: () => _submit(args),
+                loading: _loading,
               ),
+              const SizedBox(height: 14),
             ],
-            const Spacer(),
-            PigFigButton.primary(
-              label: '완성 신고하기 🎉',
-              onPressed: () => _submit(args),
-              loading: _loading,
-            ),
-            const SizedBox(height: 14),
-          ],
+          ),
         ),
       ),
     );
