@@ -1,5 +1,11 @@
-import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../../../core/download/image_downloader.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -9,12 +15,15 @@ import '../../../shared/widgets/pigfig_app_bar.dart';
 /// `/adopter/donation-certificate` route argument.
 class DonationCertificateArgs {
   const DonationCertificateArgs({
+    required this.seedlingId,
     required this.seedlingName,
     required this.organizationName,
     this.startedAt,
     this.completedAt,
   });
 
+  // 인증서 이미지 저장/공유 시 파일명(pigfig_certificate_{id}.png)에 쓴다.
+  final int seedlingId;
   final String seedlingName;
   final String organizationName;
   // 과거 데이터 등으로 하나라도 없을 수 있어 nullable로 받는다 — 없으면
@@ -35,10 +44,14 @@ String formatCertificatePeriod(DateTime? startedAt, DateTime? completedAt) {
   return '$y. $m. $d · 함께한 $days일';
 }
 
+/// 기부 인증서를 저장/공유용 파일명으로 변환한다(순수 함수라 단독 테스트 가능) —
+/// `diary_detail_screen.dart`의 `buildDiaryImageFilename`과 같은 결.
+String buildCertificateImageFilename(int seedlingId) =>
+    'pigfig_certificate_$seedlingId.png';
+
 /// 1p — 기부 인증서: 디지털 발급 화면. 입양자 닉네임은 실제 로그인 계정 값을
-/// 조회해 보여준다(이미지 저장/공유는 여전히 준비 중, 이번 범위 아님).
-/// `ModalRoute` 인자 읽기 + 닉네임 로드만 담당하는 얇은 wrapper이며, 실제
-/// 콘텐츠는 [DonationCertificateCard]가 그린다.
+/// 조회해 보여준다. `ModalRoute` 인자 읽기 + 닉네임 로드만 담당하는 얇은
+/// wrapper이며, 실제 콘텐츠(이미지 저장/공유 포함)는 [DonationCertificateCard]가 그린다.
 class DonationCertificateScreen extends StatefulWidget {
   const DonationCertificateScreen({super.key});
 
@@ -80,7 +93,12 @@ class _DonationCertificateScreenState
 /// 기부 인증서 카드 콘텐츠 — 단독 라우트(`DonationCertificateScreen`)와
 /// 기부 인증서 목록 화면의 카드 모드(세로 `PageView`) 양쪽에서 재사용된다.
 /// `ModalRoute`에 의존하지 않고 필요한 데이터를 전부 생성자로 받는다.
-class DonationCertificateCard extends StatelessWidget {
+///
+/// 인증서 콘텐츠는 [RepaintBoundary]로 감싸 "이미지 저장"(`saveImageBytes`)과
+/// "공유하기"(`SharePlus`)에서 화면에 보이는 그대로 PNG로 캡처한다 —
+/// `diary_detail_screen.dart`가 `PhotoFrameCarousel`로 하는 것과 동일한 패턴이지만,
+/// 여기는 캐러셀이 아니라 고정 카드 하나라 카드가 직접 boundary를 쥔다.
+class DonationCertificateCard extends StatefulWidget {
   const DonationCertificateCard({
     super.key,
     required this.args,
@@ -90,135 +108,101 @@ class DonationCertificateCard extends StatelessWidget {
   final DonationCertificateArgs args;
   final String nickname;
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('준비 중이에요')));
+  @override
+  State<DonationCertificateCard> createState() =>
+      _DonationCertificateCardState();
+}
+
+class _DonationCertificateCardState extends State<DonationCertificateCard> {
+  bool _downloading = false;
+  bool _sharing = false;
+  // 인증서 콘텐츠를 감싼 RepaintBoundary를 캡처하기 위한 키.
+  final _boundaryKey = GlobalKey();
+
+  /// 인증서 카드(RepaintBoundary로 감싼 영역)를 화면에 보이는 그대로 PNG로 캡처한다 —
+  /// `photo_frame_carousel.dart`의 `captureCurrentFrame()`과 동일한 방식.
+  Future<Uint8List?> _capture() async {
+    if (!mounted) return null;
+    final renderObject = _boundaryKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderRepaintBoundary) return null;
+    final image = await renderObject.toImage(
+      pixelRatio: View.of(context).devicePixelRatio,
+    );
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData?.buffer.asUint8List();
+  }
+
+  Future<void> _download() async {
+    setState(() => _downloading = true);
+    try {
+      final bytes = await _capture();
+      if (bytes == null) {
+        throw Exception('이미지를 불러오지 못했어요.');
+      }
+      await saveImageBytes(
+        bytes,
+        buildCertificateImageFilename(widget.args.seedlingId),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('인증서를 저장했어요 📥')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('인증서 저장에 실패했어요. 다시 시도해주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  Future<void> _share() async {
+    setState(() => _sharing = true);
+    try {
+      final bytes = await _capture();
+      if (bytes == null) {
+        throw Exception('이미지를 불러오지 못했어요.');
+      }
+      final filename = buildCertificateImageFilename(widget.args.seedlingId);
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile.fromData(bytes, mimeType: 'image/png', name: filename)],
+          fileNameOverrides: [filename],
+        ),
+      );
+      // 사용자가 공유 시트를 취소한 것은 실패가 아니므로 에러로 안내하지 않는다.
+      if (result.status == ShareResultStatus.dismissed) {
+        return;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('공유에 실패했어요. 다시 시도해주세요.')));
+      }
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final displayName = nickname.isEmpty ? '입양자' : nickname;
+    final args = widget.args;
+    final displayName = widget.nickname.isEmpty ? '입양자' : widget.nickname;
+    // 저장/공유 중에는 두 버튼을 모두 잠근다(diary_detail_screen.dart와 동일).
+    final busy = _downloading || _sharing;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.07),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 26,
-              ),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: AppColors.pink500,
-                  width: 2,
-                  style: BorderStyle.solid,
-                ),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    '🌸 ⁂ 🌸',
-                    style: AppTextStyles.body(
-                      fontSize: 15,
-                      color: AppColors.pink500,
-                    ).copyWith(letterSpacing: 4.5),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '기부 인증서',
-                    style: AppTextStyles.display(
-                      fontSize: 34,
-                    ).copyWith(letterSpacing: 34 * 0.16),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'CERTIFICATE OF DONATION',
-                    style: AppTextStyles.body(
-                      fontSize: 12,
-                      color: const Color(0xFFB7B2A4),
-                    ).copyWith(letterSpacing: 2.16),
-                  ),
-                  const SizedBox(height: 6),
-                  const _CertificateTreeIcon(),
-                  const SizedBox(height: 6),
-                  Text.rich(
-                    TextSpan(
-                      style: AppTextStyles.body(
-                        fontSize: 14,
-                        color: const Color(0xFF6B675C),
-                      ).copyWith(height: 1.8),
-                      children: [
-                        TextSpan(
-                          text: displayName,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const TextSpan(text: ' 님이 정성으로 키운\n'),
-                        TextSpan(
-                          text: args.seedlingName,
-                          style: const TextStyle(
-                            color: AppColors.badgeGreenText,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const TextSpan(text: ' 을(를)\n'),
-                        TextSpan(
-                          text: args.organizationName,
-                          style: const TextStyle(
-                            color: AppColors.badgePinkText,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const TextSpan(text: '에 기부하였습니다.'),
-                      ],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    formatCertificatePeriod(args.startedAt, args.completedAt),
-                    style: AppTextStyles.body(
-                      fontSize: 12,
-                      color: const Color(0xFFB7B2A4),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const PigCharacter(width: 34),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Pig.Fig.',
-                        style: AppTextStyles.display(
-                          fontSize: 18,
-                        ).copyWith(letterSpacing: 18 * 0.12),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+          RepaintBoundary(
+            key: _boundaryKey,
+            child: _CertificateContent(args: args, displayName: displayName),
           ),
           const SizedBox(height: 16),
           Row(
@@ -227,7 +211,7 @@ class DonationCertificateCard extends StatelessWidget {
                 child: SizedBox(
                   height: 54,
                   child: OutlinedButton(
-                    onPressed: () => _showComingSoon(context),
+                    onPressed: busy ? null : _download,
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: const Color(0xFF6B675C),
@@ -237,12 +221,10 @@ class DonationCertificateCard extends StatelessWidget {
                       ),
                       shape: const StadiumBorder(),
                     ),
-                    child: Text(
-                      '이미지 저장',
-                      style: AppTextStyles.button(
-                        fontSize: 14,
-                        color: const Color(0xFF6B675C),
-                      ),
+                    child: _buttonChild(
+                      loading: _downloading,
+                      label: '이미지 저장',
+                      color: const Color(0xFF6B675C),
                     ),
                   ),
                 ),
@@ -252,16 +234,17 @@ class DonationCertificateCard extends StatelessWidget {
                 child: SizedBox(
                   height: 54,
                   child: ElevatedButton(
-                    onPressed: () => _showComingSoon(context),
+                    onPressed: busy ? null : _share,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green500,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: const StadiumBorder(),
                     ),
-                    child: Text(
-                      '공유하기',
-                      style: AppTextStyles.button(fontSize: 14),
+                    child: _buttonChild(
+                      loading: _sharing,
+                      label: '공유하기',
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -277,6 +260,148 @@ class DonationCertificateCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 로딩 중이면 스피너, 아니면 라벨 텍스트 — 두 버튼이 공유하는 child 빌더
+  /// (`PigFigButton`의 loading 스타일과 동일: 20x20 / strokeWidth 2.4).
+  Widget _buttonChild({
+    required bool loading,
+    required String label,
+    required Color color,
+  }) {
+    if (loading) {
+      return SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2.4, color: color),
+      );
+    }
+    return Text(label, style: AppTextStyles.button(fontSize: 14, color: color));
+  }
+}
+
+/// 인증서 콘텐츠(흰 카드 + 핑크 테두리 안의 인증 문구 전체) — [RepaintBoundary]로
+/// 감싸 이미지로 캡처하는 대상이라 별도 위젯으로 분리했다.
+class _CertificateContent extends StatelessWidget {
+  const _CertificateContent({required this.args, required this.displayName});
+
+  final DonationCertificateArgs args;
+  final String displayName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: AppColors.pink500,
+            width: 2,
+            style: BorderStyle.solid,
+          ),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          children: [
+            Text(
+              '🌸 ⁂ 🌸',
+              style: AppTextStyles.body(
+                fontSize: 15,
+                color: AppColors.pink500,
+              ).copyWith(letterSpacing: 4.5),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '기부 인증서',
+              style: AppTextStyles.display(
+                fontSize: 34,
+              ).copyWith(letterSpacing: 34 * 0.16),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'CERTIFICATE OF DONATION',
+              style: AppTextStyles.body(
+                fontSize: 12,
+                color: const Color(0xFFB7B2A4),
+              ).copyWith(letterSpacing: 2.16),
+            ),
+            const SizedBox(height: 6),
+            const _CertificateTreeIcon(),
+            const SizedBox(height: 6),
+            Text.rich(
+              TextSpan(
+                style: AppTextStyles.body(
+                  fontSize: 14,
+                  color: const Color(0xFF6B675C),
+                ).copyWith(height: 1.8),
+                children: [
+                  TextSpan(
+                    text: displayName,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const TextSpan(text: ' 님이 정성으로 키운\n'),
+                  TextSpan(
+                    text: args.seedlingName,
+                    style: const TextStyle(
+                      color: AppColors.badgeGreenText,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const TextSpan(text: ' 을(를)\n'),
+                  TextSpan(
+                    text: args.organizationName,
+                    style: const TextStyle(
+                      color: AppColors.badgePinkText,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const TextSpan(text: '에 기부하였습니다.'),
+                ],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              formatCertificatePeriod(args.startedAt, args.completedAt),
+              style: AppTextStyles.body(
+                fontSize: 12,
+                color: const Color(0xFFB7B2A4),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const PigCharacter(width: 34),
+                const SizedBox(width: 8),
+                Text(
+                  'Pig.Fig.',
+                  style: AppTextStyles.display(
+                    fontSize: 18,
+                  ).copyWith(letterSpacing: 18 * 0.12),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
