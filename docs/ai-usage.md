@@ -4,20 +4,21 @@
 
 | 구분 | 도구 | 활용 단계 |
 |------|------|-----------|
-| AI 코딩 도구 | Cursor, Claude Code | 백엔드(Django)·프론트엔드(Flutter) 구현, 버그 수정, 테스트 작성, 리팩토링 |
+| AI 코딩 도구 | Claude Code | 백엔드(Django)·프론트엔드(Flutter) 구현, 버그 수정, 테스트 작성, 리팩토링 |
 | 기획·문서·검증 | Claude (Claude.ai) | 요구사항 분석, 계획서/README 작성, Claude Code가 세운 계획서를 실제 코드와 대조 검증 |
 | 생성형 AI (기획 보조) | ChatGPT | 초기 아이디어 브레인스토밍, 문서 초안 보조 |
-| UI 설계 | Figma AI | 핵심 화면 초안 텍스트 프롬프트 생성 |
+| UI 설계 | Figma AI, Claude Design | 핵심 화면 초안 텍스트 프롬프트 생성 및 디자인 시안 제작 |
+| 발표자료 제작 | Canva AI | 최종발표 PPT 디자인 및 슬라이드 구성 |
 | 서비스 내장 AI | Google Gemini API (`gemini-2.5-flash`, `gemini-2.5-flash-image`) | 일지·완성 사진 감성 일러스트 변환, RAG 챗봇 답변 생성, 센서 이상 자연어 진단 |
-| 서비스 내장 AI | YOLOv8 (Ultralytics) | 묘목 상태 자동 진단 (PlantVillage + 자체 촬영 데이터 전이학습) |
+| 서비스 내장 AI | YOLOv8 (Ultralytics) | 묘목 상태 자동 진단 — Fig Leaves Dataset(healthy/infected)을 Google Colab(Tesla T4 GPU)에서 YOLOv8n-cls로 파인튜닝(val top1 97%) |
 | 서비스 내장 AI | Prophet | 센서 시계열 데이터 기반 이상 감지 |
 | 서비스 내장 AI | LangChain + ChromaDB + Gemini | 농촌진흥청 매뉴얼 기반 RAG 파이프라인 |
 
 ## 2. 활용 범위
 
-**개발 과정**: Cursor·Claude Code를 기획부터 백엔드 API, 프론트엔드 화면, 테스트 코드 작성까지 전 단계에 걸쳐 활용했습니다. 특히 해커톤 후반부에는 실기기 검증 중 발견된 버그 수정과 기존 화면 개선(예: RAG 챗봇 응답 품질 개선, 재배자 일지 삭제 기능, 묘목 완성 신고 실측 데이터화, 환경 이상 감지 시각화, 탈퇴 계정 처리 등) 다수를 이 방식으로 진행했습니다.
+**개발 과정**: Claude Code를 기획부터 백엔드 API, 프론트엔드 화면, 테스트 코드 작성까지 전 단계에 걸쳐 활용했습니다. 특히 해커톤 후반부에는 실기기 검증 중 발견된 버그 수정과 기존 화면 개선(예: RAG 챗봇 응답 품질 개선, 재배자 일지 삭제 기능, 묘목 완성 신고 실측 데이터화, 환경 이상 감지 시각화, 탈퇴 계정 처리 등) 다수를 이 방식으로 진행했습니다.
 
-**서비스 내 AI**: Gemini API는 재배자가 올린 사진을 입양자용 감성 일러스트로 변환하는 데 사용되며, 같은 모델이 RAG 챗봇의 답변 생성과 센서 이상 상황의 자연어 진단 문구 생성에도 쓰입니다. YOLOv8과 Prophet은 각각 이미지 기반 묘목 상태 진단과 시계열 기반 이상 감지를 담당하며, 두 결과 모두 Gemini가 사람이 읽기 쉬운 문장으로 변환합니다.
+**서비스 내 AI**: Gemini API는 재배자가 올린 사진을 입양자용 감성 일러스트로 변환하는 데 사용되며, 같은 모델이 RAG 챗봇의 답변 생성과 센서 이상 상황의 자연어 진단 문구 생성에도 쓰입니다. YOLOv8은 API 호출이 아니라 직접 모델을 만든 사례로, 무화과 잎 healthy/infected 이미지로 구성된 Fig Leaves Dataset(총 2,321장)을 Google Colab(Tesla T4 GPU) 환경에서 YOLOv8n-cls 사전학습 가중치 기반으로 파인튜닝했습니다. 클래스별 80:20으로 train/val을 층화 분할(train 1,857장/val 464장)하고, 최대 40 epoch·조기종료(patience 10) 조건으로 38 epoch에서 학습을 마쳐 val top1 정확도 97%를 달성했습니다. Prophet은 센서 시계열 데이터 기반 이상 감지를 담당하며, 그 결과는 Gemini가 사람이 읽기 쉬운 문장으로 변환합니다.
 
 ## 3. AI 생성 코드의 검증·수정 방식
 
