@@ -85,7 +85,7 @@ class _MypageScreenState extends RevalidatableState<MypageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const PigFigAppBar(showNotificationBell: true),
+      appBar: const PigFigAppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
         child: Column(

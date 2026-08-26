@@ -266,7 +266,7 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const PigFigAppBar(showNotificationBell: true),
+      appBar: const PigFigAppBar(),
       body: _buildBody(),
     );
   }

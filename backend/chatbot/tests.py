@@ -1,13 +1,29 @@
 from unittest.mock import patch
 
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import User
 
+from .rag_pipeline import ANSWER_PROMPT
 from .views import ERROR_ANSWER, MOCK_ANSWER
+
+
+class AnswerPromptTests(SimpleTestCase):
+    """RetrievalQA(chain_type='stuff')에 넘기는 커스텀 프롬프트가 규약을 지키는지 확인한다.
+
+    입력 변수가 {context, question}이 아니면 `RetrievalQA.from_chain_type`이
+    런타임에 깨지므로(그럼 챗봇이 조용히 폴백만 함), 계약을 테스트로 못박는다.
+    실제 Gemini 응답 톤(매뉴얼 밖 질문 거부 안 함 등)은 실키 수동 검증 몫.
+    """
+
+    def test_prompt_input_variables(self):
+        self.assertEqual(set(ANSWER_PROMPT.input_variables), {'context', 'question'})
+
+    def test_prompt_keeps_figpig_persona(self):
+        self.assertIn('무화과 박사 피그', ANSWER_PROMPT.template)
 
 
 class ChatbotAskViewTests(APITestCase):
