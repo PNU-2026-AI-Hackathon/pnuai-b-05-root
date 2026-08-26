@@ -11,9 +11,17 @@ import 'grower_diary_write_screen.dart';
 
 /// `/grower/diary-list` route argument: 일지 탭에서 탭한 담당 묘목.
 class GrowerDiaryListArgs {
-  const GrowerDiaryListArgs({required this.seedlingId});
+  const GrowerDiaryListArgs({
+    required this.seedlingId,
+    required this.isCompleted,
+  });
 
   final int seedlingId;
+
+  /// 묘목이 완료(`SeedlingStatus.completed`) 상태인지. 완료된 묘목의 일지는 입양자의
+  /// 성장 타임라인에 확정 아카이브로 남아 있어 백엔드가 삭제를 막으므로, 이 값이 true면
+  /// 목록에서 삭제 아이콘 자체를 노출하지 않는다.
+  final bool isCompleted;
 }
 
 /// 묘목 한 그루의 일지 전체를 시간 역순으로 보여주는 리스트 화면. 일지 탭
@@ -48,9 +56,10 @@ class _GrowerDiaryListScreenState extends State<GrowerDiaryListScreen> {
     }
   }
 
-  int get _seedlingId =>
-      (ModalRoute.of(context)!.settings.arguments as GrowerDiaryListArgs)
-          .seedlingId;
+  GrowerDiaryListArgs get _args =>
+      ModalRoute.of(context)!.settings.arguments as GrowerDiaryListArgs;
+
+  int get _seedlingId => _args.seedlingId;
 
   Future<void> _load() async {
     setState(() {
@@ -74,6 +83,62 @@ class _GrowerDiaryListScreenState extends State<GrowerDiaryListScreen> {
     );
     // 작성 화면에서 새 일지를 남겼을 수 있으니 돌아오면 다시 불러온다.
     if (mounted) _load();
+  }
+
+  /// 삭제 전 확인 다이얼로그(`account_actions.dart`의 `confirmDeleteAccount()`와 동일한
+  /// 톤)를 띄우고, 확인한 경우에만 API를 호출한다. 성공하면 목록에서 즉시 제거하고,
+  /// 실패하면(예: 완료된 묘목) 서버 메시지를 스낵바로 안내한다 —
+  /// `grower_diary_write_screen.dart`의 전송 실패 스낵바와 같은 방식이다.
+  Future<void> _confirmAndDelete(DiaryEntry entry) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          '일지 삭제',
+          style: AppTextStyles.title(fontSize: 17, color: AppColors.errorRed),
+        ),
+        content: Text(
+          '이 일지를 삭제하면 되돌릴 수 없어요. 정말 삭제하시겠어요?',
+          style: AppTextStyles.body(fontSize: 14, color: AppColors.textMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              '취소',
+              style: AppTextStyles.body(color: AppColors.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              '삭제',
+              style: AppTextStyles.body(
+                color: AppColors.errorRed,
+              ).copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _diaryRepository.deleteDiary(entry.id);
+      if (!mounted) return;
+      setState(
+        () => _entries = _entries.where((e) => e.id != entry.id).toList(),
+      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('일지를 삭제했어요 🗑️')));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   @override
@@ -132,15 +197,25 @@ class _GrowerDiaryListScreenState extends State<GrowerDiaryListScreen> {
       padding: const EdgeInsets.only(bottom: 4),
       itemCount: _entries.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) => _DiaryCard(entry: _entries[index]),
+      itemBuilder: (context, index) {
+        final entry = _entries[index];
+        return _DiaryCard(
+          entry: entry,
+          // 완료된 묘목의 일지는 백엔드가 삭제를 막으므로 아이콘 자체를 숨긴다.
+          onDelete: _args.isCompleted ? null : () => _confirmAndDelete(entry),
+        );
+      },
     );
   }
 }
 
 class _DiaryCard extends StatelessWidget {
-  const _DiaryCard({required this.entry});
+  const _DiaryCard({required this.entry, this.onDelete});
 
   final DiaryEntry entry;
+
+  /// null이면 삭제 아이콘을 렌더하지 않는다(완료된 묘목의 일지 목록).
+  final VoidCallback? onDelete;
 
   static String _formatDate(DateTime date) =>
       '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
@@ -174,6 +249,7 @@ class _DiaryCard extends StatelessWidget {
                 ),
               ),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (entry.growthStageLabel != null)
                     StatusBadge(
@@ -188,6 +264,22 @@ class _DiaryCard extends StatelessWidget {
                       background: AppColors.badgeGreenBg,
                       textColor: AppColors.badgeGreenText,
                       pill: false,
+                    ),
+                  ],
+                  if (onDelete != null) ...[
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: onDelete,
+                      borderRadius: BorderRadius.circular(14),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: AppColors.textMuted,
+                          semanticLabel: '일지 삭제',
+                        ),
+                      ),
                     ),
                   ],
                 ],

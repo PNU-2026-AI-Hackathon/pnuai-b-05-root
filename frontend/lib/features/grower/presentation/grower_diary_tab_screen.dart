@@ -70,7 +70,10 @@ class _GrowerDiaryTabScreenState
   void _openDiaryList(Seedling seedling) {
     Navigator.of(context).pushNamed(
       '/grower/diary-list',
-      arguments: GrowerDiaryListArgs(seedlingId: seedling.id),
+      arguments: GrowerDiaryListArgs(
+        seedlingId: seedling.id,
+        isCompleted: seedling.status == SeedlingStatus.completed,
+      ),
     );
   }
 

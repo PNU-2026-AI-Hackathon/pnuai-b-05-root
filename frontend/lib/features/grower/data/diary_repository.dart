@@ -97,4 +97,18 @@ class DiaryRepository {
         .map((json) => DiaryEntry.fromJson(json as Map<String, dynamic>))
         .toList();
   }
+
+  /// 재배자 본인이 작성한 일지를 삭제한다. `DELETE /api/diary/entry/{id}/`와 연동한다
+  /// ([createDiary]와 동일한 토큰 확인 → `ApiException` 전파 패턴). 완료된 묘목의 일지는
+  /// 백엔드가 400으로 거부하므로 그 메시지를 그대로 `ApiException`으로 전파한다.
+  Future<void> deleteDiary(int diaryId) async {
+    final accessToken = await _tokenStorage.readAccessToken();
+    if (accessToken == null) {
+      throw ApiException('로그인이 필요해요.');
+    }
+    await _apiClient.delete(
+      '/api/diary/entry/$diaryId/',
+      accessToken: accessToken,
+    );
+  }
 }

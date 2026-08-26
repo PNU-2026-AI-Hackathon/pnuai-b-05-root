@@ -214,7 +214,10 @@ class _GrowerSeedlingAnalysisScreenState
             child: TextButton(
               onPressed: () => Navigator.of(context).pushNamed(
                 '/grower/diary-list',
-                arguments: GrowerDiaryListArgs(seedlingId: args.seedlingId),
+                arguments: GrowerDiaryListArgs(
+                  seedlingId: args.seedlingId,
+                  isCompleted: args.status == SeedlingStatus.completed,
+                ),
               ),
               child: const Text('전체 일지 보기'),
             ),
