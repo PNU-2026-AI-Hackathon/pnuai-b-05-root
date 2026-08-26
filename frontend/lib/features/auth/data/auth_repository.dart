@@ -13,8 +13,9 @@ extension UserRoleApi on UserRole {
 }
 
 class LoginResult {
-  LoginResult({required this.role});
+  LoginResult({required this.role, required this.userId});
   final UserRole role;
+  final String userId;
 }
 
 /// backend/accounts (`/api/accounts/register/`, `/api/accounts/login/`) 연동.
@@ -46,6 +47,7 @@ class AuthRepository {
     await CareInventoryStorage(userId: userId).grantInitialIfNeeded();
     return LoginResult(
       role: UserRoleApi.fromApiValue(response['role'] as String),
+      userId: userId,
     );
   }
 
