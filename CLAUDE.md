@@ -128,6 +128,20 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 `access`/`refresh`/`role`과 함께 `id`/`email`/`nickname`도 내려줘, 프론트가 프로필 조회 API를 따로
 부르지 않고도 `TokenStorage`에 캐싱해 쓸 수 있게 합니다.
 
+입양자가 탈퇴하면(위 소프트 삭제) 그 입양자의 묘목은 **재배자 화면에 그대로 남습니다**(데이터·
+재배정 유지). 재배자가 상태를 알 수 있도록 `SeedlingSerializer`(`fields='__all__'`)에
+`adopter_is_active`/`adopter_nickname` 두 `SerializerMethodField`(diary의 `growth_stage_label`과
+동일 패턴, `adopter_nickname`은 빈 닉네임이면 `None`)를 추가했고, N+1을 피하려
+`SeedlingListCreateView`/`SeedlingDetailView` `get_queryset()`에 `.select_related('adopter')`를 걸었습니다.
+프론트는 재배자 `Seedling`(`grower/data/grower_repository.dart`)이 `adopterIsActive`(응답에 없으면
+`true`로 폴백)/`adopterNickname`을 파싱하고, `adopterIsActive == false`면
+`presentation/deactivated_adopter_badge.dart`의 `DeactivatedAdopterBadge`(공용 `StatusBadge`를
+중립 그레이로 고정한 얇은 래퍼)를 **일지 탭 묘목 카드(`GrowerSeedlingListCard`)·묘목 분석 화면·
+완성 신고 화면** 세 곳에 띄웁니다(완성 신고 화면은 표시만 — FCM/이메일 발송 로직은 그대로).
+같은 김에 세 화면의 입양자 표기를 `입양자 #{id}` → `입양자 {닉네임}`(없으면 기존 `#{id}` 폴백)으로
+바꿨습니다. 홈 탭 선반 뷰(`_ShelfPot`)는 화분 카드가 좁아 배지를 넣지 않고, 화분을 탭해 들어가는
+묘목 분석 화면이 대신 안내합니다.
+
 ### 권한 검사 패턴 (여러 파일에 걸쳐 있어 한눈에 파악하기 어려움)
 이 프로젝트는 DRF의 오브젝트 레벨 permission class를 쓰지 않습니다. 대신 각 view의
 `perform_create`/`get_queryset` 안에서 `request.user.role`과 FK(`seedling.adopter_id`,
@@ -445,6 +459,11 @@ list/detail은 원래 절대경로).
 `_multipartRequest(method, ...)` 헬퍼)로 항상 멀티파트 전송한다(사진 유무 무관 — `createDiary`와 동일).
 키 미입력 시 제출을 스낵바로 막고(네트워크 호출 없음), 성공 시 스낵바에
 `seasonCompletionPhrase(completedAt)`("무화과 #1 완성! 한여름에 완성됐어요 ☀️")를 붙인다.
+
+`GrowerCompleteArgs`에 `adopterIsActive`(기본 `true`)가 추가돼, 입양자가 탈퇴한 묘목이면 부제가
+`{입양자}님에게 알림이 가요` 대신 `{입양자}` + `DeactivatedAdopterBadge` + "탈퇴한 계정이라 완성
+알림이 전달되지 않을 수 있어요" 안내로 바뀐다 — **표시만 바뀌고 `SeedlingCompleteView`의 FCM/이메일
+발송 로직은 그대로다**(위 "커스텀 유저 모델"의 탈퇴 입양자 배지 문단 참고).
 
 ### 계절 배지 + 탄생 시간 (기부 인증서)
 `core/util/season_badge.dart`의 `seasonBadgeFor(DateTime)`(3~5월 봄 / 6월 초여름 / 7~8월 한여름 /

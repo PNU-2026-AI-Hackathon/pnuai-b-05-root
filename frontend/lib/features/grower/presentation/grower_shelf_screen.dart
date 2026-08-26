@@ -152,6 +152,8 @@ class _GrowerShelfScreenState extends RevalidatableState<GrowerShelfScreen> {
         seedlingId: seedling.id,
         adopterId: seedling.adopterId,
         status: seedling.status,
+        adopterIsActive: seedling.adopterIsActive,
+        adopterNickname: seedling.adopterNickname,
       ),
     );
   }

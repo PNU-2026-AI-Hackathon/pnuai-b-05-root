@@ -12,6 +12,7 @@ import '../../../shared/widgets/photo_source_dialog.dart';
 import '../../../shared/widgets/pigfig_app_bar.dart';
 import '../../../shared/widgets/pigfig_button.dart';
 import '../data/grower_repository.dart';
+import 'deactivated_adopter_badge.dart';
 
 /// `/grower/complete` route argument: 묘목 분석 화면(`GrowerSeedlingAnalysisScreen`)에서
 /// 넘어온 담당 묘목 정보.
@@ -20,11 +21,17 @@ class GrowerCompleteArgs {
     required this.seedlingId,
     required this.seedlingName,
     required this.adopterName,
+    this.adopterIsActive = true,
   });
 
   final int seedlingId;
   final String seedlingName;
   final String adopterName;
+
+  /// 입양자가 회원탈퇴(소프트 삭제)했는지. false면 부제에 "탈퇴한 계정" 배지와 함께
+  /// 완성 알림이 전달되지 않을 수 있다는 안내를 띄운다(알림 발송 로직 자체는 그대로 —
+  /// 이 화면은 표시만 바꾼다).
+  final bool adopterIsActive;
 }
 
 /// 30cm 미만이면 경고를 보여주는 기준(완성 신고 자체는 막지 않음 — 재배자 판단).
@@ -141,13 +148,41 @@ class _GrowerCompleteScreenState extends State<GrowerCompleteScreen> {
                 ).copyWith(fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 4),
-              Text(
-                '${args.seedlingName} · ${args.adopterName}님에게 알림이 가요',
-                style: AppTextStyles.guide(
-                  fontSize: 14,
-                  color: AppColors.badgeGreenText,
+              if (args.adopterIsActive)
+                Text(
+                  '${args.seedlingName} · ${args.adopterName}님에게 알림이 가요',
+                  style: AppTextStyles.guide(
+                    fontSize: 14,
+                    color: AppColors.badgeGreenText,
+                  ),
+                )
+              else ...[
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${args.seedlingName} · ${args.adopterName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.guide(
+                          fontSize: 14,
+                          color: AppColors.badgeGreenText,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const DeactivatedAdopterBadge(),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 6),
+                Text(
+                  '탈퇴한 계정이라 완성 알림이 전달되지 않을 수 있어요',
+                  style: AppTextStyles.body(
+                    fontSize: 12,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               _Card(
                 child: Column(

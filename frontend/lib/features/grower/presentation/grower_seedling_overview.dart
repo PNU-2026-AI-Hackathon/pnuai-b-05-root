@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/fig_tree_illustration.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../data/grower_repository.dart';
+import 'deactivated_adopter_badge.dart';
 
 /// 담당 묘목 통계 3칸(담당 묘목/재배중/완료). 원래는 홈 탭(대시보드)과 일지 탭이 동일한
 /// 디자인을 공유하기 위해 뽑은 위젯인데, 홈 탭이 "선반 뷰"(`GrowerShelfScreen`)로 바뀌면서
@@ -117,6 +118,14 @@ class GrowerSeedlingListCard extends StatelessWidget {
   static String _formatDate(DateTime date) =>
       '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
 
+  /// 입양자 표시 이름 — 닉네임이 있으면 "입양자 {닉네임}", 없으면 "입양자 #{id}"로 폴백.
+  String get _adopterLabel {
+    final nickname = seedling.adopterNickname;
+    return nickname != null && nickname.isNotEmpty
+        ? '입양자 $nickname'
+        : '입양자 #${seedling.adopterId}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isGrowing = seedling.status == SeedlingStatus.growing;
@@ -164,12 +173,24 @@ class GrowerSeedlingListCard extends StatelessWidget {
                       ).copyWith(fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '입양자 #${seedling.adopterId}',
-                      style: AppTextStyles.body(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _adopterLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.body(
+                              fontSize: 12,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ),
+                        if (!seedling.adopterIsActive) ...[
+                          const SizedBox(width: 6),
+                          const DeactivatedAdopterBadge(),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(

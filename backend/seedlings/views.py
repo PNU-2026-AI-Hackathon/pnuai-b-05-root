@@ -30,9 +30,11 @@ class SeedlingListCreateView(ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        # SeedlingSerializer의 adopter_is_active/adopter_nickname이 obj.adopter를
+        # 읽으므로 목록 조회 시 N+1을 피하도록 select_related로 함께 가져온다.
         if user.role == User.Role.GROWER:
-            return Seedling.objects.filter(grower=user)
-        return Seedling.objects.filter(adopter=user)
+            return Seedling.objects.filter(grower=user).select_related('adopter')
+        return Seedling.objects.filter(adopter=user).select_related('adopter')
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -68,7 +70,9 @@ class SeedlingDetailView(RetrieveAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return Seedling.objects.filter(Q(adopter=user) | Q(grower=user))
+        return Seedling.objects.filter(
+            Q(adopter=user) | Q(grower=user)
+        ).select_related('adopter')
 
 
 class SeedlingCompleteView(APIView):

@@ -18,6 +18,8 @@ class Seedling {
     required this.status,
     required this.startedAt,
     this.completedAt,
+    this.adopterIsActive = true,
+    this.adopterNickname,
   });
 
   final int id;
@@ -25,6 +27,14 @@ class Seedling {
   final SeedlingStatus status;
   final DateTime startedAt;
   final DateTime? completedAt;
+
+  /// 담당 묘목의 입양자가 회원탈퇴(소프트 삭제, `is_active=False`)했는지. 탈퇴한 계정의
+  /// 묘목도 재배자 화면에 그대로 남으므로(데이터·재배정 유지), 재배자에게 "탈퇴한 계정"
+  /// 배지로 안내하는 데 쓴다. 응답에 값이 없으면(구버전 등) 안전하게 true로 본다.
+  final bool adopterIsActive;
+
+  /// 입양자 닉네임(백엔드 `adopter_nickname`). 미설정이면 null.
+  final String? adopterNickname;
 
   factory Seedling.fromJson(Map<String, dynamic> json) => Seedling(
     id: json['id'] as int,
@@ -34,6 +44,8 @@ class Seedling {
     completedAt: json['completed_at'] == null
         ? null
         : DateTime.parse(json['completed_at'] as String),
+    adopterIsActive: json['adopter_is_active'] as bool? ?? true,
+    adopterNickname: json['adopter_nickname'] as String?,
   );
 }
 

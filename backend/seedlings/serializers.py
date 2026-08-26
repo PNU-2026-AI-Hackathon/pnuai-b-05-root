@@ -4,9 +4,24 @@ from .models import Seedling
 
 
 class SeedlingSerializer(serializers.ModelSerializer):
+    # adopter는 FK id로만 내려가므로, 재배자 화면이 담당 묘목의 입양자 상태를 파악할 수
+    # 있도록 파생 필드 2개를 함께 내려준다(diary의 growth_stage_label과 동일한
+    # SerializerMethodField 패턴 — 선언하면 fields='__all__'에 자동 포함된다).
+    # adopter_is_active가 False면 회원탈퇴(소프트 삭제)한 입양자이며, 그 묘목은 재배자
+    # 화면에 그대로 남으므로(데이터·재배정 유지) "탈퇴한 계정" 배지로만 안내한다.
+    adopter_is_active = serializers.SerializerMethodField()
+    adopter_nickname = serializers.SerializerMethodField()
+
     class Meta:
         model = Seedling
         fields = '__all__'
+
+    def get_adopter_is_active(self, obj):
+        return obj.adopter.is_active
+
+    def get_adopter_nickname(self, obj):
+        # 닉네임 미설정(빈 문자열)은 growth_stage_label과 동일하게 None으로 내려준다.
+        return obj.adopter.nickname or None
 
 
 class SeedlingPickupDonateSerializer(serializers.Serializer):

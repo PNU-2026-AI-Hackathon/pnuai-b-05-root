@@ -9,6 +9,7 @@ import '../../../shared/widgets/status_badge.dart';
 import '../data/diary_repository.dart';
 import '../data/grower_repository.dart';
 import '../data/sensor_repository.dart';
+import 'deactivated_adopter_badge.dart';
 import 'grower_complete_screen.dart';
 import 'grower_diary_list_screen.dart';
 
@@ -21,11 +22,27 @@ class GrowerSeedlingAnalysisArgs {
     required this.seedlingId,
     required this.adopterId,
     required this.status,
+    this.adopterIsActive = true,
+    this.adopterNickname,
   });
 
   final int seedlingId;
   final int adopterId;
   final SeedlingStatus status;
+
+  /// 입양자가 회원탈퇴(소프트 삭제)했는지. false면 헤더에 "탈퇴한 계정" 배지를 띄운다.
+  final bool adopterIsActive;
+
+  /// 입양자 닉네임. 없으면 "입양자 #{id}"로 폴백한다.
+  final String? adopterNickname;
+
+  /// 헤더/완성 신고 화면에 넘길 입양자 표시 이름.
+  String get adopterLabel {
+    final nickname = adopterNickname;
+    return nickname != null && nickname.isNotEmpty
+        ? '입양자 $nickname'
+        : '입양자 #$adopterId';
+  }
 }
 
 /// 묘목 한 그루의 분석 화면. 새 백엔드 API 없이 이미 있는 두 조회를 병렬로 모은다 —
@@ -116,6 +133,26 @@ class _GrowerSeedlingAnalysisScreenState
                   color: AppColors.badgeGreenText,
                 ),
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      args.adopterLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                  if (!args.adopterIsActive) ...[
+                    const SizedBox(width: 6),
+                    const DeactivatedAdopterBadge(),
+                  ],
+                ],
+              ),
               const SizedBox(height: 14),
               Expanded(child: _buildBody(args)),
               if (args.status == SeedlingStatus.growing) ...[
@@ -127,7 +164,8 @@ class _GrowerSeedlingAnalysisScreenState
                     arguments: GrowerCompleteArgs(
                       seedlingId: args.seedlingId,
                       seedlingName: '무화과 #${args.seedlingId}',
-                      adopterName: '입양자 #${args.adopterId}',
+                      adopterName: args.adopterLabel,
+                      adopterIsActive: args.adopterIsActive,
                     ),
                   ),
                 ),
