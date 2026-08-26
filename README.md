@@ -158,21 +158,31 @@ flowchart LR
 #### 3.1. 전체시스템 흐름도
 
 **유저 플로우**
-```
-[시작]
-  └── 회원가입 / 로그인
-        ├── 입양자(adopter)
-        │     ├── 무화과 결제 → 묘목 배정
-        │     ├── 케어 인터랙션 (물주기·영양제·햇빛)
-        │     ├── 성장 타임라인 확인
-        │     ├── AI 챗봇 Q&A (매뉴얼 밖 질문도 자연스럽게 응답)
-        │     ├── Pig.Fig. 게임 4종 (등급별 아이템 보상)
-        │     └── 묘목 완성 알림 → 수령 or 기부 선택 → 인증서 다운로드/공유
-        └── 재배자(grower)
-              ├── 담당 묘목 대시보드
-              ├── 일지 작성 + 사진 업로드 → YOLOv8 자동 분석 (본인 일지 삭제 가능)
-              ├── MQTT 환경 데이터 수신 → Prophet 이상 감지 (기간별 그래프로 비교)
-              └── 묘목 완성 신고 (키 입력 + 최종 사진) → 입양자 FCM 알림
+
+```mermaid
+flowchart TD
+    START(["시작"]) --> AUTH["회원가입 / 로그인"]
+    AUTH --> ROLE{"역할 선택"}
+
+    ROLE -->|입양자| A1["무화과 결제 → 묘목 배정"]
+    A1 --> A2["케어 인터랙션<br/>물주기·영양제·햇빛"]
+    A2 --> A3["성장 타임라인 확인"]
+    A3 --> A4["AI 챗봇 Q&A"]
+    A3 --> A5["Pig.Fig. 게임 4종<br/>등급별 아이템 보상"]
+    A3 --> A6{"묘목 완성 알림"}
+    A6 --> A7["수령 or 기부 선택"]
+    A7 --> A8["인증서 다운로드/공유"]
+
+    ROLE -->|재배자| G1["담당 묘목 대시보드"]
+    G1 --> G2["일지 작성 + 사진 업로드<br/>YOLOv8 자동 분석"]
+    G1 --> G3["MQTT 환경 데이터 수신<br/>Prophet 이상 감지"]
+    G2 --> G4["묘목 완성 신고<br/>키 입력 + 최종 사진"]
+    G4 -->|FCM 알림| A6
+
+    classDef adopter fill:#ffe4ec,stroke:#ff6f9c,color:#7a1f3d
+    classDef grower fill:#e3f2e1,stroke:#4caf50,color:#1b4d1f
+    class A1,A2,A3,A4,A5,A6,A7,A8 adopter
+    class G1,G2,G3,G4 grower
 ```
 
 <br/>
@@ -218,9 +228,42 @@ flowchart LR
 - 묘목 완성 알림 수신 후 픽업 수령 또는 3가지 기부처를 선택합니다.
 - 기부 선택 시 최종 사진 일러스트·키·계절 배지·완성 시각이 담긴 디지털 인증서가 자동 발급되며, 이미지 저장과 공유가 가능합니다.
 
+**묘목 완성 신고 → 기부 인증서 발급 흐름**
+
+```mermaid
+sequenceDiagram
+    participant G as 재배자
+    participant App as Pig.Fig. 앱
+    participant API as Django API
+    participant Gemini as Gemini API
+    participant A as 입양자
+
+    G->>App: 키(cm) 입력 + 최종 사진 업로드
+    App->>API: PATCH /seedlings/{id}/complete/
+    API->>Gemini: 사진 → 일러스트 변환 요청
+    Gemini-->>API: 일러스트 이미지 반환
+    API->>API: 계절 배지·탄생 시각 계산
+    API-->>App: 완성 처리 완료
+    API->>A: FCM 푸시 알림 발송
+    A->>App: 수령 또는 기부 선택
+    App->>API: PATCH /seedlings/{id}/pickup-donate/
+    API-->>App: 인증서 데이터(일러스트·키·계절·탄생시각)
+    App-->>A: 인증서 표시 (다운로드/공유 가능)
+```
+
 ##### `AI 챗봇 (입양자)`
 - 농촌진흥청 매뉴얼 기반 RAG 파이프라인으로 재배 질문에 답합니다.
 - 매뉴얼에 없는 질문도 거부하지 않고 일반 지식으로 자연스럽게 답하되, 확실하지 않은 내용은 단정하지 않습니다.
+
+```mermaid
+flowchart LR
+    Q["사용자 질문"] --> EMB["질문 임베딩<br/>gemini-embedding-001"]
+    EMB --> SEARCH["ChromaDB 벡터 검색<br/>관련 문서 Top-K"]
+    KB[("농촌진흥청 매뉴얼<br/>지식 문서")] -.벡터화.-> SEARCH
+    SEARCH --> PROMPT["커스텀 프롬프트<br/>매뉴얼 우선 + 밖이어도 거부 안 함"]
+    PROMPT --> LLM["Gemini 2.5 Flash"]
+    LLM --> A["무화과 박사 피그<br/>답변"]
+```
 
 <br/>
 
@@ -421,7 +464,7 @@ flutter run                  # 연결된 기기/에뮬레이터로 실행
 
 | 강서영 | 박소영 | 강효원 |
 |:------:|:------:|:------:|
-| 팀장 · 백엔드 · AI <br/> Django, YOLOv8, Prophet, MQTT, Gemini API | 프론트엔드 <br/> Flutter, FCM, 소셜 로그인 | 기획 · 디자인 <br/> Figma AI, UI/UX, RAG 챗봇 프롬프트 |
+| 팀장 · 백엔드 · AI <br/> Django, YOLOv8, Prophet, MQTT, Gemini API | 프론트엔드 <br/> Flutter, FCM, 소셜 로그인 | 기획 · 디자인 <br/> Figma AI, UI/UX, RAG 챗봇 프롬프트, 발표 |
 
 <br/>
 
