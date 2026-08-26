@@ -140,7 +140,7 @@ class _GrowerSensorScreenState extends State<GrowerSensorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const PigFigAppBar(showNotificationBell: true),
+      appBar: const PigFigAppBar(),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
         child: _buildBody(),

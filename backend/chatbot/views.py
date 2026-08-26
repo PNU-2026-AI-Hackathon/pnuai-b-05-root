@@ -31,9 +31,11 @@ class ChatbotAskView(APIView):
         if settings.GEMINI_API_KEY:
             try:
                 answer = ask_question(question, _get_vectorstore())
-            except Exception:
-                # 네트워크 오류, 타임아웃, 모델 미지원 등 Gemini 호출 실패 시
-                # 500을 그대로 노출하지 않고 안내 메시지로 폴백한다.
+            except Exception as e:
+                # 네트워크 오류, 타임아웃, 모델 미지원, 벡터스토어(chromadb) 미설치 등
+                # RAG 호출 실패 시 500을 그대로 노출하지 않고 안내 메시지로 폴백한다.
+                # 폴백은 조용히 일어나므로(원인 파악이 어려움) 서버 로그에 예외를 남긴다.
+                print(f'[Chatbot] RAG 응답 생성 실패, 폴백 사용: {e!r}')
                 answer = ERROR_ANSWER
         else:
             answer = MOCK_ANSWER

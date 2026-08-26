@@ -175,7 +175,7 @@ class _GamesScreenState extends State<GamesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const PigFigAppBar(showNotificationBell: true),
+      appBar: const PigFigAppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 22, 16, 24),
         child: Column(

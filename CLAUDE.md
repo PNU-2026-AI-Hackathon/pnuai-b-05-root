@@ -234,12 +234,13 @@ API를 쓰는 별도 인터페이스라 이번엔 지시받은 대로 `gemini-2.
 결제 자체가 안 걸려 있던 상태, 후자는 결제는 걸려 있으나 한도를 다 쓴 상태). 텍스트 모델
 (`gemini-2.5-flash`)로 직접 호출해봐도 동일한 지출 한도 오류가 나는 것으로 보아 이 차단은
 이미지 생성 모델에 국한되지 않고 **프로젝트 전체(이 API 키를 쓰는 모든 Gemini 호출)에 걸려
-있습니다** — 즉 지금은 `sensor/anomaly.py`의 `gemini_diagnosis`와 `chatbot`의 RAG 응답도 실제로는
-같은 이유로 조용히 정적 폴백/mock 응답으로 떨어지고 있을 가능성이 높습니다. 사용자가
-https://ai.studio/spend 에서 한도를 올리기 전까지는 강화된 프롬프트의 실제 생성 결과를 재현·검증할
-방법이 없습니다 — 코드/폴백 경로 자체는 정상 동작하는 것으로 확인됐고(`DiarySerializer` 응답에
-`photo`는 URL, `illustration`은 `null`로 정확히 내려옴), 프롬프트 강화가 실제로 더 동화풍에
-가까워졌는지는 한도가 풀린 뒤 재검증이 필요합니다. `growth_timeline_screen.dart`는 `illustrationUrl`이
+있었습니다**. **2026-08-26 업데이트**: 이 한도가 풀렸거나(월간 cap이라 달이 바뀌었을 수 있음)
+API 키가 교체돼, 이제 `chatbot`의 RAG는 `gemini-2.5-flash`로 실제 Gemini 응답을 정상적으로
+받아옵니다(로컬에서 매뉴얼 질문 1개 + 매뉴얼 밖 질문 4개 curl 왕복으로 확인). 즉 텍스트 모델
+차단은 해제된 상태입니다 — 다만 이번 세션에서 재검증한 건 `chatbot`뿐이고, `sensor/anomaly.py`의
+`gemini_diagnosis`와 아래 이미지 생성(`gemini-2.5-flash-image`)은 별도로 다시 확인하지 않았습니다
+(이미지 모델은 텍스트 모델과 과금·쿼터가 달라 여전히 막혀 있을 수 있음). 강화된 일러스트
+프롬프트가 실제로 더 동화풍에 가까워졌는지는 이미지 생성 성공 사례를 얻은 뒤 재검증이 필요합니다. `growth_timeline_screen.dart`는 `illustrationUrl`이
 있으면 그것을, 없으면(지금처럼 mock 모드이거나 변환 실패) `photoUrl`을, 둘 다 없으면 기존
 placeholder 아이콘을 보여주도록 `imageUrl = entry.illustrationUrl ?? entry.photoUrl` 한 줄로
 우선순위를 정했습니다.
@@ -285,9 +286,18 @@ API 호출로 분리한 것이 이 설계의 핵심입니다.
 ### RAG 챗봇 파이프라인
 `chatbot/rag_pipeline.py`는 농촌진흥청 매뉴얼 기반 지식 문서 10개를 코드에 직접 하드코딩해두고
 (PDF 등 외부 파일 의존 없음), `initialize_rag()`가 이를 ChromaDB로 임베딩해
-`chatbot/vector_store/`에 저장(이미 저장되어 있으면 재임베딩 없이 로드)합니다. `ask_question()`은
-Gemini(`LLM_MODEL = 'gemini-2.5-flash'`)로 답변을 생성하며, `timeout=LLM_TIMEOUT_SECONDS`(10초)를
-둬 응답이 지연되면 타임아웃으로 실패시킵니다. 임베딩은 `EMBEDDING_MODEL = 'models/gemini-embedding-001'`을
+`chatbot/vector_store/`에 저장(이미 저장되어 있으면 재임베딩 없이 로드)합니다. 이때 실제 벡터
+저장/검색은 `chromadb` 패키지가 담당하는데, 한동안 `requirements.txt`에서 빠져 있어(로컬 venv에는
+어쩌다 수동 설치돼 있어 티가 안 났음) 배포 환경(Render)에서는 `initialize_rag()` →
+`Chroma(...)`가 `ImportError: Could not import chromadb python package`를 던졌고, 이걸
+`ChatbotAskView`의 `except Exception`이 삼켜 **모든 챗봇 요청이 항상 `ERROR_ANSWER`로
+폴백**했습니다 — 2026-08-26에 `chromadb==1.5.9`를 `requirements.txt`에 명시적으로 추가해
+고쳤습니다(`chatbot/vector_store/`는 `.gitignore` 대상이라 배포 환경에는 없고, 첫 요청 때
+`Chroma.from_documents()`로 10개 문서를 새로 임베딩해 만든 뒤 프로세스 수명 동안 캐싱합니다).
+`ask_question()`은 Gemini(`LLM_MODEL = 'gemini-2.5-flash'`)로 답변을 생성하며,
+`timeout=LLM_TIMEOUT_SECONDS`(원래 10초 → 20초, `gemini-2.5-flash`가 기본 thinking으로 5~8초가
+걸려 배포 환경에서 10초는 종종 타임아웃 폴백을 유발함)를 둬 응답이 지연되면 타임아웃으로
+실패시킵니다. 임베딩은 `EMBEDDING_MODEL = 'models/gemini-embedding-001'`을
 쓰는데, 예전에 쓰던 `models/embedding-001`도 이 프로젝트의 API 키/버전에서 폐지되어 404가 나는 것을
 확인해 함께 교체했습니다(임베딩 모델을 바꾸면 기존에 그 모델로 만든 벡터가 차원이 달라 호환되지
 않으므로, `chatbot/vector_store/`를 지우고 새 모델로 재임베딩해 만들었습니다). 벡터스토어는
@@ -297,8 +307,21 @@ Gemini(`LLM_MODEL = 'gemini-2.5-flash'`)로 답변을 생성하며, `timeout=LLM
 호출이 실패하면(네트워크 오류, 타임아웃, 모델 오류 등 — `except Exception`으로 폭넓게 잡음)
 `ChatbotAskView`가 500을 그대로 노출하지 않고 `ERROR_ANSWER`("죄송해요, 지금은 답변을 가져오지
 못했어요. 잠시 후 다시 시도해주세요.")로 폴백합니다 — `sensor/anomaly.py`의 Gemini 폴백과 동일한
-패턴입니다. `chatbot/tests.py`는 `initialize_rag`/`ask_question`을 mock해 mock 응답/정상 RAG 응답/
-호출 실패 시 폴백까지 세 경로를 모두 네트워크 호출 없이 검증합니다.
+패턴입니다. 다만 이 폴백은 조용히 일어나 원인 파악이 어려워서(위 chromadb 사건이 오래 안 잡힌
+이유), `except` 블록에서 `print(f'[Chatbot] RAG 응답 생성 실패, 폴백 사용: {e!r}')`로 예외를
+서버 로그에 남깁니다(`seedlings/views.py`의 `[Email] ...` 실패 로그와 같은 `[Tag]` 컨벤션).
+`ask_question()`은 `RetrievalQA.from_chain_type()`에 `chain_type_kwargs={'prompt': ANSWER_PROMPT}`로
+커스텀 한국어 `PromptTemplate`을 넘깁니다 — LangChain 기본 프롬프트("문서에 근거 없으면 모른다고
+답하라")가 매뉴얼 밖 질문("무화과 말고 다른 과일도 키울 수 있나요?" 등)을 지나치게 딱딱하게
+거부하던 걸 고치려는 것으로, `ANSWER_PROMPT`는 (1) 프론트 UI의 '무화과 박사 피그' 캐릭터·친근한
+존댓말 톤, (2) 참고 자료가 관련 있으면 우선 근거로 삼되 없어도 일반 원예 지식으로 답하기,
+(3) 참고 자료 밖·불확실한 내용은 "일반적으로는"처럼 단정하지 않는 표현 쓰기를 지시합니다.
+`chatbot/tests.py`는 `initialize_rag`/`ask_question`을 mock해 mock 응답/정상 RAG 응답/
+호출 실패 시 폴백까지 세 경로를 모두 네트워크 호출 없이 검증하고, `AnswerPromptTests`가
+`ANSWER_PROMPT`의 입력 변수(`{context, question}` — 어긋나면 `RetrievalQA`가 런타임에 깨짐)와
+'무화과 박사 피그' 페르소나 문구를 못박습니다. 프롬프트가 실제로 매뉴얼 질문은 근거 기반으로,
+매뉴얼 밖 질문은 거부하지 않고 답하는지는 실키로 curl 수동 검증했습니다 — sensor/diary와 동일하게
+과금되는 실호출은 `manage.py test`에 넣지 않습니다.
 `langchain` 1.x부터 API가 크게 바뀌어 `RetrievalQA`는 `langchain_classic.chains`에,
 `RecursiveCharacterTextSplitter`는 `langchain_text_splitters`에 있습니다(`langchain.chains`/
 `langchain.text_splitter` 아님).
@@ -814,10 +837,13 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
 - `growth_timeline_screen.dart`는 `AdopterShell`의 세 번째 탭("타임라인", 홈→게임→타임라인→마이
   순서)입니다 — 원래 마이페이지의 "성장 타임라인" 메뉴를 눌러야 들어갈 수 있었는데, 자주 확인하는
   화면이라 하단 탭으로 승격했습니다(마이페이지가 이후 리스트 메뉴 자체를 그리드로 개편하면서 이제는
-  애초에 중복될 리스트 항목도 없습니다). 앱바도
-  다른 탭 화면과 통일하려고 `closeLabel: '닫기'`(누르면 pop) 대신 `showNotificationBell: true`로
-  바꿨습니다 — 탭 화면은 애초에 push되는 게 아니라 `IndexedStack`으로 항상 트리에 떠 있어서 "닫을"
-  대상이 없기 때문입니다. `StatefulWidget`으로
+  애초에 중복될 리스트 항목도 없습니다). 앱바는 탭 화면이라 `closeLabel: '닫기'`(누르면 pop)를
+  주지 않고 인자 없는 `PigFigAppBar()`를 씁니다 — 탭 화면은 애초에 push되는 게 아니라
+  `IndexedStack`으로 항상 트리에 떠 있어서 "닫을" 대상이 없기 때문입니다(한때 그 자리에
+  `showNotificationBell: true`로 알림 종 아이콘을 뒀으나, onTap도 실제 알림 연동도 없는 순수
+  장식이라 2026-08-26에 `PigFigAppBar`에서 파라미터·렌더링 블록·8개 화면 호출부까지 통째로
+  제거했습니다 — 이제 `PigFigAppBar`는 로고+타이틀에 선택적 `closeLabel`만 있고, 알림 종이 있던
+  자리는 `Spacer()`로 비워집니다). `StatefulWidget`으로
   `seedling_repository.dart`로 대표 묘목을 고른 뒤 `features/adopter/data/diary_repository.dart`
   의 `fetchDiaries()`로 `GET /api/diary/{seedling_id}/`를 호출합니다. 실제 `Diary` 모델에는 성장
   단계·키·잎 개수 필드가 없어(그건 애초에 mock이 지어낸 값) 카드는 날짜 + `content` 본문 +
@@ -957,14 +983,19 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   생성하도록 연동 완료(위 "센서 데이터 파이프라인" 참고). `chatbot` 앱도 `gemini-2.5-flash`(LLM)/
   `models/gemini-embedding-001`(임베딩)로 모델명을 갱신하고 `ChatbotAskView`에 예외 처리(Gemini
   호출 실패 시 500 대신 안내 메시지로 폴백)를 추가해 실키로 실제 Gemini RAG 응답이 오는 것까지
-  검증 완료(위 "RAG 챗봇 파이프라인" 참고). `diary`의 사진 → 일러스트 변환(`gemini-2.5-flash-image`,
+  검증 완료(위 "RAG 챗봇 파이프라인" 참고). **2026-08-26**: `chatbot` RAG가 배포 환경에서 항상
+  폴백만 내던 원인이 `requirements.txt`에 `chromadb`가 빠진 것으로 밝혀져 `chromadb==1.5.9`를
+  추가하고(로컬은 어쩌다 수동 설치돼 있어 정상 동작했음), 커스텀 프롬프트로 매뉴얼 밖 질문도
+  '무화과 박사 피그' 톤으로 답하도록 고쳤으며(위 "RAG 챗봇 파이프라인" 참고), 로컬 서버 + curl로
+  매뉴얼 질문 1개(근거 기반 답변) + 매뉴얼 밖 질문 4개(거부 없이 답변) 실 Gemini 응답을 재확인함.
+  Render 반영에는 **`requirements.txt` 커밋 후 재배포가 필요**(Render는 배포 시 `pip install -r
+  requirements.txt`를 다시 돌림). `diary`의 사진 → 일러스트 변환(`gemini-2.5-flash-image`,
   위 "일지 사진 → 일러스트 변환" 참고)은 프롬프트를 동화풍 스타일 키워드로 강화까지 마쳤지만, 코드/
-  폴백 경로만 실서버로 검증됐을 뿐 실제 변환 성공 사례는 아직 확인하지 못했음 — 이 프로젝트 API 키가
-  현재 프로젝트 단위 월간 지출 한도(monthly spending cap)를 소진한 상태라(`429 RESOURCE_EXHAUSTED
-  ... exceeded its monthly spending cap`) 모든 Gemini 호출이 막혀 있고, 텍스트 모델로 직접 호출해도
-  동일 오류가 나는 것으로 보아 이미지 생성뿐 아니라 `sensor`의 `gemini_diagnosis`·`chatbot`의 RAG
-  응답도 지금은 실제로는 같은 이유로 조용히 정적 폴백/mock으로 떨어지고 있을 가능성이 있음 —
-  https://ai.studio/spend 에서 한도를 올린 뒤 세 기능 모두 재검증 필요
+  폴백 경로만 실서버로 검증됐을 뿐 실제 변환 성공 사례는 아직 확인하지 못했음 — 한동안 이 프로젝트
+  API 키가 월간 지출 한도(`429 ... exceeded its monthly spending cap`)로 모든 Gemini 호출이 막혀
+  있었으나, 2026-08-26 기준 텍스트 모델(`gemini-2.5-flash`) 호출은 위 chatbot 재검증에서 정상 동작
+  확인 — 즉 한도는 풀린 것으로 보이나 이미지 생성 모델(`gemini-2.5-flash-image`)과 `sensor`의
+  `gemini_diagnosis`는 이번에 따로 재확인하지 않았으므로, 일러스트 변환은 여전히 별도 재검증 필요
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 스플래시(`/splash`, `Hero` 전환) → 로그인, 입양자로 로그인 성공 시마다(1회성이 아님)
   온보딩(3장) 노출, 입양자 플로우(닉네임 입력 포함 회원가입/로그인/홈·게임·타임라인·마이페이지 4탭

@@ -10,6 +10,7 @@ from django.conf import settings
 from langchain_classic.chains import RetrievalQA
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
+from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -17,10 +18,40 @@ PERSIST_DIRECTORY = os.path.join(os.path.dirname(__file__), 'vector_store')
 
 EMBEDDING_MODEL = 'models/gemini-embedding-001'
 LLM_MODEL = 'gemini-2.5-flash'
-LLM_TIMEOUT_SECONDS = 10
+# gemini-2.5-flash는 기본으로 thinking이 켜져 있어 응답이 5~8초가량 걸린다.
+# 10초는 배포 환경(느린 컨테이너 + Google 왕복 지연)에서 종종 타임아웃 폴백을
+# 유발할 만큼 빠듯해 20초로 잡는다. gunicorn 자체 타임아웃(120초)이 최종 상한.
+LLM_TIMEOUT_SECONDS = 20
 RETRIEVAL_K = 3
 CHUNK_SIZE = 300
 CHUNK_OVERLAP = 30
+
+# RAG 답변 생성용 커스텀 프롬프트.
+# RetrievalQA의 LangChain 기본 프롬프트는 "문서에 근거가 없으면 모른다고 답하라"는
+# 지시라, 매뉴얼(KNOWLEDGE_DOCUMENTS) 밖의 질문을 지나치게 딱딱하게 거부한다.
+# 프론트 UI의 '무화과 박사 피그' 캐릭터와 톤을 맞추고, 참고 자료가 없어도 일반
+# 재배 지식으로 답하되 단정하지 않도록 답변 태도를 직접 지정한다.
+ANSWER_PROMPT = PromptTemplate(
+    input_variables=['context', 'question'],
+    template=(
+        '당신은 무화과 재배를 도와주는 친근한 AI 챗봇 "무화과 박사 피그"입니다. '
+        '무화과를 사랑하는 다정하고 편안한 말투로, 존댓말로 답합니다.\n\n'
+        '아래는 농촌진흥청 무화과 재배 매뉴얼에서 질문과 관련해 찾은 참고 자료입니다.\n'
+        '----------\n'
+        '{context}\n'
+        '----------\n\n'
+        '답변 규칙:\n'
+        '1. 참고 자료가 질문과 관련이 있으면, 그 내용을 우선 근거로 삼아 답합니다.\n'
+        '2. 참고 자료에 없는 질문이라도 절대 "정보가 없다"며 거부하지 말고, '
+        '일반적인 식물·원예 재배 지식으로 최대한 도움이 되게 답합니다.\n'
+        '3. 참고 자료에 없거나 확실하지 않은 내용을 말할 때는 단정하지 말고 '
+        '"일반적으로는", "정확한 건 상황에 따라 조금씩 달라요"처럼 여지를 두는 표현을 씁니다.\n'
+        '4. 무화과와 전혀 관계없는 질문이면 짧게만 답한 뒤 자연스럽게 무화과 이야기로 돌아오도록 안내합니다.\n'
+        '5. 항상 한국어로, 2~4문장 정도로 간결하게 답합니다.\n\n'
+        '질문: {question}\n\n'
+        '무화과 박사 피그의 답변:'
+    ),
+)
 
 # 농촌진흥청 무화과 재배 매뉴얼 기반 지식 문서 (하드코딩)
 KNOWLEDGE_DOCUMENTS = [
@@ -116,6 +147,7 @@ def ask_question(question, vectorstore):
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
         retriever=vectorstore.as_retriever(search_kwargs={'k': RETRIEVAL_K}),
+        chain_type_kwargs={'prompt': ANSWER_PROMPT},
     )
     result = qa_chain.invoke({'query': question})
     return result['result']
