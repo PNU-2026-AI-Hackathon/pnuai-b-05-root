@@ -210,6 +210,7 @@ class _TimingBar extends StatelessWidget {
   final double halfWidth;
 
   static const _indicatorSize = 40.0;
+  static const _centerLineWidth = 3.0; // 타겟 존 정중앙 안내선 두께
 
   @override
   Widget build(BuildContext context) {
@@ -246,6 +247,26 @@ class _TimingBar extends StatelessWidget {
                   color: AppColors.green500.withValues(alpha: 0.28),
                   border: Border.all(color: AppColors.green500, width: 2),
                   borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            // 타겟 존 정중앙 안내선 (순수 시각 가이드 — 게임 로직과 무관).
+            // 물방울 인디케이터가 Positioned(left: value * usable)로 그려지므로,
+            // controller.value 대신 targetCenter를 넣은 같은 식으로 x를 잡고
+            // 인디케이터 너비(_indicatorSize)의 절반만큼 보정하면 인디케이터가
+            // targetCenter에 있을 때의 시각적 중심과 정확히 겹친다. 이 좌표는
+            // 타겟 존 박스의 정중앙(zoneLeft + zoneWidth / 2)과도 일치한다.
+            Positioned(
+              left: targetCenter * usable +
+                  _indicatorSize / 2 -
+                  _centerLineWidth / 2,
+              width: _centerLineWidth,
+              top: 0,
+              bottom: 0,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.errorRed,
+                  borderRadius: BorderRadius.circular(_centerLineWidth / 2),
                 ),
               ),
             ),
