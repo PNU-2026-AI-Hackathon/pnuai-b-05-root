@@ -227,3 +227,71 @@ class DiaryListViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         entry = next(d for d in response.data if d['growth_stage'] == Diary.GrowthStage.LEAFING)
         self.assertEqual(entry['growth_stage_label'], '잎 성장 중')
+
+
+class DiaryDestroyViewTests(APITestCase):
+    def setUp(self):
+        self.adopter = User.objects.create_user(
+            email='adopter@example.com', password='testpass123', role=User.Role.ADOPTER,
+        )
+        self.grower = User.objects.create_user(
+            email='grower@example.com', password='testpass123', role=User.Role.GROWER,
+        )
+        self.other_grower = User.objects.create_user(
+            email='other-grower@example.com', password='testpass123', role=User.Role.GROWER,
+        )
+        self.seedling = Seedling.objects.create(adopter=self.adopter, grower=self.grower)
+        self.diary = Diary.objects.create(
+            seedling=self.seedling, grower=self.grower, content='삭제 대상 일지',
+        )
+        self.url = reverse('diary:delete', kwargs={'pk': self.diary.pk})
+
+    def test_grower_can_delete_own_diary(self):
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Diary.objects.filter(pk=self.diary.pk).exists())
+
+    def test_other_grower_cannot_delete_diary(self):
+        self.client.force_authenticate(user=self.other_grower)
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Diary.objects.filter(pk=self.diary.pk).exists())
+
+    def test_adopter_cannot_delete_diary(self):
+        self.client.force_authenticate(user=self.adopter)
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Diary.objects.filter(pk=self.diary.pk).exists())
+
+    def test_cannot_delete_diary_on_completed_seedling(self):
+        self.seedling.status = Seedling.Status.COMPLETED
+        self.seedling.save(update_fields=['status'])
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Diary.objects.filter(pk=self.diary.pk).exists())
+
+    def test_delete_missing_diary_returns_404(self):
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.delete(reverse('diary:delete', kwargs={'pk': 999999}))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_unauthenticated_delete_rejected(self):
+        response = self.client.delete(self.url)
+
+        self.assertIn(
+            response.status_code,
+            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
+        )
+        self.assertTrue(Diary.objects.filter(pk=self.diary.pk).exists())
