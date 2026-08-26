@@ -466,7 +466,7 @@ flutter run                  # 연결된 기기/에뮬레이터로 실행
 | 강서영 | 박소영 | 강효원 |
 |:------:|:------:|:------:|
 | <ksksyy25@pusan.ac.kr> | <kye625@pusan.ac.kr> | <hwdh0330@pusan.ac.kr> |
-| 팀장 · 백엔드 · AI <br/> Django, YOLOv8, Prophet, MQTT, Gemini API | 프론트엔드 <br/> Flutter, FCM, 소셜 로그인 | 기획 · 디자인 <br/> Figma AI, Claude Design, UI/UX, RAG 챗봇 프롬프트, Canva AI 발표자료 |
+| 팀장 · 백엔드 · AI <br/> Django, YOLOv8, Prophet, MQTT, Gemini API | 프론트엔드 <br/> Flutter, FCM, Lottie 애니메이션 | 기획 · 디자인 <br/> Figma AI, Claude Design, UI/UX, RAG 챗봇 프롬프트, Canva AI 발표자료 |
 
 <br/>
 
