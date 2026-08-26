@@ -1,13 +1,29 @@
+import io
+import shutil
+import tempfile
 from unittest.mock import patch
 
 from django.core import mail
+from django.test import override_settings
 from django.urls import reverse
+from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import User
 
 from .models import Seedling
+
+_MEDIA_ROOT = tempfile.mkdtemp()
+
+
+def _generate_test_photo():
+    """diary/tests.py의 동명 헬퍼와 동일 — 10x10 JPEG 하나를 메모리에 만든다."""
+    buffer = io.BytesIO()
+    Image.new('RGB', (10, 10), color='green').save(buffer, format='JPEG')
+    buffer.seek(0)
+    buffer.name = 'final.jpg'
+    return buffer
 
 
 class SeedlingListCreateViewTests(APITestCase):
@@ -84,7 +100,13 @@ class SeedlingDetailViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
+@override_settings(MEDIA_ROOT=_MEDIA_ROOT)
 class SeedlingCompleteViewTests(APITestCase):
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(_MEDIA_ROOT, ignore_errors=True)
+
     def setUp(self):
         self.adopter = User.objects.create_user(
             email='adopter@example.com', password='testpass123', role=User.Role.ADOPTER,
@@ -102,15 +124,100 @@ class SeedlingCompleteViewTests(APITestCase):
     def test_grower_can_complete_own_seedling(self, mock_send_notification):
         self.client.force_authenticate(user=self.grower)
 
-        response = self.client.patch(self.url)
+        response = self.client.patch(self.url, {'height_cm': 34})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.seedling.refresh_from_db()
         self.assertEqual(self.seedling.status, Seedling.Status.COMPLETED)
         self.assertIsNotNone(self.seedling.completed_at)
+        self.assertEqual(self.seedling.height_cm, 34)
         mock_send_notification.assert_called_once_with(
             self.adopter, '묘목 완성!', '무화과 묘목이 완성됐어요. 수령 또는 기부를 선택해주세요.',
         )
+
+    @patch('seedlings.views.send_notification_to_user')
+    def test_complete_requires_height_cm(self, mock_send_notification):
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.patch(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.seedling.refresh_from_db()
+        self.assertEqual(self.seedling.status, Seedling.Status.GROWING)
+        mock_send_notification.assert_not_called()
+
+    @patch('seedlings.views.send_notification_to_user')
+    def test_complete_rejects_non_positive_height(self, mock_send_notification):
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.patch(self.url, {'height_cm': 0})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('seedlings.views.send_notification_to_user')
+    def test_complete_allows_height_below_30(self, mock_send_notification):
+        """30cm 미만이어도 완성 신고를 막지 않는다(재배자 판단, 프론트에서 경고만)."""
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.patch(self.url, {'height_cm': 22})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.seedling.refresh_from_db()
+        self.assertEqual(self.seedling.height_cm, 22)
+        self.assertEqual(self.seedling.status, Seedling.Status.COMPLETED)
+
+    @patch('seedlings.views.convert_to_illustration', return_value=b'fake-png-bytes')
+    @patch('seedlings.views.send_notification_to_user')
+    def test_complete_with_photo_converts_to_illustration(
+        self, mock_send_notification, mock_convert,
+    ):
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.patch(
+            self.url,
+            {'height_cm': 34, 'final_photo': _generate_test_photo()},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.seedling.refresh_from_db()
+        self.assertTrue(self.seedling.final_photo)
+        mock_convert.assert_called_once_with(self.seedling.final_photo.path)
+        self.assertTrue(self.seedling.final_illustration)
+        with self.seedling.final_illustration.open('rb') as f:
+            self.assertEqual(f.read(), b'fake-png-bytes')
+
+    @patch('seedlings.views.convert_to_illustration', return_value=None)
+    @patch('seedlings.views.send_notification_to_user')
+    def test_complete_saved_without_illustration_when_conversion_fails(
+        self, mock_send_notification, mock_convert,
+    ):
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.patch(
+            self.url,
+            {'height_cm': 34, 'final_photo': _generate_test_photo()},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.seedling.refresh_from_db()
+        self.assertTrue(self.seedling.final_photo)
+        self.assertFalse(self.seedling.final_illustration)
+
+    @patch('seedlings.views.convert_to_illustration')
+    @patch('seedlings.views.send_notification_to_user')
+    def test_complete_without_photo_skips_conversion(
+        self, mock_send_notification, mock_convert,
+    ):
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.patch(self.url, {'height_cm': 34})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.seedling.refresh_from_db()
+        self.assertFalse(self.seedling.final_photo)
+        mock_convert.assert_not_called()
 
     @patch('seedlings.views.send_notification_to_user')
     def test_completing_seedling_sends_email_to_adopter(self, mock_send_notification):
@@ -118,7 +225,7 @@ class SeedlingCompleteViewTests(APITestCase):
         self.adopter.save(update_fields=['nickname'])
         self.client.force_authenticate(user=self.grower)
 
-        response = self.client.patch(self.url)
+        response = self.client.patch(self.url, {'height_cm': 34})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 1)
@@ -134,7 +241,7 @@ class SeedlingCompleteViewTests(APITestCase):
     ):
         self.client.force_authenticate(user=self.grower)
 
-        response = self.client.patch(self.url)
+        response = self.client.patch(self.url, {'height_cm': 34})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.seedling.refresh_from_db()
@@ -143,7 +250,7 @@ class SeedlingCompleteViewTests(APITestCase):
     def test_adopter_cannot_complete_seedling(self):
         self.client.force_authenticate(user=self.adopter)
 
-        response = self.client.patch(self.url)
+        response = self.client.patch(self.url, {'height_cm': 34})
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.seedling.refresh_from_db()
@@ -152,7 +259,7 @@ class SeedlingCompleteViewTests(APITestCase):
     def test_other_grower_cannot_complete_unassigned_seedling(self):
         self.client.force_authenticate(user=self.other_grower)
 
-        response = self.client.patch(self.url)
+        response = self.client.patch(self.url, {'height_cm': 34})
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 

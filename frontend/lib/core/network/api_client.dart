@@ -169,9 +169,50 @@ class ApiClient {
     String? fileFieldName,
     String? fileName,
     required String accessToken,
+  }) {
+    return _multipartRequest(
+      'POST',
+      path,
+      fields: fields,
+      fileBytes: fileBytes,
+      fileFieldName: fileFieldName,
+      fileName: fileName,
+      accessToken: accessToken,
+    );
+  }
+
+  /// 인증된 `multipart/form-data` PATCH 요청. [postMultipart]와 동일한 규약이며
+  /// 메서드만 PATCH다 — 사진 파일을 함께 보내야 하는 부분 수정(예: 묘목 완성 신고)에 쓴다.
+  Future<Map<String, dynamic>> patchMultipart(
+    String path, {
+    required Map<String, String> fields,
+    Uint8List? fileBytes,
+    String? fileFieldName,
+    String? fileName,
+    required String accessToken,
+  }) {
+    return _multipartRequest(
+      'PATCH',
+      path,
+      fields: fields,
+      fileBytes: fileBytes,
+      fileFieldName: fileFieldName,
+      fileName: fileName,
+      accessToken: accessToken,
+    );
+  }
+
+  Future<Map<String, dynamic>> _multipartRequest(
+    String method,
+    String path, {
+    required Map<String, String> fields,
+    Uint8List? fileBytes,
+    String? fileFieldName,
+    String? fileName,
+    required String accessToken,
   }) async {
     final uri = Uri.parse('$baseUrl$path');
-    final request = http.MultipartRequest('POST', uri)
+    final request = http.MultipartRequest(method, uri)
       ..headers['Authorization'] = 'Bearer $accessToken'
       ..fields.addAll(fields);
     if (fileBytes != null && fileFieldName != null) {

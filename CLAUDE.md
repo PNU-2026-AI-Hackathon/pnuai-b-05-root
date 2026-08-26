@@ -30,7 +30,8 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
   홈으로 진입합니다. accounts(회원가입/로그인/로그아웃/`GET`·`PATCH`·`DELETE /api/accounts/me/`로
   프로필 조회·닉네임 수정·회원탈퇴, Android는 로그인 성공 시 FCM 토큰도 함께 등록), seedlings
   (`GET /api/seedlings/` 목록 조회 + `POST /api/seedlings/` 입양(결제 후 생성, 재배자 자동 배정) +
-  `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary(`POST /api/diary/` 작성 +
+  `PATCH /api/seedlings/{id}/complete/` 완성 신고 — 최종 키 입력(필수) + 최종 사진 업로드(선택,
+  Gemini 일러스트 변환)), diary(`POST /api/diary/` 작성 +
   `GET /api/diary/{seedling_id}/` 조회 + `DELETE /api/diary/entry/{id}/` 재배자 본인 일지 삭제 —
   완료된 묘목의 일지는 삭제 불가, 사진은 `image_picker`로 선택해 multipart 업로드), sensor
   (`POST /api/sensor/data/` 저장 + `GET /api/sensor/anomaly/{seedling_id}/` 이상 이력 조회), vision
@@ -411,6 +412,64 @@ context에서 뜨려는 레이스 컨디션이 생기기 때문입니다. 다만
 결정적 tie-break), 재배자가 한 명도 없으면 `grower=NULL`로 조용히 생성하지 않고 `ValidationError`
 (400)로 명확히 실패시킵니다. 이 로직은 재배자가 여러 명일 때 신규 묘목이 한쪽으로 쏠리지 않게 하는
 것이 목적이며, `seedlings/tests.py`에 이 자동 배정 happy path 테스트가 있습니다.
+
+### 묘목 완성 신고 (키 입력 + 최종 사진 → 일러스트)
+`SeedlingCompleteView`(`PATCH /api/seedlings/{id}/complete/`, 담당 재배자만)는 원래 바디 없이
+`status`/`completed_at`만 바꿨는데, 이제 재배자가 입력한 **최종 키**(`Seedling.height_cm`,
+`PositiveSmallIntegerField`)와 **최종 사진**(`final_photo`)을 함께 받는다(`0003` 마이그레이션,
+3필드 모두 소급 데이터 때문에 `null=True, blank=True` — 새 신고에서만 `SeedlingCompleteSerializer`가
+`height_cm`을 required로 강제, `final_photo`는 선택). 입력 검증은 `SeedlingPickupDonateSerializer`와
+같은 `serializers.Serializer` 기반 `SeedlingCompleteSerializer`가 담당하며, `height_cm`은
+`min_value=1, max_value=500`으로 음수·0 같은 명백한 오입력만 거른다 — **30cm 미만이어도 막지 않는다**
+(재배자 판단에 맡기고 프론트에서 경고 문구만; `SeedlingCompleteView`가 원래 재완성 가드조차 없는
+설계 기조 + '시니어 재배자' 신뢰 원칙과 일치). 사진이 오면 `diary/views.py`의
+`perform_create()`와 똑같이 `convert_to_illustration()`(diary 앱 함수를 `seedlings.views`에서
+직접 import — `gemini_illustration`은 앱 모델을 import하지 않아 순환참조 없음, `seedlings →
+notifications.fcm`과 같은 수준의 앱 간 참조)으로 `final_illustration`까지 변환 시도하되, 실패해도
+완성 신고 자체는 정상 처리(원본 사진만 저장)한다. 변환은 FCM/이메일 발송 뒤에 둬서 Gemini 지연이
+입양자 알림을 늦추지 않게 했다. `SeedlingCompleteView`는 `APIView`라 시리얼라이저 context를 자동으로
+안 넘겨줘서, 응답의 `final_photo`/`final_illustration` URL이 절대경로로 나가도록
+`SeedlingSerializer(seedling, context={'request': request})`로 직접 넣었다(generic 뷰인
+list/detail은 원래 절대경로).
+
+프론트 `grower_complete_screen.dart`는 하드코딩 튜플 체크리스트(`('수고(키) 30cm 이상', '34cm')`
+식 3항목)를 걷어내고 — 잎/가지 항목은 입양자에게 의미 없어 완전 삭제 — **키 입력 필드**(숫자 키패드,
+`_Card` 안에 밑줄 없는 큰 숫자 + "cm", `< 30`이면 그 아래 비차단 경고 문구)와 실제로 동작하는
+**"최종 사진 업로드"**(`_showComingSoon` mock 제거, `grower_diary_write_screen.dart`와 동일하게
+`showPhotoSourceDialog` + `ImagePicker` + 미리보기 썸네일)로 바꿨다. body는 `Column`+`Spacer` →
+`SingleChildScrollView`로 전환(입력 필드가 늘어 소형 기기 오버플로 방지, `grower_diary_write`와 동일
+구조). `GrowerRepository.completeSeedling`은 시그니처가
+`completeSeedling({required seedlingId, required heightCm, photoBytes, photoFileName})`로 바뀌고
+(반환 `void → Seedling`, 성공 문구에서 서버가 확정한 `completed_at`을 쓰기 위함),
+`ApiClient.patch`(JSON) 대신 새로 뽑은 `ApiClient.patchMultipart`(`postMultipart`와 공유하는
+`_multipartRequest(method, ...)` 헬퍼)로 항상 멀티파트 전송한다(사진 유무 무관 — `createDiary`와 동일).
+키 미입력 시 제출을 스낵바로 막고(네트워크 호출 없음), 성공 시 스낵바에
+`seasonCompletionPhrase(completedAt)`("무화과 #1 완성! 한여름에 완성됐어요 ☀️")를 붙인다.
+
+### 계절 배지 + 탄생 시간 (기부 인증서)
+`core/util/season_badge.dart`의 `seasonBadgeFor(DateTime)`(3~5월 봄 / 6월 초여름 / 7~8월 한여름 /
+9~11월 가을 / 12~2월 겨울, 내부에서 `.toLocal()` 후 month 판정)과 `seasonCompletionPhrase()`는
+순수 함수이며 완성 신고 성공 스낵바와 기부 인증서 양쪽이 공유한다 — 백엔드는 `completed_at`(ISO8601
++ tz)만 내려주고 계절 계산은 안 한다(문구·이모지는 UI 카피라 Dart에서만 관리, 소비 화면도 1~2곳뿐).
+`donation_certificate_screen.dart`에 순수 함수 `formatSeasonLine(completedAt, heightCm)`
+("☀️ 한여름에 완성 · 34cm")과 `formatBirthMoment(completedAt)`("🐣 2026. 08. 26 · 23:23:26",
+`formatCertificatePeriod`와 달리 초 단위까지, `completed_at`은 UTC일 수 있어 반드시 `.toLocal()`
+후 포맷 — CLAUDE.md 활동 캘린더 UTC 버그 선례)을 추가하고 `_CertificateContent`의
+`formatCertificatePeriod` 줄 바로 아래에 표시한다(둘 다 `completed_at` 없으면 렌더 안 함). 인증서
+안의 손그림 무화과나무(`_CertificateTreeIcon`)는 `_CertificateArtwork`로 감싸, `finalIllustrationUrl`이
+있으면 그 일러스트를 둥근 액자로 보여주고 없거나 로딩 실패면 기존 손그림으로 폴백한다
+(`growth_timeline_screen.dart`의 `illustrationUrl ?? photoUrl ?? placeholder`와 같은 결).
+`DonationCertificateArgs`에 `heightCm`/`finalIllustrationUrl` 필드를 추가했고, 호출부
+(`donation_certificate_list_screen.dart` 카드/목록 모드, `pickup_donate_screen.dart` — 이쪽은
+원래 `startedAt`/`completedAt`도 안 넘기던 걸 함께 보완)가 `Seedling`에서 채워 넘긴다.
+adopter `Seedling` 모델(`adopter/data/seedling_repository.dart`)에 `heightCm`/`finalPhotoUrl`/
+`finalIllustrationUrl` 파싱을 추가했다(grower `Seedling`은 완성 신고 응답 파싱용이라 그대로).
+**실기 검증**: 로컬 백엔드 + `flutter build web` + Playwright 헤드리스로 재배자 계정 로그인 →
+무화과 #1 완성 신고(키 34, 사진 없음) → 스낵바 "무화과 #1 완성! 한여름에 완성됐어요 ☀️" + 백엔드
+`status=completed, height_cm=34` 확인 → 입양자 계정 로그인 → 수령/기부 선택 → 기부 → 인증서에
+"☀️ 한여름에 완성 · 34cm" + "🐣 2026. 08. 26 · 23:23:26" + 손그림 나무 폴백까지 스크린샷 검증
+(검증 후 데모 묘목 #1은 growing 상태로 원복). 사진 첨부 시 실제 Gemini 이미지 변환 성공 사례는
+diary와 마찬가지로 미확인(쿼터/과금) — 코드·폴백 경로만 백엔드 테스트(mock)로 커버.
 
 ### 완성 묘목 수령/기부 선택
 `Seedling.pickup_or_donate`(`PickupOrDonate` TextChoices: `pickup`/`donate`)와 `donate_type`
@@ -1017,7 +1076,8 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   있습니다. accounts(회원가입·로그인·로그아웃·프로필 조회/수정·회원탈퇴, Android는 FCM 토큰 등록도
   함께), seedlings(`GET /api/seedlings/` 목록
   조회, `POST /api/seedlings/` 입양(mock 결제 후 생성, 재배자 자동 배정), `PATCH /api/seedlings/{id}/
-  complete/` 완성 신고), diary(`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회,
+  complete/` 완성 신고 — 최종 키 입력 + 최종 사진(선택)→Gemini 일러스트, 위 "묘목 완성 신고" 참고),
+  diary(`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회,
   `DELETE /api/diary/entry/{id}/` 재배자 본인 일지 삭제 — 완료된 묘목의 일지는 400으로 차단),
   vision(`POST /api/vision/analyze/`, 일지 사진 업로드 후 자동 분석), sensor
   (`POST /api/sensor/data/` 저장, `GET /api/sensor/anomaly/{seedling_id}/` 이력 조회),
@@ -1031,9 +1091,12 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   흐름과, 데모 계정이 아닌 새 테스트 계정으로 회원탈퇴 후 같은 계정으로 재로그인이 실제로 거부되는
   것까지 확인 — 데모 계정(`adopter@demo.com` 등)은 탈퇴 검증에 쓰지 않아 seed 데이터가 그대로
   보존됨; 무화과 입양(결제) 플로우는 로그인 → 입양 → 결제 → 홈 반영 → grower 자동 배정까지
-  실기기(크롬)로 확인됨). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지/환경 점검 작성·묘목
-  입양·수령/기부 선택·마이페이지 프로필(닉네임 조회·수정, `GET`/`PATCH /api/accounts/me/`)이 모두
-  실제 데이터를 씀. 케어 게이지 3종(물주기/영양제
+  실기기(크롬)로 확인됨; 묘목 완성 신고는 재배자가 키(34cm) 입력 후 신고 → 스낵바에 계절 문구
+  ("한여름에 완성됐어요 ☀️") + 백엔드 `status=completed, height_cm=34` → 입양자가 기부 선택 시
+  인증서에 "☀️ 한여름에 완성 · 34cm" + "🐣 탄생 시각"까지 Playwright 헤드리스로 왕복 확인,
+  검증 후 데모 묘목 #1은 growing으로 원복). 재배자 대시보드·입양자 홈·성장 타임라인·재배자 일지/
+  환경 점검 작성·묘목 입양·완성 신고(키·사진)·수령/기부 선택·마이페이지 프로필(닉네임 조회·수정,
+  `GET`/`PATCH /api/accounts/me/`)이 모두 실제 데이터를 씀. 케어 게이지 3종(물주기/영양제
   2종은 `CareStorage`로 로컬 영속화, 햇빛은 완료 개념이 없어 제외)은 계획서상 "실제
   재배와 분리된 미션형 연출"이라는 의도적 설계라 서버에는 연동하지 않음(위 "케어 화면" 문단 참고).
   물주기/영양제/돼지먹이 횟수제 전환(`CareInventoryStorage`), 나무 방치 상태(`TreeStatus`), 돼지

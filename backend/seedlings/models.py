@@ -35,6 +35,18 @@ class Seedling(models.Model):
     )
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    # 완성 신고 시 재배자가 직접 입력하는 최종 수고(키, cm). 이 필드 도입 이전에 완료된
+    # 묘목에는 값이 없으므로(마이그레이션으로 소급 불가) null=True, blank=True로 둔다 —
+    # 새 완성 신고에서는 SeedlingCompleteSerializer가 required로 강제한다.
+    height_cm = models.PositiveSmallIntegerField(null=True, blank=True)
+    # 완성 신고 시 재배자가 올리는 최종 사진과, 그것을 Gemini로 변환한 동화풍 일러스트.
+    # diary.Diary의 photo/illustration과 동일한 패턴(변환 실패/미설정 시 illustration만 비어 있음).
+    final_photo = models.ImageField(
+        upload_to='seedlings/final_photos/', null=True, blank=True,
+    )
+    final_illustration = models.ImageField(
+        upload_to='seedlings/final_illustrations/', null=True, blank=True,
+    )
     pickup_or_donate = models.CharField(
         max_length=10,
         choices=PickupOrDonate.choices,

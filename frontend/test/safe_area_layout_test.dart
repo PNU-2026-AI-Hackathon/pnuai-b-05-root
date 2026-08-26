@@ -70,7 +70,7 @@ void main() {
     expect(buttonBottom, lessThanOrEqualTo(screenHeight(tester) - navBarInset));
   });
 
-  testWidgets('GrowerCompleteScreen: SafeArea로 감싸지고 완성 신고 버튼이 하단 인셋 위에 있다', (
+  testWidgets('GrowerCompleteScreen: SafeArea로 감싸지고 스크롤 끝의 완성 신고 버튼이 하단 인셋 위에 있다', (
     tester,
   ) async {
     await pumpScreen(
@@ -85,6 +85,14 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expectBodySafeArea(tester);
+    // 키 입력 필드가 생겨 body가 스크롤 구조로 바뀌었다(grower_diary_write와 동일).
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('완성 신고하기 🎉'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     final buttonBottom = tester.getRect(find.text('완성 신고하기 🎉')).bottom;
     expect(buttonBottom, lessThanOrEqualTo(screenHeight(tester) - navBarInset));
   });
