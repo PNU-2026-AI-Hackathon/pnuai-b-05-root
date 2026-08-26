@@ -80,6 +80,38 @@ class SeedlingListCreateViewTests(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['adopter'], self.adopter.pk)
 
+    def test_grower_list_includes_adopter_account_state(self):
+        """재배자 목록 응답에 입양자 활성 상태/닉네임이 포함되고, 탈퇴 시에도 묘목은
+        그대로 남되 adopter_is_active만 False가 된다(diary의 growth_stage_label 테스트 패턴)."""
+        self.adopter.nickname = '단풍'
+        self.adopter.save(update_fields=['nickname'])
+        Seedling.objects.create(adopter=self.adopter, grower=self.grower)
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertIs(response.data[0]['adopter_is_active'], True)
+        self.assertEqual(response.data[0]['adopter_nickname'], '단풍')
+
+        self.adopter.is_active = False
+        self.adopter.save(update_fields=['is_active'])
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(len(response.data), 1)
+        self.assertIs(response.data[0]['adopter_is_active'], False)
+
+    def test_adopter_nickname_is_null_when_unset(self):
+        Seedling.objects.create(adopter=self.other_adopter, grower=self.grower)
+        self.client.force_authenticate(user=self.grower)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data[0]['adopter_nickname'])
+
 
 class SeedlingDetailViewTests(APITestCase):
     def setUp(self):
