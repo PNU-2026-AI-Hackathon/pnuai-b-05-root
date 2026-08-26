@@ -353,10 +353,11 @@ class _HomeFetchResult {
   final _GrowthStageState growthStageState;
 }
 
-/// 마지막 케어 시각을 홈 화면 문구로 변환한다. 기록이 없으면(신규 계정 등) 별도 안내를,
-/// 있으면 오늘/어제/N일 전으로 표시한다.
-String formatLastCare(DateTime? lastCompleted) {
-  if (lastCompleted == null) return '아직 케어 기록이 없어요';
+/// 마지막 케어 시각을 홈 화면 문구로 변환한다. 기록이 있으면 오늘/어제/N일 전으로
+/// 표시하고, 기록이 없으면(신규 계정 등) null을 반환한다 — 호출부가 그 경우 문구
+/// 줄(Text 위젯) 자체를 렌더하지 않아 카드에 빈 줄이 남지 않게 한다.
+String? formatLastCare(DateTime? lastCompleted) {
+  if (lastCompleted == null) return null;
   final days = DateTime.now().difference(lastCompleted).inDays;
   if (days == 0) return '마지막 케어: 오늘';
   if (days == 1) return '마지막 케어: 어제';
@@ -422,11 +423,19 @@ class _SeedlingHome extends StatelessWidget {
   final bool exitDirectionLeft;
   final VoidCallback onPigExitAnimationEnd;
 
+  /// 나무를 페인트 단계에서 위로 끌어올리는 양 = 화면 높이 × 이 비율. 기준 화면
+  /// 높이 914px에서 기존 고정값 -50px과 같아지도록 역산했다(50 / 914 ≈ 0.055).
+  /// 아래 Column의 `Spacer()`가 나무를 화면 하단(흙)에 붙인 뒤, 이 lift가 줄기
+  /// 밑동이 흙에 박히는 깊이를 결정한다 — 너무 깊으면 이 값만 키우면 된다.
+  static const double _treeLiftRatio = 0.055;
+
   @override
   Widget build(BuildContext context) {
     final isGrowing = seedling.status == SeedlingStatus.growing;
     final daysTogether =
         DateTime.now().difference(seedling.startedAt).inDays + 1;
+    // 케어 기록이 없으면 null — 그 경우 카드에서 "마지막 케어" 줄을 통째로 뺀다.
+    final lastCareText = formatLastCare(lastCareCompletedAt);
 
     return Stack(
       // 기본값 topStart(좌상단)면 아래 non-positioned Column이 자기 콘텐츠 폭(가장 넓은
@@ -505,22 +514,19 @@ class _SeedlingHome extends StatelessWidget {
                       color: AppColors.textMuted,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    formatLastCare(lastCareCompletedAt),
-                    style: AppTextStyles.caption(),
-                  ),
+                  if (lastCareText != null) ...[
+                    const SizedBox(height: 2),
+                    Text(lastCareText, style: AppTextStyles.caption()),
+                  ],
                 ],
               ),
             ),
             const SizedBox(height: 12),
             // Visibility(maintainSize: true)로 배너가 없는 healthy 상태에서도
-            // 항상 같은 높이를 예약한다 — 예전엔 if/else로 healthy일 때만 배너
-            // Container 자체를 렌더링하지 않아 그만큼 높이가 줄어, 아래 나무가
-            // 상태에 따라 다른 Y 위치에 그려지는 문제가 있었다(로컬 Stack으로
-            // 나무를 감싼 것과는 무관 — 그 Stack은 나무 하나만으로 크기가
-            // 정해져 자체적으로는 위치를 바꾸지 않는다). 나무 위치를 항상
-            // healthy 상태 기준으로 고정하기 위한 조치.
+            // 항상 같은 높이를 예약한다 — 아래 나무는 Spacer 덕분에 화면 하단(흙)
+            // 기준으로 배치되므로 배너 유무가 나무 Y를 바꾸진 않지만, 배너가
+            // 나타났다 사라질 때 그 위 카드와 아래 Spacer가 세로로 출렁이지 않도록
+            // 배너 자리 높이만 항상 고정해 둔다.
             Visibility(
               visible: treeStatus != TreeStatus.healthy,
               maintainSize: true,
@@ -546,7 +552,11 @@ class _SeedlingHome extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            // 빈 공간(슬랙)을 배너와 나무 '사이'에 둬서 나무 밑동이 항상 화면
+            // 하단(=흙 배경)에 붙게 한다. 예전엔 이 Spacer가 나무 '뒤'에 있어
+            // 나무가 화면 상단 기준 고정 거리에 못박혀, 화면이 커질수록 흙에서
+            // 멀리 떠 보이고 작은 화면에선 Column이 body를 넘겨 하단이 잘렸다.
+            const Spacer(),
             Stack(
               // 로컬 Stack의 폭(380)은 화면보다 좁아 기본 Clip.hardEdge를 쓰면
               // 돼지의 등장/퇴장 슬라이드(화면 밖 → 중앙, screenWidth 기준)가 이
@@ -556,12 +566,16 @@ class _SeedlingHome extends StatelessWidget {
               children: [
                 // Transform.translate는 페인트 단계에서만 그림을 옮길 뿐 레이아웃
                 // 크기/위치는 그대로라서, 이 Stack의 크기(=나무의 원래 380×482.6
-                // 레이아웃 박스)와 그 아래 SizedBox(8)/Spacer 등 Column 흐름에는
-                // 전혀 영향이 없다 — 나무만 시각적으로 50px 위로 옮겨지고, 아래
+                // 레이아웃 박스)와 그 아래 SizedBox(8) 등 Column 흐름에는 전혀
+                // 영향이 없다 — 나무만 시각적으로 화면 높이의 약 5.5%(기준 화면
+                // 914px에서 ≈50px)만큼 위로 옮겨져 밑동이 흙에 알맞게 박히고, 아래
                 // Positioned 돼지는 여전히 이 Stack의 원래 박스 기준으로 배치되어
                 // 제자리(밑동 밴드)에 남는다.
                 Transform.translate(
-                  offset: const Offset(0, -50),
+                  offset: Offset(
+                    0,
+                    -MediaQuery.sizeOf(context).height * _treeLiftRatio,
+                  ),
                   child: _GrowAnimatedTree(
                     width: 380,
                     status: treeStatus,
@@ -599,7 +613,6 @@ class _SeedlingHome extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            const Spacer(),
           ],
         ),
         Positioned(
