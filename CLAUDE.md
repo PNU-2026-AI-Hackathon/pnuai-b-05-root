@@ -560,7 +560,18 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   퇴장시킵니다 — `AnimatedSlide.onEnd`는 최초 mount 시에도 한 번 불리므로, 실제로 퇴장 중일 때만
   (`_isPigExiting == true`) 상태를 리셋하는 가드가 있습니다. 홈 화면 우측 케어 버튼 3개
   (`CareActionButton`)에는 물주기/영양제 보유 개수 배지가 붙어 `_fetchCareState()`가 조회한
-  `CareInventoryStorage` 값을 표시합니다(햇빛은 소비 개념이 없어 배지 없음).
+  `CareInventoryStorage` 값을 표시합니다(햇빛은 소비 개념이 없어 배지 없음). 홈 화면의
+  나무 일러스트와 화면 하단 흙 배경(`shared/widgets/ground_illustration.dart`의
+  `GroundIllustration`)은 이제 화면 높이 비율 기반입니다 — 예전엔 흙 높이/곡선(160/50)과
+  나무를 올리는 `Transform.translate` 오프셋(-50)이 고정 픽셀이라 실기기 화면 크기에 따라
+  나무와 흙의 상대 위치가 어긋났습니다. `GroundIllustration.height`는 `MediaQuery.sizeOf(
+  context).height * 0.175`(곡선은 그 높이의 0.3125), 나무 lift는 `screenH * _treeLiftRatio`
+  (0.055)로, 화면 높이 914(저장소 `safe_area_layout_test.dart` 픽스처)에서 기존 값이 그대로
+  재현되도록 역산한 비율입니다. `_SeedlingHome`의 `Column`도 `Spacer()`를 나무 '뒤'가 아니라
+  배너와 나무 '사이'로 옮겨, 나무 밑동이 화면 상단 기준 고정 거리가 아니라 항상 화면
+  하단(흙)에 붙도록 했습니다(겹침량이 화면 크기와 무관하게 일정). 다만 사용 가능 높이가
+  ~675px 미만인 초소형 기기에서는 나무 박스(≈482px)+카드+배너가 body를 넘겨 나무 상단이
+  여전히 잘립니다 — body 스크롤화는 이번 범위 밖입니다.
 - `features/grower/presentation/grower_shell.dart`는 홈(`GrowerShelfScreen`)/일지
   (`GrowerDiaryScreen`)/환경점검(`GrowerSensorScreen`)/마이(`GrowerMypageScreen`) 4탭
   `StatefulWidget`입니다. `body: IndexedStack(index: _index, children: _screens)`로 네 화면을 전부
