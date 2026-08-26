@@ -64,10 +64,18 @@ class SensorRepository {
   }
 
   /// 해당 묘목의 이상 감지 이력(`is_anomaly=True`인 기록만). 최신순으로 정렬해 반환한다.
-  Future<List<SensorReading>> fetchAnomalyHistory(int seedlingId) async {
+  ///
+  /// [days]를 주면 `?days=N`으로 최근 N일 이내만 조회한다(백엔드가 필터). null이면
+  /// 전체 기간. 백엔드는 유효하지 않은 값도 조용히 전체로 폴백하지만, 프론트에서는
+  /// 7 / 30 / null만 넘긴다.
+  Future<List<SensorReading>> fetchAnomalyHistory(
+    int seedlingId, {
+    int? days,
+  }) async {
     final accessToken = await _requireAccessToken();
+    final query = days == null ? '' : '?days=$days';
     final response = await _apiClient.get(
-      '/api/sensor/anomaly/$seedlingId/',
+      '/api/sensor/anomaly/$seedlingId/$query',
       accessToken: accessToken,
     );
     final readings = (response as List<dynamic>)

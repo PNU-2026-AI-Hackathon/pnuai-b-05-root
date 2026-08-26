@@ -34,7 +34,9 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
   Gemini 일러스트 변환)), diary(`POST /api/diary/` 작성 +
   `GET /api/diary/{seedling_id}/` 조회 + `DELETE /api/diary/entry/{id}/` 재배자 본인 일지 삭제 —
   완료된 묘목의 일지는 삭제 불가, 사진은 `image_picker`로 선택해 multipart 업로드), sensor
-  (`POST /api/sensor/data/` 저장 + `GET /api/sensor/anomaly/{seedling_id}/` 이상 이력 조회), vision
+  (`POST /api/sensor/data/` 저장 + `GET /api/sensor/anomaly/{seedling_id}/?days=N` 이상 이력 조회
+  — 재배자 마이 탭 "환경 이상 감지 요약"이 기간 필터(7/30/전체)와 `fl_chart` 가로 막대그래프로
+  소비), vision
   (`POST /api/vision/analyze/`, 재배자가 일지 사진 업로드 시 백그라운드로 자동 호출), chatbot
   (`POST /api/chatbot/ask/`)는 실제 백엔드와 연동됩니다. 게임 탭 4종(돼지 풍선 터뜨리기/무화과 퀴즈/
   해충 잡기/물주기 타이밍)은 모두 실제로 플레이 가능하며, 획득 아이템은 `InventoryStorage`
@@ -148,7 +150,12 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 `seedling.grower_id`)를 직접 비교해 `PermissionDenied`를 raise하는 방식입니다.
 예시 (`sensor/views.py`):
 - `SensorDataCreateView` — `role == GROWER`이고 `seedling.grower_id == request.user.pk`인 경우에만 생성 허용
-- `SensorAnomalyListView` — 해당 묘목의 adopter 또는 grower만 조회 허용
+- `SensorAnomalyListView` — 해당 묘목의 adopter 또는 grower만 조회 허용. `?days=N` 쿼리
+  파라미터를 받아 `recorded_at__gte=now - timedelta(days=N)`로 최근 N일만 필터한다(모듈 함수
+  `_parse_days`가 파싱, 없거나 유효하지 않으면 — 음수·0·문자열·3650 초과 — `None`을 돌려줘
+  전체 기간 반환). 프론트가 7/30/없음만 보내는 닫힌 구조라 잘못된 값에 400을 내지 않고 이
+  프로젝트 전반의 "게이트 체크 → 폴백" 기조를 따랐다. 이 프로젝트에서 쿼리 파라미터를 읽는
+  유일한 뷰다(django-filter 미설치, `get_queryset`에서 `self.request.query_params` 직접 읽음).
 
 `diary`, `vision` 등 새 앱의 view를 구현할 때도 `Seedling.adopter`/`Seedling.grower`를 기준으로
 동일한 명시적 체크 패턴을 따라야 합니다 (AGENTS.md의 API 작업 순서: models → serializers → views → urls).
@@ -872,9 +879,21 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   않음) + "담당 묘목 N그루"(`GrowerRepository.fetchSeedlings().length`)를 보여줍니다. 그리드 4개는
   📅 재배 활동 캘린더(`grower_activity_calendar_screen.dart`의 `GrowerActivityCalendarScreen`으로
   push), 🆘 도움 요청하기(바텀시트로 전화/문자 연결), 📊 환경 이상 감지 요약
-  (`grower_anomaly_summary_screen.dart`, 신규 — `GrowerRepository.fetchSeedlings()`와
-  `SensorRepository.fetchAnomalyHistory()`를 `Future.wait()`로 병렬 조회해 담당 묘목별 이상 건수를
-  `GaugeBar`로 시각화하고 최근 발생일을 보여줌, 로딩/에러/빈 목록/데이터 4상태 분기), ❓ FAQ
+  (`grower_anomaly_summary_screen.dart` — `GrowerRepository.fetchSeedlings()`와
+  `SensorRepository.fetchAnomalyHistory(id, days:)`를 `Future.wait()`로 병렬 조회해 담당 묘목별
+  이상 건수를 **`fl_chart`(`^1.2.0`, 이 프로젝트의 유일한 차트 라이브러리) 가로 막대그래프**로
+  보여줌. 상단에 기간 필터 칩 3개(최근 7일/최근 30일/전체, 기본 "전체" — `_AnomalyPeriod` enum의
+  `days`가 7/30/null을 백엔드 `?days=`로 넘김)가 있고, 칩을 바꿀 때마다 `_load()`가 담당 묘목
+  전체를 다시 병렬 조회한다(연타 대비 `_loadToken` 가드, 재조회 중에는 기존 차트 유지 + 얇은
+  `LinearProgressIndicator`). 차트는 세로 막대 `BarChart`를 `rotationQuarterTurns: 1`로 90도 돌린
+  것(fl_chart 공식 Horizontal Bar Chart 방식, 축 라벨은 `SideTitleWidget`이 회전 자동 보정) —
+  Y축(회전 후 왼쪽)=`묘목 #{id}`, X축(막대 길이)=이상 건수, 0건은 회색(`textMuted`)·1건 이상은
+  `errorRed`, 뒤에 `maxY` 길이의 회색 트랙(`backDrawRodData`)을 깔아 "회색 트랙+채움" 느낌을 유지.
+  건수·최근 발생일은 막대 탭 시 툴팁(`BarTouchTooltipData`, `getTooltipColor`)으로만 보여준다
+  (값축·상시 숫자 라벨은 없음 — 화면 톤에 맞춰 최소화). 차트 높이는 `max(168, 묘목수*48)`이라
+  묘목이 많으면 바깥 `SingleChildScrollView`로 스크롤된다(차트 내부 스크롤 X — 회전 좌표계에서
+  제스처 충돌). 로딩/에러/빈 목록(담당 묘목 0)/데이터 4상태 분기. 독립 push 화면이라
+  `RevalidatableState` 대신 일반 `State`), ❓ FAQ
   (`grower_faq_screen.dart`, 신규 — API 호출 없이 정적 데이터 7문항을 `ExpansionTile` 아코디언으로
   나열)입니다. 재배 활동 캘린더 화면은 묘목별 일지 화면(`grower_diary_screen.dart`)이 새로 작성할
   때만 쓰여서 과거 작성 이력을 전체적으로 돌아볼 방법이 없었던 것을 보완한 월별 달력 화면입니다.
@@ -1099,7 +1118,8 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   diary(`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회,
   `DELETE /api/diary/entry/{id}/` 재배자 본인 일지 삭제 — 완료된 묘목의 일지는 400으로 차단),
   vision(`POST /api/vision/analyze/`, 일지 사진 업로드 후 자동 분석), sensor
-  (`POST /api/sensor/data/` 저장, `GET /api/sensor/anomaly/{seedling_id}/` 이력 조회),
+  (`POST /api/sensor/data/` 저장, `GET /api/sensor/anomaly/{seedling_id}/?days=N` 이력 조회 —
+  기간 필터는 재배자 마이 탭 "환경 이상 감지 요약"이 `fl_chart` 가로 막대그래프로 소비),
   chatbot(`POST /api/chatbot/ask/`)는 모두 JWT 인증으로 실제 백엔드와 연동되어 동작 확인됨(서로 다른
   재배자 계정 2개로 대시보드 목록·통계·완성 신고 자동 새로고침 테스트; 재배자로 일지를 실제로 작성한
   뒤 같은 묘목의 입양자 계정으로 로그인해 성장 타임라인에 그 일지가 실제로 나타나는 end-to-end
@@ -1159,3 +1179,13 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   내는 것을 발견함(`Unknown column 'diary_diary.growth_stage'`) — 이번 작업과 무관한 기존 이슈라
   손대지 않았으며, `backend/`에서 `python manage.py migrate`만 실행하면 해결됨(다음 세션이 이
   화면들에서 원인 불명의 500/빈 목록을 마주치면 먼저 확인할 것).
+- 재배자 마이 탭 "환경 이상 감지 요약"을 손으로 그린 막대(회색 트랙 카드 나열)에서 `fl_chart`
+  (`^1.2.0`, pubspec에 신규 추가 — 이 프로젝트 첫 차트 라이브러리) 가로 막대그래프로 전환 +
+  상단 기간 필터 칩(최근 7일/최근 30일/전체) 추가 완료(위 `grower_anomaly_summary_screen.dart`
+  문단 참고). 백엔드는 `SensorAnomalyListView.get_queryset()`에 `?days=N` 필터를 추가
+  (`_parse_days` 모듈 함수, 유효하지 않으면 전체 폴백 — 위 "권한 검사 패턴" 참고). `python
+  manage.py check` + `python manage.py test sensor`(신규 `SensorAnomalyListDateFilterTests` 5개
+  포함 12개) 통과, `flutter analyze` 0 이슈, `flutter test`(56개) 통과. `flutter build web` +
+  Playwright 헤드리스로 데모 재배자(`grower@demo.com`) 로그인 → 마이 → 환경 이상 감지 요약에서
+  전체(4/1/2/0/0건) → 최근 7일(2/1/1/0/0건, 필터 실제 반영 확인) → 최근 30일 → 전체 왕복 +
+  막대 탭 시 "4건 / 최근 8월 24일" 툴팁까지 스크린샷 검증. DESIGN.md 엔드포인트 표도 갱신.

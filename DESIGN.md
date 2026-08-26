@@ -39,7 +39,7 @@ Pig.Fig. 서비스 플로우 및 API 설계 문서입니다.
 | `/api/diary/{seedling_id}/` | GET | 특정 묘목의 일지 목록 조회 |
 | `/api/diary/entry/{id}/` | DELETE | 재배자 본인 일지 삭제 (완료된 묘목의 일지는 불가) |
 | `/api/sensor/data/` | POST | 센서 데이터 수집 (MQTT 연동) |
-| `/api/sensor/anomaly/{seedling_id}/` | GET | 특정 묘목의 이상치 이력 조회 |
+| `/api/sensor/anomaly/{seedling_id}/` | GET | 특정 묘목의 이상치 이력 조회 (`?days=7`·`?days=30`으로 최근 N일 필터, 없거나 유효하지 않으면 전체 기간) |
 | `/api/vision/analyze/` | POST | YOLOv8 이미지 분석 요청 |
 | `/api/chatbot/ask/` | POST | LangChain RAG + Gemini 챗봇 질의 |
 | `/api/notifications/register-token/` | POST | FCM 디바이스 토큰 등록 |
