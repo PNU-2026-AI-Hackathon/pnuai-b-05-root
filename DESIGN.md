@@ -37,6 +37,7 @@ Pig.Fig. 서비스 플로우 및 API 설계 문서입니다.
 | `/api/seedlings/{id}/pickup-donate/` | PATCH | 입양자 수령/기부 선택 (완성된 묘목만, 재배자에게 FCM 알림 발송) |
 | `/api/diary/` | POST | 재배 일지 작성 |
 | `/api/diary/{seedling_id}/` | GET | 특정 묘목의 일지 목록 조회 |
+| `/api/diary/entry/{id}/` | DELETE | 재배자 본인 일지 삭제 (완료된 묘목의 일지는 불가) |
 | `/api/sensor/data/` | POST | 센서 데이터 수집 (MQTT 연동) |
 | `/api/sensor/anomaly/{seedling_id}/` | GET | 특정 묘목의 이상치 이력 조회 |
 | `/api/vision/analyze/` | POST | YOLOv8 이미지 분석 요청 |

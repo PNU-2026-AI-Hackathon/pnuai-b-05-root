@@ -31,7 +31,8 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
   프로필 조회·닉네임 수정·회원탈퇴, Android는 로그인 성공 시 FCM 토큰도 함께 등록), seedlings
   (`GET /api/seedlings/` 목록 조회 + `POST /api/seedlings/` 입양(결제 후 생성, 재배자 자동 배정) +
   `PATCH /api/seedlings/{id}/complete/` 완성 신고), diary(`POST /api/diary/` 작성 +
-  `GET /api/diary/{seedling_id}/` 조회, 사진은 `image_picker`로 선택해 multipart 업로드), sensor
+  `GET /api/diary/{seedling_id}/` 조회 + `DELETE /api/diary/entry/{id}/` 재배자 본인 일지 삭제 —
+  완료된 묘목의 일지는 삭제 불가, 사진은 `image_picker`로 선택해 multipart 업로드), sensor
   (`POST /api/sensor/data/` 저장 + `GET /api/sensor/anomaly/{seedling_id}/` 이상 이력 조회), vision
   (`POST /api/vision/analyze/`, 재배자가 일지 사진 업로드 시 백그라운드로 자동 호출), chatbot
   (`POST /api/chatbot/ask/`)는 실제 백엔드와 연동됩니다. 게임 탭 4종(돼지 풍선 터뜨리기/무화과 퀴즈/
@@ -136,6 +137,16 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://10.0.2.2:8000
 
 `diary`, `vision` 등 새 앱의 view를 구현할 때도 `Seedling.adopter`/`Seedling.grower`를 기준으로
 동일한 명시적 체크 패턴을 따라야 합니다 (AGENTS.md의 API 작업 순서: models → serializers → views → urls).
+
+`diary/views.py`의 `DiaryDestroyView`(`DELETE /api/diary/entry/{id}/`)도 같은 방식입니다 —
+`DestroyAPIView` 제네릭을 쓰되 `perform_destroy(instance)` 안에서 `DiaryCreateView.perform_create()`와
+대칭으로 `user.role != GROWER` 또는 `instance.grower_id != user.pk`면 `PermissionDenied`, 추가로
+`instance.seedling.status == COMPLETED`면 `ValidationError`(400)로 막습니다 — 완료된 묘목의 일지는
+입양자의 성장 타임라인에 확정 아카이브로 노출됐을 수 있어(회원탈퇴가 하드 삭제 대신 소프트 삭제를
+쓰는 것과 같은 취지) 삭제를 허용하지 않습니다(`SeedlingPickupDonateView`의 status 가드와 동일한
+형태, 조건만 반대). URL을 `entry/<int:pk>/` 아래에 둔 이유: `/api/diary/<int:seedling_id>/`(목록
+조회)와 `path()` 패턴이 겹치는데 Django는 이를 HTTP 메서드로 구분하지 못하고, 여기 정수는 seedling
+id가 아니라 일지 id라 같은 URL에 얹으면 의미가 헷갈리기 때문입니다.
 
 ### 센서 데이터 파이프라인 (MQTT/REST → Prophet 이상 감지 → DB)
 센서 데이터가 시스템에 들어오는 경로는 두 가지이며, 둘 다 동일한 이상 감지 로직으로 수렴합니다.
@@ -847,6 +858,14 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   "입양자에게 전달하기"는 `features/grower/data/diary_repository.dart`의 `createDiary()`로
   `POST /api/diary/`를 호출합니다 — 사진이 있으면 `multipart/form-data`(`ApiClient.postMultipart()`,
   신규 추가), 없으면 텍스트 필드만 보냅니다. 성공 시 폼을 초기화하고 스낵바를 띄웁니다.
+- `grower_diary_list_screen.dart`의 일지 카드(`_DiaryCard`)에는 삭제 아이콘(`Icons.delete_outline`)이
+  있어, 탭하면 `account_actions.dart`의 `confirmDeleteAccount()`와 같은 톤의 확인 다이얼로그를 띄운
+  뒤 확인한 경우에만 `DiaryRepository.deleteDiary()`(`DELETE /api/diary/entry/{id}/`, `ApiClient.
+  delete()` 재사용)를 호출합니다. 성공하면 `_entries`에서 즉시 제거 + "일지를 삭제했어요 🗑️" 스낵바,
+  실패하면 서버 메시지를 스낵바로 안내합니다(`grower_diary_write_screen.dart` `_submit()`의 전송
+  실패 스낵바와 같은 방식). 완료된 묘목의 일지는 백엔드가 400으로 막으므로 `GrowerDiaryListArgs.
+  isCompleted`(호출부 `grower_diary_tab_screen.dart`/`grower_seedling_analysis_screen.dart` 두 곳이
+  `SeedlingStatus`에서 채워 전달)가 true면 삭제 아이콘 자체를 렌더하지 않습니다.
 - `grower_sensor_screen.dart`도 `grower_diary_screen.dart`와 동일한 묘목 선택 칩 패턴을 씁니다
   (`GrowerRepository.fetchSeedlings()` 재사용). "기록 저장하기"는 `features/grower/data/
   sensor_repository.dart`의 `createSensorData()`로 `POST /api/sensor/data/`를 호출하고, 응답의
@@ -919,7 +938,8 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   있습니다. accounts(회원가입·로그인·로그아웃·프로필 조회/수정·회원탈퇴, Android는 FCM 토큰 등록도
   함께), seedlings(`GET /api/seedlings/` 목록
   조회, `POST /api/seedlings/` 입양(mock 결제 후 생성, 재배자 자동 배정), `PATCH /api/seedlings/{id}/
-  complete/` 완성 신고), diary(`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회),
+  complete/` 완성 신고), diary(`POST /api/diary/` 작성, `GET /api/diary/{seedling_id}/` 조회,
+  `DELETE /api/diary/entry/{id}/` 재배자 본인 일지 삭제 — 완료된 묘목의 일지는 400으로 차단),
   vision(`POST /api/vision/analyze/`, 일지 사진 업로드 후 자동 분석), sensor
   (`POST /api/sensor/data/` 저장, `GET /api/sensor/anomaly/{seedling_id}/` 이력 조회),
   chatbot(`POST /api/chatbot/ask/`)는 모두 JWT 인증으로 실제 백엔드와 연동되어 동작 확인됨(서로 다른
