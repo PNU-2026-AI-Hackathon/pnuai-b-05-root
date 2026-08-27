@@ -18,18 +18,12 @@ const _pickupLat = 35.2304;
 const _pickupLng = 129.0840;
 const _pickupAddress = '부산대학교 IT관';
 
-/// 키 없이 실제 PNG를 반환하는 Wikimedia Maps 정적 이미지 엔드포인트. Google Static Maps API와
-/// 달리 URL만으로는 마커를 찍을 수 없어, 중심좌표를 픽업 장소로 고정하고 이미지 위에 Flutter가
-/// 직접 핀을 그려 겹친다(`_PickupLocationMap` 참고). Wikimedia 정책상 정적 이미지의 제3자
-/// 임베드는 승인 없이 허용되나 OpenStreetMap 저작자 표시가 필요하다. 자원봉사 기반 서비스라
-/// 공식 SLA는 없으므로, 장기적으로 불안정해지면 다른 무료 정적 지도 서비스로 교체할 수 있다.
-String _staticMapUrl(
-  double lat,
-  double lng, {
-  int zoom = 17,
-  int width = 640,
-  int height = 320,
-}) => 'https://maps.wikimedia.org/img/osm-intl,$zoom,$lat,$lng,${width}x$height.png';
+/// 픽업 장소 정적 지도 이미지. 처음엔 Wikimedia Maps 정적 이미지 엔드포인트를 매 요청마다
+/// 네트워크로 불러왔으나, 국내 일부 통신망(LTE)에서 위키미디어 도메인 접속이 불안정해 지도가
+/// 아예 뜨지 않는 사례가 실기기에서 확인됐다. 픽업 장소는 고정 정보라 바뀔 일이 없으므로,
+/// 같은 URL(zoom 17, 640x320)로 한 번 받아온 이미지를 앱에 내장 asset으로 번들링해 네트워크
+/// 의존을 없앴다(`_PickupLocationMap` 참고). 지도 위 핀은 여전히 Flutter가 직접 그려 겹친다.
+const _staticMapAsset = 'assets/images/pickup_location_map.png';
 
 final _googleMapsUrl =
     'https://www.google.com/maps/search/?api=1&query=$_pickupLat,$_pickupLng';
@@ -485,21 +479,7 @@ class _PickupLocationMap extends StatelessWidget {
                   alignment: Alignment.center,
                   fit: StackFit.expand,
                   children: [
-                    Image.network(
-                      _staticMapUrl(_pickupLat, _pickupLng),
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: const Color(0xFFF7F5EC),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '지도를 불러올 수 없어요',
-                          style: AppTextStyles.body(
-                            fontSize: 13,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                    ),
+                    Image.asset(_staticMapAsset, fit: BoxFit.cover),
                     // 핀 끝(뾰족한 하단 중앙)이 이미지 정중앙(=픽업 장소 좌표)을 가리키도록
                     // 아이콘 바운딩박스를 위로 절반만큼 보정한다.
                     Transform.translate(
