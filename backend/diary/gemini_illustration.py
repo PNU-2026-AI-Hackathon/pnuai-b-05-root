@@ -36,7 +36,8 @@ def convert_to_illustration(photo_path):
         return None
     try:
         return _generate_illustration(photo_path)
-    except Exception:
+    except Exception as e:
+        print(f'[Diary] 일러스트 변환 실패, 원본 사진으로 폴백: {e!r}')
         return None
 
 
@@ -63,4 +64,14 @@ def _generate_illustration(photo_path):
     for part in response.candidates[0].content.parts:
         if part.inline_data is not None:
             return part.inline_data.data
+
+    # 예외 없이 응답이 왔지만 이미지 part가 없는 경우(세이프티 필터링, 텍스트만 응답 등) —
+    # 호출 자체는 성공이라 convert_to_illustration()의 except 블록을 타지 않으므로 여기서
+    # 직접 로그를 남긴다. 그렇지 않으면 원인 파악 없이 조용히 원본 사진만 저장된다.
+    finish_reason = getattr(response.candidates[0], 'finish_reason', None)
+    text_parts = [p.text for p in response.candidates[0].content.parts if p.text]
+    print(
+        f'[Diary] 일러스트 변환 실패, 원본 사진으로 폴백: 응답에 이미지 없음 '
+        f'(finish_reason={finish_reason!r}, text={text_parts!r})'
+    )
     return None
