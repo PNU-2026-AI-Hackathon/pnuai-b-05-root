@@ -261,8 +261,19 @@ API 키가 교체돼, 이제 `chatbot`의 RAG는 `gemini-2.5-flash`로 실제 Ge
 받아옵니다(로컬에서 매뉴얼 질문 1개 + 매뉴얼 밖 질문 4개 curl 왕복으로 확인). 즉 텍스트 모델
 차단은 해제된 상태입니다 — 다만 이번 세션에서 재검증한 건 `chatbot`뿐이고, `sensor/anomaly.py`의
 `gemini_diagnosis`와 아래 이미지 생성(`gemini-2.5-flash-image`)은 별도로 다시 확인하지 않았습니다
-(이미지 모델은 텍스트 모델과 과금·쿼터가 달라 여전히 막혀 있을 수 있음). 강화된 일러스트
-프롬프트가 실제로 더 동화풍에 가까워졌는지는 이미지 생성 성공 사례를 얻은 뒤 재검증이 필요합니다. `growth_timeline_screen.dart`는 `illustrationUrl`이
+(이미지 모델은 텍스트 모델과 과금·쿼터가 달라 여전히 막혀 있을 수 있음). **2026-08-27
+업데이트**: 로컬에서 실제로 재검증했습니다 — `convert_to_illustration()`의 `except` 블록에
+`[Chatbot]`과 동일한 컨벤션으로 `[Diary]` 태그 로그를 추가하고(원인 파악용, 영구 유지),
+`_generate_illustration()`이 예외 없이 성공했는데도 응답에 이미지 part가 없는 경우(세이프티
+필터링 등으로 조용히 `None`이 되는 경로)에도 `finish_reason`/텍스트 파트를 함께 남기는 로그를
+추가했습니다. 그 상태로 실제 로컬 서버에 재배자 계정으로 `POST /api/diary/`(사진 첨부) 3건 +
+`PATCH /api/seedlings/{id}/complete/`(최종 사진 첨부) 1건을 실행한 결과 **4건 모두 실제 Gemini
+호출로 일러스트 생성에 성공**했습니다(`[Diary]` 로그가 한 번도 찍히지 않음 = 실패 없음) — 즉
+로컬 `GEMINI_API_KEY`로는 이 파이프라인이 현재 정상 동작합니다. 검증에 쓴 테스트 데이터(묘목 #2
+완성 상태, 테스트 일지 3건)는 확인 후 원래 상태(재배중, 일지 삭제)로 원복했습니다. 사용자가
+실기기 앱에서 겪은 "계속 원본 사진만 보임" 증상은 로컬에서 재현되지 않아, **배포 환경(Render)의
+`GEMINI_API_KEY`가 이미지 생성 모델까지 커버하는 유효한 키/쿼터인지**가 유력한 원인 후보로
+남아있습니다 — Render 환경변수는 직접 확인할 수 없어 사용자 확인이 필요합니다. `growth_timeline_screen.dart`는 `illustrationUrl`이
 있으면 그것을, 없으면(지금처럼 mock 모드이거나 변환 실패) `photoUrl`을, 둘 다 없으면 기존
 placeholder 아이콘을 보여주도록 `imageUrl = entry.illustrationUrl ?? entry.photoUrl` 한 줄로
 우선순위를 정했습니다.
@@ -558,23 +569,28 @@ enum은 백엔드 문자열 키와 정확히 1:1 대응하도록 `apiValue`/`fro
 처음엔 Google Maps Static API(마커를 `markers=` 쿼리 파라미터로 찍는 방식)로 계획했으나, 이
 프로젝트 어디에도 `GOOGLE_MAPS_API_KEY`가 없어 새로 발급이 필요했고, 사용자가 API 키 없는 방식으로
 전환을 요청했습니다. 처음 제안받은 대안(`staticmap.openstreetmap.de`, StaticMapLite)은 DNS 조회
-자체가 실패해 이미 서비스가 죽은 상태임을 확인했고, 대신 **Wikimedia Maps 정적 이미지
-엔드포인트**(`https://maps.wikimedia.org/img/osm-intl,{zoom},{lat},{lng},{width}x{height}.png`)를
-씁니다 — 키 없이 실제 PNG를 반환하는 것을 확인했고, Wikimedia 정책상 정적 이미지의 제3자 임베드는
-승인 없이 허용되지만 OpenStreetMap 저작자 표시(CC BY-SA)가 필요해 카드 하단에 캡션을 붙였습니다.
-이 서비스도 Wikimedia 재단이 자원봉사 성격으로 운영해 공식 SLA는 없으므로(사전 통보 없이 제한/중단
-가능), 장기적으로 불안정해지면 다른 무료 정적 지도 서비스로 교체할 수 있습니다. 이 엔드포인트는
-Google Static Maps와 달리 URL만으로 마커를 찍는 기능이 없어(마커는 별도 GeoJSON 데이터 저장이
-필요한 구조), 대신 지도 중심좌표를 픽업 장소 좌표로 고정하고 `Stack`으로 이미지 위에 Flutter가
-직접 `Icon(Icons.location_on)`을 겹쳐 그립니다 — 핀의 뾰족한 끝(바운딩박스 중심이 아님)이 이미지
-정중앙을 가리키도록 `Transform.translate`로 위로 절반만큼 보정했습니다(`watering_timing_screen.dart`의
-`_centerLineWidth` 보정과 같은 결). 좌표(위도 35.2304, 경도 129.0840)는 부산대학교 IT관의 공개
-도로 주소(부산광역시 금정구 부산대학로63번길 2)를 OpenStreetMap Nominatim으로 지오코딩한
-근사값이라 도로/캠퍼스 단위 정밀도이며, 건물 단위 정밀 검증은 아직 하지 않았습니다. 지도 탭 시
-열리는 링크는 `https://www.google.com/maps/search/?api=1&query={lat},{lng}` 범용 웹 URL이라
-구글맵 앱이 설치돼 있으면 OS가 자동으로 가로챕니다(커스텀 스킴 불필요) — 기존
-`_launchOrganizationUrl()`(기부처 상세 링크 전용이었음)을 `_launchExternalUrl()`로 일반화해
-재사용합니다.
+자체가 실패해 이미 서비스가 죽은 상태임을 확인했고, 대신 Wikimedia Maps 정적 이미지 엔드포인트
+(`https://maps.wikimedia.org/img/osm-intl,{zoom},{lat},{lng},{width}x{height}.png`)로 매 요청마다
+네트워크에서 지도를 받아오는 방식으로 처음 구현했습니다. **그러나 실기기 LTE(유플러스) 통신망에서
+위키미디어 도메인 접속이 안 되는 것이 실제로 확인**돼(Wi-Fi 헤드리스 테스트에서는 정상 로드),
+국내 일부 통신망에서 접속이 불안정한 것으로 판단해 **로컬 asset 이미지로 전환**했습니다 —
+픽업 장소가 고정 정보라 바뀔 일이 없으므로, 실제 요청 URL(줌 17, `35.2304,129.084`, 640x320)로
+한 번 받아온 PNG를 `frontend/assets/images/pickup_location_map.png`에 커밋해두고
+`Image.asset()`으로 번들링해 네트워크 자체를 없앴습니다(`pubspec.yaml`의 `assets/images/` 폴더
+전체가 이미 asset으로 등록돼 있어 별도 항목 추가는 필요 없었습니다). 네트워크 실패 개념이 없어져
+기존 `errorBuilder`(로드 실패 시 "지도를 불러올 수 없어요" 폴백)는 제거했습니다. 다만 Wikimedia도
+OpenStreetMap 데이터 기반이라 저작자 표시(CC BY-SA) 의무는 asset으로 바뀐 뒤에도 그대로 남아있어
+카드 하단 캡션은 유지했습니다. 지도는 이제 URL만으로 마커를 찍을 수 없던 원래 서비스의 한계가
+그대로 적용되므로(고정 이미지라 애초에 동적 마커가 불가능), 지도 중심좌표를 픽업 장소 좌표로 맞춰
+찍어둔 이미지 위에 `Stack`으로 Flutter가 직접 `Icon(Icons.location_on)`을 겹쳐 그립니다 — 핀의
+뾰족한 끝(바운딩박스 중심이 아님)이 이미지 정중앙을 가리키도록 `Transform.translate`로 위로
+절반만큼 보정했습니다(`watering_timing_screen.dart`의 `_centerLineWidth` 보정과 같은 결). 좌표
+(위도 35.2304, 경도 129.0840)는 부산대학교 IT관의 공개 도로 주소(부산광역시 금정구
+부산대학로63번길 2)를 OpenStreetMap Nominatim으로 지오코딩한 근사값이라 도로/캠퍼스 단위
+정밀도이며, 건물 단위 정밀 검증은 아직 하지 않았습니다. 지도 탭 시 열리는 링크는
+`https://www.google.com/maps/search/?api=1&query={lat},{lng}` 범용 웹 URL이라 구글맵 앱이
+설치돼 있으면 OS가 자동으로 가로챕니다(커스텀 스킴 불필요) — 기존 `_launchOrganizationUrl()`
+(기부처 상세 링크 전용이었음)을 `_launchExternalUrl()`로 일반화해 재사용합니다.
 
 ### URL 라우팅
 루트 `config/urls.py`가 앱마다 `/api/<앱명>/` prefix로 각 앱의 `urls.py`를 include합니다
@@ -1119,12 +1135,15 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   매뉴얼 질문 1개(근거 기반 답변) + 매뉴얼 밖 질문 4개(거부 없이 답변) 실 Gemini 응답을 재확인함.
   Render 반영에는 **`requirements.txt` 커밋 후 재배포가 필요**(Render는 배포 시 `pip install -r
   requirements.txt`를 다시 돌림). `diary`의 사진 → 일러스트 변환(`gemini-2.5-flash-image`,
-  위 "일지 사진 → 일러스트 변환" 참고)은 프롬프트를 동화풍 스타일 키워드로 강화까지 마쳤지만, 코드/
-  폴백 경로만 실서버로 검증됐을 뿐 실제 변환 성공 사례는 아직 확인하지 못했음 — 한동안 이 프로젝트
-  API 키가 월간 지출 한도(`429 ... exceeded its monthly spending cap`)로 모든 Gemini 호출이 막혀
-  있었으나, 2026-08-26 기준 텍스트 모델(`gemini-2.5-flash`) 호출은 위 chatbot 재검증에서 정상 동작
-  확인 — 즉 한도는 풀린 것으로 보이나 이미지 생성 모델(`gemini-2.5-flash-image`)과 `sensor`의
-  `gemini_diagnosis`는 이번에 따로 재확인하지 않았으므로, 일러스트 변환은 여전히 별도 재검증 필요
+  위 "일지 사진 → 일러스트 변환" 참고)은 프롬프트를 동화풍 스타일 키워드로 강화까지 마쳤고,
+  **2026-08-27 로컬 재검증에서 실제 변환 성공을 확인**했습니다(일지 3건 + 완성 신고 1건, 4/4
+  성공 — 원인 진단용 `[Diary]` 로그 추가 후 재현 시도했으나 실패가 재현되지 않음). 한동안 이
+  프로젝트 API 키가 월간 지출 한도(`429 ... exceeded its monthly spending cap`)로 모든 Gemini
+  호출이 막혀 있었으나, 2026-08-26 기준 텍스트 모델(`gemini-2.5-flash`) 호출은 chatbot 재검증에서,
+  2026-08-27 기준 이미지 생성 모델(`gemini-2.5-flash-image`)은 diary 일러스트 재검증에서 각각 정상
+  동작을 확인했습니다 — `sensor`의 `gemini_diagnosis`만 아직 별도 재확인 전입니다. 사용자가 실기기
+  앱에서 겪은 실패 증상은 로컬에서 재현되지 않아 배포 환경(Render)의 `GEMINI_API_KEY` 유효성이
+  다음 확인 대상으로 남아있음(사용자 확인 필요, 위 "일지 사진 → 일러스트 변환" 참고)
 - DB(MySQL) 연결 및 `migrate` 완료 (`.env`에 실제 접속 정보 필요)
 - 프론트엔드: 스플래시(`/splash`, `Hero` 전환) → 로그인, 입양자로 로그인 성공 시마다(1회성이 아님)
   온보딩(3장) 노출, 입양자 플로우(닉네임 입력 포함 회원가입/로그인/홈·게임·타임라인·마이페이지 4탭
