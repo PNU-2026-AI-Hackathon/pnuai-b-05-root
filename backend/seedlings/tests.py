@@ -214,7 +214,7 @@ class SeedlingCompleteViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.seedling.refresh_from_db()
         self.assertTrue(self.seedling.final_photo)
-        mock_convert.assert_called_once_with(self.seedling.final_photo.path)
+        mock_convert.assert_called_once_with(self.seedling.final_photo)
         self.assertTrue(self.seedling.final_illustration)
         with self.seedling.final_illustration.open('rb') as f:
             self.assertEqual(f.read(), b'fake-png-bytes')

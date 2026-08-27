@@ -136,7 +136,7 @@ class SeedlingCompleteView(APIView):
         # 최종 사진 -> 동화풍 일러스트 변환 (diary/views.py의 perform_create와 동일 패턴).
         # 변환은 알림 발송 뒤에 둬서 Gemini 지연이 입양자 알림까지 늦추지 않게 한다.
         if seedling.final_photo:
-            illustration_bytes = convert_to_illustration(seedling.final_photo.path)
+            illustration_bytes = convert_to_illustration(seedling.final_photo)
             if illustration_bytes:
                 seedling.final_illustration.save(
                     f'seedling_{seedling.pk}_final_illustration.png',

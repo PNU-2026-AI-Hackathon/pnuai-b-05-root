@@ -28,13 +28,18 @@ class DiaryCreateView(CreateAPIView):
         diary = serializer.save(grower=user)
 
         if diary.photo:
-            illustration_bytes = convert_to_illustration(diary.photo.path)
-            if illustration_bytes:
-                diary.illustration.save(
-                    f'diary_{diary.pk}_illustration.png',
-                    ContentFile(illustration_bytes),
-                    save=True,
-                )
+            try:
+                illustration_bytes = convert_to_illustration(diary.photo)
+                if illustration_bytes:
+                    diary.illustration.save(
+                        f'diary_{diary.pk}_illustration.png',
+                        ContentFile(illustration_bytes),
+                        save=True,
+                    )
+            except Exception as e:
+                # 사진 읽기/Gemini 변환/일러스트 저장 중 어떤 이유로 실패해도(스토리지 접근
+                # 오류 등) diary는 이미 저장된 뒤이므로 응답은 그대로 성공시킨다.
+                print(f'[Diary] 일러스트 변환 실패: diary={diary.pk} error={e}')
 
 
 class DiaryListView(ListAPIView):
