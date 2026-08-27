@@ -194,10 +194,6 @@ class _AccountSettingsDialogState extends State<AccountSettingsDialog> {
                 ),
               ],
               const SizedBox(height: 4),
-              Text(
-                '아직 실제 알림 종류 제어에는 반영되지 않아요',
-                style: AppTextStyles.caption(fontSize: 11),
-              ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 12),
                 Text(

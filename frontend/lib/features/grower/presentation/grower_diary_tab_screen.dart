@@ -11,6 +11,14 @@ import '../data/grower_repository.dart';
 import 'grower_diary_list_screen.dart';
 import 'grower_seedling_overview.dart';
 
+/// 재배중 묘목이 완료 묘목보다 항상 먼저 오도록 재정렬한다. `List.sort`는 Dart에서 stable을
+/// 보장하지 않으므로, 상태별로 `where()`(원래 순서를 보존)한 결과를 이어붙여 안정적으로
+/// 정렬한다 — 같은 상태 안에서의 순서는 API 응답 순서 그대로 유지된다.
+List<Seedling> _sortByStatus(List<Seedling> seedlings) => [
+  ...seedlings.where((s) => s.status == SeedlingStatus.growing),
+  ...seedlings.where((s) => s.status == SeedlingStatus.completed),
+];
+
 /// "일지" 탭: 예전 대시보드(현재는 "선반 뷰"인 홈 탭으로 대체됨)가 쓰던 것과 동일한
 /// 디자인(통계 3칸 + 담당 묘목 목록 카드)을 쓰되, 카드를 탭하면 완성 신고가 아니라 그
 /// 묘목의 일지 리스트 화면(`GrowerDiaryListScreen`)으로 이동한다. 상단 헤더(이모지+
@@ -44,7 +52,7 @@ class _GrowerDiaryTabScreenState
     });
     try {
       final seedlings = await _repository.fetchSeedlings();
-      setState(() => _seedlings = seedlings);
+      setState(() => _seedlings = _sortByStatus(seedlings));
     } on ApiException catch (e) {
       setState(() => _errorMessage = e.message);
     } finally {
@@ -61,7 +69,7 @@ class _GrowerDiaryTabScreenState
     if (!_hasLoadedOnce) return _load();
     try {
       final seedlings = await _repository.fetchSeedlings();
-      if (mounted) setState(() => _seedlings = seedlings);
+      if (mounted) setState(() => _seedlings = _sortByStatus(seedlings));
     } on ApiException {
       // 재조회 실패 시 기존 목록을 그대로 유지한다.
     }

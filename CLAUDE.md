@@ -554,6 +554,28 @@ enum은 백엔드 문자열 키와 정확히 1:1 대응하도록 `apiValue`/`fro
 `donation-certificate` 화면으로 이동하고(다만 이제 PATCH 성공 **후에만** 이동), 수령 확정 성공
 시에는 인증서가 필요 없으므로 스낵바("수령이 확정됐어요 🧺") + `Navigator.pop()`으로 마무리합니다.
 
+"직접 수령" 카드를 선택하면 그 아래 픽업 장소(부산대학교 IT관) 지도가 나타납니다(`_PickupLocationMap`).
+처음엔 Google Maps Static API(마커를 `markers=` 쿼리 파라미터로 찍는 방식)로 계획했으나, 이
+프로젝트 어디에도 `GOOGLE_MAPS_API_KEY`가 없어 새로 발급이 필요했고, 사용자가 API 키 없는 방식으로
+전환을 요청했습니다. 처음 제안받은 대안(`staticmap.openstreetmap.de`, StaticMapLite)은 DNS 조회
+자체가 실패해 이미 서비스가 죽은 상태임을 확인했고, 대신 **Wikimedia Maps 정적 이미지
+엔드포인트**(`https://maps.wikimedia.org/img/osm-intl,{zoom},{lat},{lng},{width}x{height}.png`)를
+씁니다 — 키 없이 실제 PNG를 반환하는 것을 확인했고, Wikimedia 정책상 정적 이미지의 제3자 임베드는
+승인 없이 허용되지만 OpenStreetMap 저작자 표시(CC BY-SA)가 필요해 카드 하단에 캡션을 붙였습니다.
+이 서비스도 Wikimedia 재단이 자원봉사 성격으로 운영해 공식 SLA는 없으므로(사전 통보 없이 제한/중단
+가능), 장기적으로 불안정해지면 다른 무료 정적 지도 서비스로 교체할 수 있습니다. 이 엔드포인트는
+Google Static Maps와 달리 URL만으로 마커를 찍는 기능이 없어(마커는 별도 GeoJSON 데이터 저장이
+필요한 구조), 대신 지도 중심좌표를 픽업 장소 좌표로 고정하고 `Stack`으로 이미지 위에 Flutter가
+직접 `Icon(Icons.location_on)`을 겹쳐 그립니다 — 핀의 뾰족한 끝(바운딩박스 중심이 아님)이 이미지
+정중앙을 가리키도록 `Transform.translate`로 위로 절반만큼 보정했습니다(`watering_timing_screen.dart`의
+`_centerLineWidth` 보정과 같은 결). 좌표(위도 35.2304, 경도 129.0840)는 부산대학교 IT관의 공개
+도로 주소(부산광역시 금정구 부산대학로63번길 2)를 OpenStreetMap Nominatim으로 지오코딩한
+근사값이라 도로/캠퍼스 단위 정밀도이며, 건물 단위 정밀 검증은 아직 하지 않았습니다. 지도 탭 시
+열리는 링크는 `https://www.google.com/maps/search/?api=1&query={lat},{lng}` 범용 웹 URL이라
+구글맵 앱이 설치돼 있으면 OS가 자동으로 가로챕니다(커스텀 스킴 불필요) — 기존
+`_launchOrganizationUrl()`(기부처 상세 링크 전용이었음)을 `_launchExternalUrl()`로 일반화해
+재사용합니다.
+
 ### URL 라우팅
 루트 `config/urls.py`가 앱마다 `/api/<앱명>/` prefix로 각 앱의 `urls.py`를 include합니다
 (예: `/api/sensor/` → `sensor/urls.py`). 새 앱도 이 컨벤션을 따릅니다.

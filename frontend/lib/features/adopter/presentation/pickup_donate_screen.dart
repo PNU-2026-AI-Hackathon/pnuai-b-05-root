@@ -12,6 +12,28 @@ import 'donation_certificate_screen.dart';
 
 enum _Choice { pickup, donate }
 
+/// 픽업 장소(부산대학교 IT관) 좌표. 공개 도로 주소(부산광역시 금정구 부산대학로63번길 2)를
+/// OpenStreetMap Nominatim으로 지오코딩한 근사값이며, 정밀 검증은 별도로 필요하다.
+const _pickupLat = 35.2304;
+const _pickupLng = 129.0840;
+const _pickupAddress = '부산대학교 IT관';
+
+/// 키 없이 실제 PNG를 반환하는 Wikimedia Maps 정적 이미지 엔드포인트. Google Static Maps API와
+/// 달리 URL만으로는 마커를 찍을 수 없어, 중심좌표를 픽업 장소로 고정하고 이미지 위에 Flutter가
+/// 직접 핀을 그려 겹친다(`_PickupLocationMap` 참고). Wikimedia 정책상 정적 이미지의 제3자
+/// 임베드는 승인 없이 허용되나 OpenStreetMap 저작자 표시가 필요하다. 자원봉사 기반 서비스라
+/// 공식 SLA는 없으므로, 장기적으로 불안정해지면 다른 무료 정적 지도 서비스로 교체할 수 있다.
+String _staticMapUrl(
+  double lat,
+  double lng, {
+  int zoom = 17,
+  int width = 640,
+  int height = 320,
+}) => 'https://maps.wikimedia.org/img/osm-intl,$zoom,$lat,$lng,${width}x$height.png';
+
+final _googleMapsUrl =
+    'https://www.google.com/maps/search/?api=1&query=$_pickupLat,$_pickupLng';
+
 class _Organization {
   const _Organization({
     required this.emoji,
@@ -53,10 +75,10 @@ const _organizations = [
   ),
 ];
 
-/// [organization.url]을 외부 브라우저로 연다. `grower_mypage_screen.dart`의
-/// `_launchContact()`와 동일하게 실행 실패(웹/앱 부재 등)에도 앱이 죽지 않도록
-/// try-catch로 감싸고 스낵바로만 안내한다.
-Future<void> _launchOrganizationUrl(BuildContext context, String url) async {
+/// [url]을 외부 브라우저/앱으로 연다(기부처 상세 링크, 픽업 장소 구글맵 딥링크 양쪽에서 재사용).
+/// `grower_mypage_screen.dart`의 `_launchContact()`와 동일하게 실행 실패(웹/앱 부재 등)에도
+/// 앱이 죽지 않도록 try-catch로 감싸고 스낵바로만 안내한다.
+Future<void> _launchExternalUrl(BuildContext context, String url) async {
   final messenger = ScaffoldMessenger.of(context);
   try {
     final launched = await launchUrl(
@@ -275,6 +297,19 @@ class _PickupDonateScreenState extends State<PickupDonateScreen> {
             ],
           ),
         ],
+        if (!isDonate) ...[
+          const SizedBox(height: 16),
+          Text(
+            '픽업 장소',
+            style: AppTextStyles.title(
+              fontSize: 15,
+            ).copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 10),
+          _PickupLocationMap(
+            onTap: () => _launchExternalUrl(context, _googleMapsUrl),
+          ),
+        ],
         if (_submitErrorMessage != null) ...[
           const SizedBox(height: 12),
           Text(
@@ -417,6 +452,92 @@ class _ChoiceCard extends StatelessWidget {
   }
 }
 
+/// 픽업 장소를 보여주는 정적 지도 카드. `_staticMapUrl()`의 중심좌표가 항상 픽업 장소이므로,
+/// 이미지 정중앙에 핀 아이콘을 겹쳐 그리면 실제 마커처럼 보인다(서비스 자체는 URL 파라미터로
+/// 마커를 찍는 기능이 없음). 탭하면 [onTap]으로 구글맵 딥링크를 연다.
+class _PickupLocationMap extends StatelessWidget {
+  const _PickupLocationMap({required this.onTap});
+
+  final VoidCallback onTap;
+
+  static const _pinSize = 36.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFEEEBDF), width: 2),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 160,
+                width: double.infinity,
+                child: Stack(
+                  alignment: Alignment.center,
+                  fit: StackFit.expand,
+                  children: [
+                    Image.network(
+                      _staticMapUrl(_pickupLat, _pickupLng),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: const Color(0xFFF7F5EC),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '지도를 불러올 수 없어요',
+                          style: AppTextStyles.body(
+                            fontSize: 13,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // 핀 끝(뾰족한 하단 중앙)이 이미지 정중앙(=픽업 장소 좌표)을 가리키도록
+                    // 아이콘 바운딩박스를 위로 절반만큼 보정한다.
+                    Transform.translate(
+                      offset: const Offset(0, -_pinSize / 2),
+                      child: const Icon(
+                        Icons.location_on,
+                        color: AppColors.pink500,
+                        size: _pinSize,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _pickupAddress,
+              style: AppTextStyles.body(
+                fontSize: 14,
+              ).copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '탭하면 구글맵으로 길찾기 🧭',
+              style: AppTextStyles.body(fontSize: 12, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '지도 데이터 © OpenStreetMap contributors',
+              style: AppTextStyles.caption(fontSize: 10),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _OrganizationRow extends StatelessWidget {
   const _OrganizationRow({
     required this.organization,
@@ -483,7 +604,7 @@ class _OrganizationRow extends StatelessWidget {
             if (organization.url != null)
               IconButton(
                 onPressed: () =>
-                    _launchOrganizationUrl(context, organization.url!),
+                    _launchExternalUrl(context, organization.url!),
                 icon: const Icon(Icons.open_in_new),
                 iconSize: 18,
                 color: AppColors.textMuted,
