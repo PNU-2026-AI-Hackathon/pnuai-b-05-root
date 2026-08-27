@@ -63,16 +63,18 @@ mock 데이터가 아니라 실제로 연동됐다는 걸 증명하려면 세 �
 
 ## 5. 데모 계정 보호
 
-`backend/seedlings/management/commands/seed_demo.py`로 만든 계정(`adopter@demo.com`,
-`adopter2@demo.com`, `grower@demo.com`, 비밀번호 모두 `demo1234`)과 그 묘목/일지/센서 데이터는
-시연·개발용 고정 데이터다. 다음 같은 파괴적 검증에는 **절대 쓰지 않는다**:
+`backend/seedlings/management/commands/seed_demo.py`로 만든 계정(재배자 `grower@demo.com` +
+입양자 `adopter1@demo.com`~`adopter5@demo.com`, 비밀번호 모두 `demo1234`)과 그 묘목/일지/센서
+데이터는 시연·개발용 고정 데이터다. 다음 같은 파괴적 검증에는 **절대 쓰지 않는다**:
 
 - 회원탈퇴(소프트 삭제라도 `is_active=False`가 되어 데모 흐름이 깨짐)
 - 되돌리기 어려운 상태 전이를 반복 검증하는 것(예: 완성 신고는 멱등하지 않음 — 이미 완료된 묘목으로
   실험하면 이후 시연에서 "완성 신고" 흐름을 다시 보여줄 수 없게 됨)
 
 이런 검증이 필요하면 그 자리에서 임시 계정을 새로 만들어(회원가입) 쓰고, 결과를 확인한 뒤 그대로
-둔다(정리 스크립트 불필요 — 기존 e2e 테스트 계정들도 정리하지 않고 누적돼 있음).
+둔다(정리 스크립트 불필요 — 기존 e2e 테스트 계정들도 정리하지 않고 누적돼 있음). 데모 계정이
+망가졌으면 `PYTHONIOENCODING=utf-8 python manage.py seed_demo`를 다시 돌리면 된다 — 입양자
+계정·데이터는 매 실행마다 삭제 후 재생성되므로 항상 같은 상태로 복구된다(재배자는 유지).
 
 ## 6. 완료 조건
 

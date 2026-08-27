@@ -203,17 +203,33 @@ id가 아니라 일지 id라 같은 URL에 얹으면 의미가 헷갈리기 때�
 
 ### 데모 시드 데이터 (`seedlings/management/commands/seed_demo.py`)
 `python manage.py seed_demo`는 DB가 비어 있어 프론트엔드 화면이 전부 빈 상태로 보일 때 앱 전체
-흐름을 바로 확인할 수 있도록 계정 3개(`adopter@demo.com`/`adopter2@demo.com`/`grower@demo.com`,
-비밀번호 모두 `demo1234`) + 묘목 3개(재배중/완료/다른 입양자 소유 재배중 각 1개, 모두 위 재배자
-담당) + 묘목 #1에 일지 3건(6/20·7/2·7/18로 날짜 분산, 성장 타임라인이 시간 역순으로 보이도록) +
-센서 데이터 6건(정상 5건 + 습도 급등 1건)을 만듭니다. 센서 데이터는 `SensorDataCreateView.
-perform_create()`와 동일하게 `detect_anomaly()`/`build_diagnosis_text()`를 실제로 호출해
-저장하므로(직접 `is_anomaly=True`를 박아넣지 않음), 이력 5건이 쌓인 뒤 마지막 습도 85% 값이
-Prophet 기반 판정으로 실제 이상 감지되고(`GEMINI_API_KEY` 설정 시 `gemini_diagnosis`도 진짜
-Gemini 응답으로 채워짐) "최근 이상 이력"이 재현 가능하게 나타납니다. 멱등하게 동작합니다 — 이메일이
-이미 있는 계정, `(adopter, grower, status)` 조합이 이미 있는 묘목, 일지/센서 데이터가 하나라도
-있는 묘목은 건너뛰므로 재실행해도 중복 생성되지 않습니다. Django 커맨드 규칙에 따라 앱 하나(
-`seedlings`) 아래 두었지만 `accounts`/`diary`/`sensor` 모델을 모두 다룹니다.
+흐름을 바로 확인할 수 있도록 계정 6개(재배자 `grower@demo.com` 닉네임 박재배 + 입양자
+`adopter1@demo.com`~`adopter5@demo.com`, 비밀번호 모두 `demo1234`) + 묘목 5개(전부 위 재배자
+담당) + 묘목당 일지 3~4건 + 센서 데이터 3~4건을 만듭니다. 각 입양자 묘목은 성장 단계가 서로
+다릅니다 — #1 발근 중(rooting)·재배중, #2 잎 성장 중(leafing)·재배중, #3 가지 발달(branching)·
+재배중, #4 묘목 완성(mature)·완료·기부(도시농업 공동체·`height_cm=32`), #5 가지 발달(branching)·
+재배중. **`Seedling`에는 growth_stage 필드가 없고**, 앱이 보여주는 성장 단계는 "그 묘목의 가장
+최근 일지(`created_at` 기준)의 `Diary.growth_stage`"에서 파생되므로(입양자 홈
+`_fetchGrowthStageState`, 재배자 선반 `_latestDiary` 둘 다), 각 묘목의 일지 리스트 마지막(최근)
+항목에 목표 단계를 넣어 만듭니다. 센서 데이터는 `SensorDataCreateView.perform_create()`와 동일하게
+`detect_anomaly()`/`build_diagnosis_text()`를 실제로 호출해 저장하고(직접 `is_anomaly=True`를 박지
+않음), 묘목당 4건 이하라 항상 `FALLBACK_RANGES` 단순 임계값 경로를 탑니다 — 재배자 마이 탭
+"환경 이상 감지 요약"(fl_chart) 비교가 되도록 이상 건수를 #1에 2건(습도·조도)·#3에 1건(온도)·
+#5에 1건(습도)·#2·#4는 0건으로 편차를 줬습니다. `completed_at`·`started_at`(가장 오래된 일지보다
+2일 앞)은 `QuerySet.update()`로 백데이트하며(`auto_now_add` 우회, `Diary.created_at` 백데이트와
+동일 패턴), 완료 알림(`SeedlingCompleteView`)은 API 뷰 안에만 있고 이 ORM create/update 경로는
+거치지 않아 시딩 시 이메일/FCM이 발송되지 않습니다.
+
+**멱등성 (예전과 달라진 점)**: 이제 입양자는 매 실행마다 삭제 후 재생성입니다 — `handle()` 맨
+앞의 `_reset_demo_adopters()`가 구버전 입양자(`adopter@demo.com`/`adopter2@demo.com`/
+`dummy1~3@demo.com`)와 신버전 입양자(`adopter1~5@demo.com`)를 `User.objects.filter(
+email__in=...).delete()`로 삭제하고, 관련 FK가 전부 `on_delete=CASCADE`(+ post_delete 시그널
+없음)라 그 입양자의 묘목/일지/센서/비전 분석이 함께 지워집니다. 재배자(`grower@demo.com`)는
+삭제 목록에 없어 `get_or_create`로 그대로 유지됩니다(비밀번호·닉네임 보존). 따라서 재실행하면
+`Seedling`/`Diary` PK만 계속 증가할 뿐 데이터는 항상 같은 상태로 수렴합니다. Django 커맨드
+규칙에 따라 앱 하나(`seedlings`) 아래 두었지만 `accounts`/`diary`/`sensor` 모델을 모두 다룹니다.
+Windows 콘솔에서는 요약 출력이 cp949 인코딩 에러를 낼 수 있어 `PYTHONIOENCODING=utf-8`로
+실행합니다(데이터 자체는 이미 저장된 뒤라 무해).
 
 ### 일지 사진 → 일러스트 변환 (Gemini 이미지 생성)
 재배자가 일지 작성 시 사진(`Diary.photo`)을 함께 올리면, `diary/gemini_illustration.py`의
