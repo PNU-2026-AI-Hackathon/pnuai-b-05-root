@@ -83,7 +83,7 @@ class DiaryCreateViewTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         diary = Diary.objects.get()
-        mock_convert.assert_called_once_with(diary.photo.path)
+        mock_convert.assert_called_once_with(diary.photo)
         self.assertTrue(diary.illustration)
         with diary.illustration.open('rb') as f:
             self.assertEqual(f.read(), fake_illustration_bytes)
