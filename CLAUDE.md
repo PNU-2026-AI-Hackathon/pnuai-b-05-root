@@ -665,7 +665,12 @@ feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 
   이미 추가됨), 다음에 이 주석을 만지게 되면 함께 정리할 것.
 - 라우팅은 `main.dart`의 `MaterialApp.routes`에 이름 있는 라우트로 전부 등록합니다(중첩 라우터 없음).
   로그인 성공 시 역할이 `adopter`면 `pushReplacementNamed('/adopter')`, `grower`면
-  `pushReplacementNamed('/grower')`로 이동합니다(`login_screen.dart`).
+  `pushReplacementNamed('/grower')`로 이동합니다(`login_screen.dart`). **`routes` 맵으로 등록된
+  라우트는 항상 `MaterialPageRoute<dynamic>`으로 생성되므로 `pushNamed<T>`(타입 인자 명시)를
+  쓰면 안 됩니다** — 내부 `as Route<T?>` 캐스트가 실패해 예외가 나고, 그게 제스처 콜백에서
+  삼켜져 "탭해도 아무 반응 없음"으로 나타납니다(실제로 `home_screen.dart`의 돼지먹이 버튼이
+  `pushNamed<bool>` 때문에 한동안 죽어 있었음). pop 결과값이 필요하면 타입 인자 없이
+  `pushNamed(...)`로 부른 뒤 `result as bool?`처럼 반환값만 캐스팅합니다(`_goToPigFeed` 참고).
 - 케어 화면(`features/adopter/presentation/care/*.dart`) 3종은 각각 다른 제스처로 게이지 값을 올립니다:
   물주기=`onLongPressStart`/`onLongPressEnd`로 타이머 반복 증가, 영양제=`Draggable`/`DragTarget`,
   햇빛=`Slider`. 계획서상 이 케어는 "실제 재배와 분리된 미션형 연출"이라 서버(Django) 저장 대상은 아니라고
