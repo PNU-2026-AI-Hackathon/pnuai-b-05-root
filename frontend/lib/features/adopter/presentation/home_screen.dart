@@ -243,9 +243,15 @@ class _HomeScreenState extends RevalidatableState<HomeScreen> {
   }
 
   Future<void> _goToPigFeed() async {
-    final fed = await Navigator.of(
+    // main.dart가 라우트를 `MaterialApp.routes` 맵으로 등록해 라우트가 항상
+    // `MaterialPageRoute<dynamic>`으로 만들어지므로, `pushNamed<bool>`은 내부의
+    // `as Route<bool?>` 캐스트에서 예외를 던진다(그러면 화면 진입 자체가 안 됨).
+    // 다른 케어 이동(_goToWaterCare 등)과 똑같이 타입 인자 없이 부르고, 반환값만
+    // bool?로 캐스팅해 받는다.
+    final result = await Navigator.of(
       context,
-    ).pushNamed<bool>('/adopter/care/pig-feed');
+    ).pushNamed('/adopter/care/pig-feed');
+    final fed = result as bool?;
     if (fed == true) {
       // _load()가 끝나기 전에 먼저 퇴장 애니메이션을 시작해야, 그 사이 showPig가
       // false로 바뀌어도 isPigExiting 덕분에 돼지가 화면에서 갑자기 사라지지 않는다.
