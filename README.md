@@ -114,15 +114,19 @@ flowchart LR
     FCM["Firebase FCM<br/>푸시 알림"]
 
     User --> FE
-    FE <-->|"REST API · JWT"| API
+    FE --> API
+    API --> FE
     API --> YOLO
     API --> PROPHET
     API --> RAG
     RAG --> GEMINI
     PROPHET --> GEMINI
-    API <--> DB
-    IOT --> MQTT --> API
-    API --> FCM --> FE
+    API --> DB
+    DB --> API
+    IOT --> MQTT
+    MQTT --> API
+    API --> FCM
+    FCM --> FE
 ```
 
 <br/>
