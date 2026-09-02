@@ -47,7 +47,11 @@ AGENTS.md는 새 API 작업 전 아래 두 문서를 먼저 참조하도록 규�
   닉네임·이메일·담당/입양 묘목 수는 실제 서버 데이터(닉네임 수정은 `PATCH /api/accounts/me/`로 실제
   저장)입니다 — 홈 화면의 케어 게이지 3종만 여전히 로컬(서버 미연동)입니다
 - **백엔드**: Django 6.0.7 + Django REST Framework 3.17.1 (djangorestframework-simplejwt로 JWT 인증)
-- **DB**: MySQL 8.0
+- **DB**: MySQL 8.0 (`mysqlclient`). 배포 환경은 `DATABASE_URL` 하나를 `dj-database-url`로 파싱,
+  로컬은 `.env`의 `DB_NAME`/`DB_USER` 등 개별 값으로 폴백 (아래 "배포 환경" 참고)
+- **배포**: Render (`gunicorn`, `Procfile`, `runtime.txt`=python-3.12.4). 정적 파일은 `whitenoise`
+  (`CompressedManifestStaticFilesStorage`), 유저 업로드 미디어는 `CLOUDINARY_URL`이 있으면
+  Cloudinary(`django-cloudinary-storage`), 없으면 로컬 파일시스템 — 아래 "배포 환경" 참고
 - **비전 분석**: YOLOv8-cls — `vision/yolo_inference.py`에서 `backend/vision/weights/best.pt`
   (healthy/infected 이진 분류, val top1 96.1%, 2.9MB로 저장소에 커밋됨)로 실제 추론. 가중치가 없으면
   mock으로 폴백. 프론트엔드도 연동 완료 — 재배자가 일지에 사진을 올리면 저장 직후 같은 사진으로
@@ -611,6 +615,28 @@ OpenStreetMap 데이터 기반이라 저작자 표시(CC BY-SA) 의무는 asset�
 ### URL 라우팅
 루트 `config/urls.py`가 앱마다 `/api/<앱명>/` prefix로 각 앱의 `urls.py`를 include합니다
 (예: `/api/sensor/` → `sensor/urls.py`). 새 앱도 이 컨벤션을 따릅니다.
+
+### 배포 환경 (Render)
+백엔드는 Render에 배포되며, 로컬과 배포의 차이는 전부 `config/settings.py`가 환경변수 유무로
+자동 분기합니다 — 배포 전용 설정 파일은 없습니다.
+
+- **`DEBUG`**: `os.getenv('DEBUG') == 'True'`, 기본 `False`. **`ALLOWED_HOSTS`**: 콤마 구분 환경변수,
+  기본 `localhost,127.0.0.1`.
+- **DB**: `DATABASE_URL`이 있으면 `dj_database_url.parse(...)`(`conn_max_age=600`, `charset=utf8mb4`),
+  없으면 `.env`의 `DB_NAME`/`DB_USER`/`DB_PASSWORD`/`DB_HOST`/`DB_PORT` 개별 값으로 폴백.
+- **정적 파일**: `whitenoise.middleware.WhiteNoiseMiddleware` + `STORAGES['staticfiles']`는 항상
+  `whitenoise.storage.CompressedManifestStaticFilesStorage`. Render 빌드 시 `collectstatic` 실행.
+- **미디어(유저 업로드 이미지 — `Diary.photo`/`illustration`, `Seedling.final_photo` 등)**:
+  `STORAGES['default']`가 `CLOUDINARY_URL` 환경변수 유무로 갈립니다 — 있으면
+  `cloudinary_storage.storage.MediaCloudinaryStorage`(배포, 응답의 이미지 URL이 Cloudinary 호스트로
+  나감), 없으면 `django.core.files.storage.FileSystemStorage`(로컬, `MEDIA_ROOT = BASE_DIR/media`).
+  `cloudinary`/`cloudinary_storage`는 **일부러 `INSTALLED_APPS`에 넣지 않았습니다** — 앱으로 등록하면
+  그 패키지의 `collectstatic` 오버라이드가 Django 4.2+에서 폐지된 `STATICFILES_STORAGE`를 읽으려다
+  `AttributeError`로 배포 시 `collectstatic`을 깨뜨린 전례가 있습니다(settings.py 주석에 상술).
+- **Gemini/FCM 자격증명**: `GEMINI_API_KEY`, `FIREBASE_CREDENTIALS_JSON`(파일 경로 `..._PATH`가 아닌
+  JSON 문자열 통째 — Render Free 플랜은 Shell 접근이 안 돼 파일을 못 올림, 위 "FCM 푸시 알림" 참고).
+- 배포에만 영향을 주는 변경(`requirements.txt` 등)은 Render가 재배포 때 `pip install`을 다시 돌리므로
+  **커밋 후 재배포가 필요**합니다(과거 `chromadb` 누락으로 챗봇이 배포에서만 항상 폴백한 사건).
 
 ### 프론트엔드 구조 (`frontend/lib/`)
 feature-first 구조이며 상태관리 라이브러리(Provider/Riverpod/Bloc) 없이 `StatefulWidget` +
